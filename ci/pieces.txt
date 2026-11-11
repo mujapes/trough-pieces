@@ -4,7 +4,7 @@ charset impl.S to_utf8 named
 cover impl.S check cover_path
 ecdsa impl.S verify
 exchange impl.S public shared
-fill fast.c check fill_path
+fill impl.S check fill_path
 flac reference.c info decode
 font reference.c check draw measure draw_cached
 gif reference.c check size frames delay decode
