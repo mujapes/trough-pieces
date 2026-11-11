@@ -268,15 +268,30 @@ recover:
     subs    x10, x10, #1
     b.ne    4b
     neg     x22, x22
-    ADDR    x25, R2                     // 2^(128 limbs) modulo the modulus, by doubling
+    ldr     x9, [x19, #NB]              // the modulus's length in bits
+    ldr     x10, [x19, #SKIP]
+    add     x9, x9, #64
+    ldrb    w9, [x9, x10]
+    clz     w9, w9
+    sub     w9, w9, #24
+    lsl     x23, x26, #3
+    sub     x23, x23, x9
+    // 2^(128 limbs) modulo the modulus. First 2^(64 limbs + 64): the highest power of two below the modulus, doubled up to it.
+    ADDR    x25, BASE
     mov     x9, #0
 5:  str     xzr, [x25, x9, lsl #3]
     add     x9, x9, #1
     cmp     x9, x21
     b.lo    5b
-    mov     x9, #1
-    str     x9, [x25]
-    lsl     x24, x21, #7
+    sub     x9, x23, #1
+    lsr     x10, x9, #6
+    and     x11, x9, #63
+    mov     x12, #1
+    lsl     x12, x12, x11
+    str     x12, [x25, x10, lsl #3]
+    lsl     x24, x21, #6
+    add     x24, x24, #64
+    sub     x24, x24, x9
 6:  sub     x9, x21, #1
     ldr     x10, [x25, x9, lsl #3]
     lsr     x15, x10, #63
@@ -298,6 +313,33 @@ recover:
     bl      take
 9:  subs    x24, x24, #1
     b.ne    6b
+    // Then that number "to the power of the limb count", in Montgomery's products: each product adds the exponents above 64 limbs.
+    ADDR    x9, R2
+    mov     x11, #0
+1:  ldr     x12, [x25, x11, lsl #3]
+    str     x12, [x9, x11, lsl #3]
+    add     x11, x11, #1
+    cmp     x11, x21
+    b.lo    1b
+    clz     x9, x21
+    mov     x24, #63
+    sub     x24, x24, x9
+r2_bit:
+    subs    x24, x24, #1
+    b.mi    r2_done
+    ADDR    x0, R2
+    mov     x1, x0
+    mov     x2, x0
+    bl      product
+    lsr     x9, x21, x24
+    tbz     x9, #0, r2_bit
+    ADDR    x0, R2
+    ADDR    x1, BASE
+    mov     x2, x0
+    bl      product
+    b       r2_bit
+r2_done:
+    ADDR    x25, R2
     ADDR    x0, S
     mov     x1, x25
     ADDR    x2, BASE
