@@ -11,7 +11,7 @@ gif reference.c check size frames delay decode
 hash impl.S sha256 hmac_sha256 expand_label sha384 sha512
 home impl.S check render hit
 http impl.S status header body packed request
-image reference.c check blit scale smooth stretch
+image impl.S check blit scale smooth stretch
 inflate impl.S size unpack
 jpeg fast2.c check size decode
 listen-step impl.S migrate step
