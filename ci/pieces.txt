@@ -13,7 +13,7 @@ home impl.S check render hit
 http impl.S status header body packed request
 image impl.S check blit scale smooth stretch
 inflate impl.S size unpack
-jpeg fast2.c check size decode
+jpeg impl.S check size decode
 listen-step impl.S migrate step
 page impl.S check render
 paint impl.S check clear fill_rect
