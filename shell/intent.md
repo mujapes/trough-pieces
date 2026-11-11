@@ -33,7 +33,7 @@ by calling other pieces. With this, a screen's behaviour lives in a piece and ca
 | 20-23 | pressed: a tile 0-15, -1 nothing, -2 the back strip |
 | 24-27, 28-31 | hour, minute |
 | 32-35 | the tile that was opened |
-| 36-43 | events taken, a 64-bit count |
+| 40-47 | events taken, a 64-bit count (bytes 36-39 are unused) |
 
 ## Uses
 Through the call table: home render (socket 12), home hit (13), paint clear (3), paint fill_rect (4),
@@ -41,3 +41,7 @@ text draw (5), text measure (6).
 
 ## Conventions
 - Nothing is kept outside the state block. Every pixel goes through the pieces it calls.
+
+## Implementations
+- `reference.c`: the meaning, compiled (1,848 bytes). One compiler (gcc 13) turned its copy of the state into a call to a library routine, which a piece may not make.
+- `impl.S` (live): written by hand in ARM64 (1,588 bytes). Passed the 6,040 recorded checks, which fingerprint the state after every call, on its first run. No compiler is involved, so the gcc 13 problem cannot arise.

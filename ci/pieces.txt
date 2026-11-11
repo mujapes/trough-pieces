@@ -21,7 +21,7 @@ peak impl.S peak
 png fast.c check size decode
 rsa fast.c verify_pkcs1 verify_pss
 seal reference.c seal open
-shell reference.c migrate event render
+shell impl.S migrate event render
 sound-measures impl.S energy climbs
 sound reference.c convert mix resample
 text reference.c check draw measure
