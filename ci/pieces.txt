@@ -6,7 +6,7 @@ ecdsa impl.S verify
 exchange impl.S public shared
 fill impl.S check fill_path
 flac impl.S info decode
-font reference.c check draw measure draw_cached
+font impl.S check draw measure draw_cached
 gif impl.S check size frames delay decode
 hash impl.S sha256 hmac_sha256 expand_label sha384 sha512
 home impl.S check render hit
