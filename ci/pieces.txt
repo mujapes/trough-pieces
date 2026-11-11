@@ -14,7 +14,7 @@ http impl.S status header body packed request
 image reference.c check blit scale smooth stretch
 inflate impl.S size unpack
 jpeg fast2.c check size decode
-listen-step reference.c migrate step
+listen-step impl.S migrate step
 page reference.c check render
 paint impl.S check clear fill_rect
 peak impl.S peak
