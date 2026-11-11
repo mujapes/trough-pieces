@@ -26,3 +26,7 @@ delivers. (The png piece carries the same method inside it for image data.)
 ## Conventions
 - Every read is checked against the packed data's size and every write against the room in the block.
 - No state; calls nothing outside itself.
+
+## Implementations
+- `reference.c`: the meaning, compiled (10,576 bytes, including a table for the CRC).
+- `impl.S` (live): written by hand in ARM64 (2,620 bytes, 25%). Passed the 6,040 recorded checks on its first assembled run, including the cases that fail part-way, where what is left in the output must match. Uses the processor's CRC-32 instruction (needs the "crc32" feature; present on this phone). On a 7.7 MB text, same output as the compiled build, twice as fast for gzip and about 10% faster for zlib (one pinned core).
