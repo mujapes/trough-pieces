@@ -1,0 +1,6 @@
+state 0
+entry skip_ahead 0 0
+entry duck_volume 0 0
+entry filler_wait 0 0
+entry points_wait 0 0
+entry join_wait 0 0

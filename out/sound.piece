@@ -1,0 +1,14 @@
+state 20064
+target mask 200 100
+hold 0 file sound-stereo.fixture
+hold 3 file sound-mono.fixture
+hold 4 file sound-loud.fixture
+hold 5 file sound-odd.fixture
+hold 6 file sound-empty.fixture
+hold 2 block 5 4096
+entry convert 0 0
+entry mix 0 0
+entry resample 0 0
+numbers convert 6 6 range:0:8 pick:1764,1920,882,441,320,640,3840,7680 pick:1,2,2,1,2,1,2,3 pick:1764,1920,1920,882,441,640,7680,1 pick:2,2,2,1,1,2,1,0 pick:256,256,128,90,0,255,1,257
+numbers mix 4 4 range:0:8 pick:256,256,256,128,90,0,255,300 pick:0,0,1,777,4000,9999,12000,-1 pick:0,0,0,0,0,0,0,1
+numbers resample 6 6 range:0:8 pick:1764,1920,882,441,320,640,3840,7680 pick:1,2,2,1,2,1,2,3 pick:1764,1920,1920,882,441,640,7680,1 pick:2,2,2,1,1,2,1,0 pick:256,256,128,90,0,255,1,257

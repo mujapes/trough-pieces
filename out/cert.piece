@@ -1,0 +1,20 @@
+state 4064
+target mask 80 50
+hold 0 file cert-leaf.fixture
+hold 2 file cert-middle.fixture
+hold 3 file cert-wiki.fixture
+hold 4 file cert-google.fixture
+hold 5 file cert-root.fixture
+hold 6 file cert-cut.fixture
+hold 7 file cert-bent.fixture
+hold 8 file cert-name1.fixture
+hold 9 file cert-name2.fixture
+hold 10 file cert-name3.fixture
+hold 11 file cert-name4.fixture
+hold 12 file cert-junk.fixture
+entry number 0 0
+entry bytes 0 0
+entry covers 0 0
+numbers number 2 2 range:0:13 range:-1:10
+numbers bytes 2 2 range:0:13 range:-1:9
+numbers covers 2 2 pick:0,0,3,3,4,6,7,12 pick:8,9,10,11,8,9,0,1

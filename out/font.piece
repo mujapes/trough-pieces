@@ -1,0 +1,14 @@
+state 30784
+target surface 160 48
+hold 0 file font.fixture
+hold 2 block 3 1048576
+hold 3 mask 256 256
+entry check 0 0
+entry draw 0 0
+entry measure 0 0
+entry draw_cached 0 0
+numbers draw 0 22 pick:0,0,0,0,0,0,0,1 range:0:120 range:-40:200 range:-30:80 chars
+numbers measure 0 20 pick:0,0,0,0,0,0,0,1 range:0:120 chars
+numbers draw_cached 0 24 pick:0,0,0,0,0,0,0,1 pick:2,2,2,2,2,2,2,1 pick:3,3,3,3,3,3,3,1 range:0:70 range:-40:200 range:-30:80 chars
+needs 7
+needs 10

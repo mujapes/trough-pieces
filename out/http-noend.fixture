@@ -1,0 +1,3 @@
+HTTP/1.1 200 OK
+Date: never finishes its headers
+Content-Type: x

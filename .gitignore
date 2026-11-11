@@ -1,0 +1,11 @@
+out/*.bin
+out/*.elf
+out/*.o
+out/*.entries
+out/*.check
+
+out/*.pair
+out/vectors
+out/certfuzz
+out/check.txt
+__pycache__/

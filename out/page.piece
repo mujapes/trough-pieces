@@ -1,0 +1,13 @@
+state 76864
+target surface 160 120
+hold 0 file page.fixture
+hold 2 file font.fixture
+hold 3 block 3 1048576
+hold 4 mask 256 256
+entry check 0 0
+entry render 0 0
+numbers render 2 6 pick:0,0,0,0,0,0,0,1 pick:2,2,2,2,2,2,2,1 range:4:40 range:-30:160 pick:3,3,1 pick:4,4,1
+needs 3
+needs 8
+needs 9
+needs 11

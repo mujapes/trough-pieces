@@ -1,0 +1,14 @@
+HTTP/1.1 200 OK
+DATE:   spaced out value  
+transfer-encoding: Chunked
+
+5
+<html
+1
+>
+1e
+<body><h1>Hello</h1><p>A small
+27;ext=1
+ page for the checks.</p></body></html>
+0
+

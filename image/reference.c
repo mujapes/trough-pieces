@@ -1,0 +1,67 @@
+/* The meaning of the piece, written the obvious way. This is also today's implementation. */
+#include <stdint.h>
+#include "../slots.h"
+typedef struct { uint32_t version, width, height, stride; uint64_t size; uint8_t reserved[40]; uint8_t pixels[]; } surface;
+static int sound(const surface *s) { return s->version == 1 && s->width >= 1 && s->width <= 16384 && s->height >= 1 && s->height <= 16384
+        && s->stride == 4 * s->width && s->size == 64 + (uint64_t)s->stride * s->height; }
+int64_t check(surface *s, const int16_t *p, int64_t n, int64_t a, void *const *table) { (void)p; (void)n; (void)a; (void)table; return sound(s); }
+static int over(uint8_t *d, const uint8_t *src) {
+    uint32_t a = src[3]; if (!a) return 0;
+    for (int c = 0; c < 4; c++) { uint32_t S = c == 3 ? 255 : src[c]; d[c] = (uint8_t)((S * a + d[c] * (255 - a) + 127) / 255); }
+    return 1;
+}
+static const surface *source(const surface *dst, const int16_t *p, int64_t n, void *const *table) {
+    const surface *src = (const surface *)TROUGH_BLOCK(table, n > 0 ? p[0] : 0);
+    return src && src != dst && sound(src) ? src : 0;
+}
+int64_t blit(surface *s, const int16_t *p, int64_t n, int64_t unused, void *const *table) { (void)unused;
+    const surface *src = source(s, p, n, table); if (!src) return -1;
+    int64_t x = n > 1 ? p[1] : 0, y = n > 2 ? p[2] : 0, touched = 0;
+    for (int64_t r = 0; r < src->height; r++) { int64_t py = y + r; if (py < 0 || py >= s->height) continue;
+        for (int64_t c = 0; c < src->width; c++) { int64_t px = x + c; if (px < 0 || px >= s->width) continue;
+            touched += over(s->pixels + py * s->stride + px * 4, src->pixels + r * src->stride + c * 4); } }
+    return touched;
+}
+int64_t scale(surface *s, const int16_t *p, int64_t n, int64_t unused, void *const *table) { (void)unused;
+    const surface *src = source(s, p, n, table); if (!src) return -1;
+    int64_t x = n > 1 ? p[1] : 0, y = n > 2 ? p[2] : 0, w = n > 3 ? p[3] : 0, h = n > 4 ? p[4] : 0, touched = 0;
+    if (w <= 0 || h <= 0) return 0;
+    for (int64_t r = 0; r < h; r++) { int64_t py = y + r; if (py < 0 || py >= s->height) continue; int64_t sr = (2 * r + 1) * src->height / (2 * h);
+        for (int64_t c = 0; c < w; c++) { int64_t px = x + c; if (px < 0 || px >= s->width) continue; int64_t sc = (2 * c + 1) * src->width / (2 * w);
+            touched += over(s->pixels + py * s->stride + px * 4, src->pixels + sr * src->stride + sc * 4); } }
+    return touched;
+}
+int64_t smooth(surface *s, const int16_t *p, int64_t n, int64_t unused, void *const *table) { (void)unused;
+    const surface *src = source(s, p, n, table); if (!src) return -1;
+    int64_t x = n > 1 ? p[1] : 0, y = n > 2 ? p[2] : 0, w = n > 3 ? p[3] : 0, h = n > 4 ? p[4] : 0, touched = 0;
+    if (w <= 0 || h <= 0) return 0;
+    for (int64_t r = 0; r < h; r++) { int64_t py = y + r; if (py < 0 || py >= s->height) continue;
+        for (int64_t c = 0; c < w; c++) { int64_t px = x + c; if (px < 0 || px >= s->width) continue;
+            uint32_t sum[3] = {0, 0, 0}, solid = 0;
+            for (int j = 0; j < 4; j++) { int64_t sr = (8 * r + 2 * j + 1) * src->height / (8 * h);
+                for (int i = 0; i < 4; i++) { int64_t sc = (8 * c + 2 * i + 1) * src->width / (8 * w);
+                    const uint8_t *q = src->pixels + sr * src->stride + sc * 4; uint32_t a = q[3];
+                    sum[0] += q[0] * a; sum[1] += q[1] * a; sum[2] += q[2] * a; solid += a; } }
+            if (!solid) continue;
+            uint8_t mixed[4] = { (uint8_t)((sum[0] + solid / 2) / solid), (uint8_t)((sum[1] + solid / 2) / solid), (uint8_t)((sum[2] + solid / 2) / solid), (uint8_t)((solid + 8) / 16) };
+            touched += over(s->pixels + py * s->stride + px * 4, mixed); } }
+    return touched;
+}
+/* Enlarging smoothly: each pixel is a blend of the four source pixels around the point it comes from. */
+int64_t stretch(surface *s, const int16_t *p, int64_t n, int64_t unused, void *const *table) { (void)unused;
+    const surface *src = source(s, p, n, table); if (!src) return -1;
+    int64_t x = n > 1 ? p[1] : 0, y = n > 2 ? p[2] : 0, w = n > 3 ? p[3] : 0, h = n > 4 ? p[4] : 0, touched = 0, W = src->width, H = src->height;
+    if (w <= 0 || h <= 0) return 0;
+    for (int64_t r = 0; r < h; r++) { int64_t py = y + r; if (py < 0 || py >= s->height) continue;
+        int64_t v = (2 * r + 1) * H * 256 / (2 * h) - 128; if (v < 0) v = 0; if (v > (H - 1) * 256) v = (H - 1) * 256; int64_t r0 = v >> 8, fy = v & 255, r1 = r0 + 1 < H ? r0 + 1 : r0;
+        for (int64_t c = 0; c < w; c++) { int64_t px = x + c; if (px < 0 || px >= s->width) continue;
+            int64_t u = (2 * c + 1) * W * 256 / (2 * w) - 128; if (u < 0) u = 0; if (u > (W - 1) * 256) u = (W - 1) * 256; int64_t c0 = u >> 8, fx = u & 255, c1 = c0 + 1 < W ? c0 + 1 : c0;
+            const uint8_t *q[4] = { src->pixels + r0 * src->stride + c0 * 4, src->pixels + r0 * src->stride + c1 * 4, src->pixels + r1 * src->stride + c0 * 4, src->pixels + r1 * src->stride + c1 * 4 };
+            uint64_t weight[4] = { (uint64_t)((256 - fx) * (256 - fy)), (uint64_t)(fx * (256 - fy)), (uint64_t)((256 - fx) * fy), (uint64_t)(fx * fy) }, sum[3] = {0, 0, 0}, solid = 0;
+            for (int i = 0; i < 4; i++) { uint64_t a = weight[i] * q[i][3]; sum[0] += a * q[i][0]; sum[1] += a * q[i][1]; sum[2] += a * q[i][2]; solid += a; }
+            if (!solid) continue;
+            uint8_t mixed[4] = { (uint8_t)((sum[0] + solid / 2) / solid), (uint8_t)((sum[1] + solid / 2) / solid), (uint8_t)((sum[2] + solid / 2) / solid), (uint8_t)((solid + 32768) >> 16) };
+            if (!mixed[3]) continue;
+            touched += over(s->pixels + py * s->stride + px * 4, mixed); } }
+    return touched;
+}

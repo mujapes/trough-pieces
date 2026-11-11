@@ -1,0 +1,19 @@
+state 264
+target mask 20 10
+hold 0 file seal-key.fixture
+hold 2 file seal-key2.fixture
+hold 3 file seal-nonce.fixture
+hold 4 file seal-badkey.fixture
+hold 5 file seal-badnonce.fixture
+hold 6 file seal-extra.fixture
+hold 7 file seal-none.fixture
+hold 8 file seal-short.fixture
+hold 9 file seal-msg64.fixture
+hold 10 file seal-msg100.fixture
+hold 11 file seal-big.fixture
+hold 12 file seal-sealed.fixture
+hold 13 file seal-sealed-none.fixture
+entry seal 0 0
+entry open 0 0
+numbers seal 4 4 pick:0,0,0,0,0,2,4,1 pick:3,3,3,3,3,3,5,1 pick:6,6,6,7,7,8,9,1 pick:9,10,8,7,11,12,13,1
+numbers open 4 4 pick:0,0,0,0,0,2,4,1 pick:3,3,3,3,3,3,5,1 pick:6,6,6,7,7,8,9,1 pick:12,12,12,13,13,10,8,11

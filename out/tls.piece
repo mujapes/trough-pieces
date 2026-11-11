@@ -1,0 +1,45 @@
+state 100160
+target state 100160
+fingerprint all
+hold 0 file tls-seed.fixture
+hold 2 file tls-name.fixture
+hold 3 file tls-server.fixture
+hold 4 file tls-server2.fixture
+hold 5 file tls-corrupt.fixture
+hold 6 file tls-seed2.fixture
+hold 7 block 5 4096
+hold 8 block 5 4096
+hold 9 file tls-request.fixture
+hold 10 file tls-badproof.fixture
+hold 11 file tls-roots.fixture
+hold 12 file tls-wrongroots.fixture
+hold 13 file tls-badsig.fixture
+hold 14 file tls-othername.fixture
+hold 15 file tls-nocert.fixture
+entry migrate 0 0
+entry begin 0 0
+entry feed 1794328081 1794500881
+entry send 0 0
+entry reset 0 0
+numbers begin 3 4 pick:0,0,0,6,6,6,6,1 pick:2,2,2,2,2,2,14,1 pick:7,7,7,7,7,7,7,1 pick:0,0,0,2,2,2,1,3
+numbers feed 3 4 pick:3,3,4,4,10,13,15,5 pick:7,7,7,7,7,7,7,1 pick:8,8,8,8,8,8,8,1 pick:11,11,11,11,11,11,12,3
+numbers send 2 2 pick:9,9,9,9,2,3,1,1 pick:7,7,7,7,7,7,7,1
+needs 14
+needs 15
+needs 16
+needs 17
+needs 18
+needs 19
+needs 20
+needs 21
+needs 22
+needs 23
+needs 24
+needs 25
+needs 26
+needs 27
+needs 28
+needs 29
+needs 30
+needs 34
+needs 35

@@ -1,0 +1,17 @@
+state 128
+target mask 8 8
+hold 0 file exchange-a.fixture
+hold 2 file exchange-b.fixture
+hold 3 file exchange-c.fixture
+hold 4 file exchange-ones.fixture
+hold 5 file exchange-zero.fixture
+hold 6 file exchange-one.fixture
+hold 7 file exchange-low.fixture
+hold 8 file exchange-top.fixture
+hold 9 file exchange-short.fixture
+hold 10 file exchange-long.fixture
+hold 11 file exchange-nine.fixture
+entry public 0 0
+entry shared 0 0
+numbers public 1 1 range:0:12
+numbers shared 2 2 range:0:12 range:0:12

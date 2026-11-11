@@ -1,0 +1,8 @@
+state 12352
+surface 64 48
+style image
+entry check 0 0
+entry blit 0 0
+entry scale 0 0
+entry smooth 0 0
+entry stretch 0 0

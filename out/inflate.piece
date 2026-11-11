@@ -1,0 +1,15 @@
+state 16064
+target mask 160 100
+hold 0 file inflate-gzip-text.fixture
+hold 3 file inflate-gzip-fast.fixture
+hold 4 file inflate-zlib-text.fixture
+hold 5 file inflate-zlib-stored.fixture
+hold 6 file inflate-raw.fixture
+hold 7 file inflate-gzip-empty.fixture
+hold 8 file inflate-gzip-cut.fixture
+hold 9 file inflate-gzip-corrupt.fixture
+hold 10 file inflate-gzip-wrong-length.fixture
+entry size 0 0
+entry unpack 0 0
+numbers size 1 1 range:0:11
+numbers unpack 1 1 range:0:11

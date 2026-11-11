@@ -1,0 +1,23 @@
+state 128
+target mask 8 8
+hold 0 file hash-0.fixture
+hold 2 file hash-1.fixture
+hold 3 file hash-55.fixture
+hold 4 file hash-56.fixture
+hold 5 file hash-63.fixture
+hold 6 file hash-64.fixture
+hold 7 file hash-65.fixture
+hold 8 file hash-119.fixture
+hold 9 file hash-131.fixture
+hold 10 file hash-1000.fixture
+hold 11 file hash-4097.fixture
+entry sha256 0 0
+entry hmac_sha256 0 0
+entry expand_label 0 0
+entry sha384 0 0
+entry sha512 0 0
+numbers sha256 1 1 range:0:13
+numbers hmac_sha256 2 2 range:0:13 range:0:13
+numbers expand_label 4 4 range:0:13 pick:0,2,3,4,5,6,7,10 pick:0,0,2,3,5,7,9,10 pick:1,12,16,32,48,64,0,65
+numbers sha384 1 1 range:0:13
+numbers sha512 1 1 range:0:13

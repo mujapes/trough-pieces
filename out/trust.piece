@@ -1,0 +1,30 @@
+state 128
+target mask 8 8
+hold 0 file trust-name.fixture
+hold 2 file trust-roots.fixture
+hold 3 file trust-leaf.fixture
+hold 4 file trust-mid2.fixture
+hold 5 file trust-mid1.fixture
+hold 6 file trust-plain2.fixture
+hold 7 file trust-nosign2.fixture
+hold 8 file trust-old2.fixture
+hold 9 file trust-short1.fixture
+hold 10 file trust-forgedleaf.fixture
+hold 11 file trust-rsaforged.fixture
+hold 12 file trust-content.fixture
+hold 13 file trust-ecsig.fixture
+hold 14 file trust-p384sig.fixture
+hold 15 file trust-rsasig.fixture
+entry chain 1794153162 1795449162
+entry signed_handshake 0 0
+numbers chain 3 5 pick:0,0,0,0,0,0,12,1 pick:2,2,2,2,2,2,2,0 pick:3,3,3,3,10,11,4,1 pick:4,4,6,7,8,5,3,1 pick:5,5,5,5,9,9,4,1
+numbers signed_handshake 4 4 pick:3,3,11,11,5,5,4,1 pick:1027,1027,2052,2052,1283,1283,0,2053 pick:12,12,12,12,12,12,0,1 pick:13,13,15,15,14,14,12,15
+needs 14
+needs 21
+needs 22
+needs 23
+needs 24
+needs 25
+needs 26
+needs 27
+needs 28

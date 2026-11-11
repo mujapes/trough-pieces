@@ -1,0 +1,6 @@
+HTTP/1.1 200 OK
+Date: Tue, 10 Nov 2026 08:00:00 GMT
+Content-Type: text/html
+Content-Length: 75
+
+<html><body><h1>Hello</h1><p>A small page for the checks.</p></body></html>TRAILING JUNK

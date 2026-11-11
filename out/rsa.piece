@@ -1,0 +1,19 @@
+state 128
+target mask 8 8
+hold 0 file rsa-n.fixture
+hold 2 file rsa-e.fixture
+hold 3 file rsa-sig.fixture
+hold 4 file rsa-digest.fixture
+hold 5 file rsa-pss.fixture
+hold 6 file rsa-sig384.fixture
+hold 7 file rsa-digest384.fixture
+hold 8 file rsa-badsig.fixture
+hold 9 file rsa-otherdigest.fixture
+hold 10 file rsa-n4096.fixture
+hold 11 file rsa-sig4096.fixture
+hold 12 file rsa-pss4096.fixture
+entry verify_pkcs1 0 0
+entry verify_pss 0 0
+numbers verify_pkcs1 4 4 pick:0,0,0,0,10,10,2,1 pick:2,2,2,2,2,2,4,1 pick:3,3,6,8,11,5,12,1 pick:4,4,4,7,9,7,3,1
+numbers verify_pss 4 4 pick:0,0,0,0,10,10,2,1 pick:2,2,2,2,2,2,4,1 pick:5,5,5,8,12,3,11,1 pick:4,4,4,4,9,7,3,1
+needs 14

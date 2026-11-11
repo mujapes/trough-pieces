@@ -1,0 +1,5 @@
+state 3136
+target mask 64 48
+entry check 0 0
+entry cover_path 0 0
+numbers cover_path 13 13 fixed:6 range:-200:1200

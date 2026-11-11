@@ -1,0 +1,9 @@
+state 96064
+surface 120 200
+entry check 0 0
+entry render 0 0
+entry hit 0 0
+needs 3
+needs 4
+needs 5
+needs 6

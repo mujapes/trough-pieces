@@ -1,0 +1,43 @@
+# The call table: numbered sockets through which one piece reaches another. A number, once given, is never
+# reused for something else (like a system call number). The host keeps each socket pointing at the current
+# implementation; a piece calls through the table it is handed and never holds an address of its own.
+# Sockets 0-255 are code. Sockets 256-511 are HANDLES: each holds the address of a block of memory the host owns
+# (a picture today; files and fonts later), or nothing. A piece given handle h reads socket 256 + h, and must
+# check what it finds there before using it. The host fills and empties handles; pieces never do.
+# <slot> <piece> <entry>
+0 sound-measures energy
+1 sound-measures climbs
+2 peak peak
+3 paint clear
+4 paint fill_rect
+5 text draw
+6 text measure
+7 fill fill_path
+8 font draw
+9 font measure
+10 cover cover_path
+11 font draw_cached
+12 home render
+13 home hit
+14 hash sha256
+15 hash hmac_sha256
+16 hash expand_label
+17 seal seal
+18 seal open
+19 exchange public
+20 exchange shared
+21 hash sha384
+22 hash sha512
+23 cert number
+24 cert bytes
+25 cert covers
+26 rsa verify_pkcs1
+27 rsa verify_pss
+28 ecdsa verify
+29 trust chain
+30 trust signed_handshake
+31 url resolve
+32 url part
+33 url port
+34 aesgcm seal
+35 aesgcm open

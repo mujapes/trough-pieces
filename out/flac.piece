@@ -1,0 +1,20 @@
+state 20064
+target mask 200 100
+hold 0 file flac-fixed.fixture
+hold 3 file flac-best.fixture
+hold 4 file flac-mono.fixture
+hold 5 file flac-noise.fixture
+hold 6 file flac-quiet.fixture
+hold 7 file flac-flat.fixture
+hold 8 file flac-long.fixture
+hold 9 file flac-deep.fixture
+hold 10 file flac-cut.fixture
+hold 11 file flac-corrupt.fixture
+hold 12 file flac-not.fixture
+hold 13 file flac-rightside.fixture
+hold 14 file flac-wasted.fixture
+hold 2 block 5 70000
+entry info 0 0
+entry decode 0 0
+numbers info 2 2 range:0:16 range:-1:5
+numbers decode 1 2 range:0:16 pick:2,2,2,2,2,2,2,1

@@ -1,0 +1,22 @@
+state 4864
+target surface 40 30
+hold 0 file png.fixture
+hold 3 file png-rgb.fixture
+hold 4 file png-greya.fixture
+hold 5 file png-palette.fixture
+hold 6 file png-grey.fixture
+hold 7 file png-chunks.fixture
+hold 8 file png-stored.fixture
+hold 9 file png-fixed.fixture
+hold 10 file png-cut.fixture
+hold 11 file png-corrupt.fixture
+hold 12 file png-deep-interlaced-alpha.fixture
+hold 13 file png-bits1.fixture
+hold 14 file png-bits4-palette.fixture
+hold 15 file png-transparent.fixture
+hold 2 block 5 37024
+entry check 0 0
+entry size 0 0
+entry decode 0 0
+numbers size 1 1 range:0:16
+numbers decode 1 2 range:0:16 pick:2,2,2,2,2,2,2,1

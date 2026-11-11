@@ -1,0 +1,14 @@
+name: checks
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: gcc --version | head -1 && grep -m1 Features /proc/cpuinfo | tr ' ' '\n' | grep -E '^(aes|pmull|sha2|asimd)$' | tr '\n' ' '
+      - name: Rebuild every piece and replay its recorded checks
+        run: ./ci/run.sh

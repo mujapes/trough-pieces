@@ -1,0 +1,18 @@
+state 7744
+target surface 48 40
+hold 0 file jpeg-full.fixture
+hold 4 file jpeg-half.fixture
+hold 5 file jpeg-wide.fixture
+hold 6 file jpeg-grey.fixture
+hold 7 file jpeg-restart.fixture
+hold 8 file jpeg-progressive.fixture
+hold 9 file jpeg-cut.fixture
+hold 10 file jpeg-corrupt.fixture
+hold 11 file jpeg-progressive-scans.fixture
+hold 12 file jpeg-progressive-restart.fixture
+hold 2 block 5 40000
+entry check 0 0
+entry size 0 0
+entry decode 0 0
+numbers size 1 1 range:0:14
+numbers decode 1 2 range:0:14 pick:2,2,2,2,2,2,2,1

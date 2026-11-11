@@ -1,0 +1,27 @@
+state 16064
+target mask 160 100
+hold 0 file http-real.fixture
+hold 3 file http-length.fixture
+hold 4 file http-chunked.fixture
+hold 5 file http-bare.fixture
+hold 6 file http-packed.fixture
+hold 7 file http-short.fixture
+hold 8 file http-badchunk.fixture
+hold 9 file http-notreply.fixture
+hold 10 file http-noend.fixture
+hold 11 file http-address1.fixture
+hold 12 file http-address2.fixture
+hold 13 file http-address3.fixture
+hold 14 file http-address4.fixture
+entry status 0 0
+entry header 0 0
+entry body 0 0
+entry packed 0 0
+entry request 0 0
+numbers status 1 1 range:0:11
+numbers header 1 5 range:0:11 fixed:100 fixed:65 fixed:116 fixed:69
+numbers body 1 1 range:0:11
+numbers packed 1 1 range:0:11
+numbers request 1 1 range:0:16
+needs 32
+needs 33

@@ -1,0 +1,16 @@
+state 128
+target mask 8 8
+hold 0 file ecdsa-x256.fixture
+hold 2 file ecdsa-y256.fixture
+hold 3 file ecdsa-r256.fixture
+hold 4 file ecdsa-s256.fixture
+hold 5 file ecdsa-d256.fixture
+hold 6 file ecdsa-x384.fixture
+hold 7 file ecdsa-y384.fixture
+hold 8 file ecdsa-r384.fixture
+hold 9 file ecdsa-s384.fixture
+hold 10 file ecdsa-d384.fixture
+hold 11 file ecdsa-badr.fixture
+hold 12 file ecdsa-otherd.fixture
+entry verify 0 0
+numbers verify 6 6 pick:256,256,256,256,384,384,384,255 pick:0,0,0,0,6,6,2,1 pick:2,2,2,2,7,7,0,1 pick:3,3,3,11,8,8,4,1 pick:4,4,4,4,9,9,3,1 pick:5,5,5,12,10,10,10,1

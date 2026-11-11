@@ -1,0 +1,23 @@
+state 4064
+target mask 80 50
+hold 0 file url-base1.fixture
+hold 2 file url-base2.fixture
+hold 3 file url-base3.fixture
+hold 4 file url-up.fixture
+hold 5 file url-mixed.fixture
+hold 6 file url-abs.fixture
+hold 7 file url-site.fixture
+hold 8 file url-full.fixture
+hold 9 file url-query.fixture
+hold 10 file url-frag.fixture
+hold 11 file url-empty.fixture
+hold 12 file url-far.fixture
+hold 13 file url-semi.fixture
+hold 14 file url-long.fixture
+hold 15 file url-mail.fixture
+entry resolve 0 0
+entry part 0 0
+entry port 0 0
+numbers resolve 2 2 pick:0,0,0,2,2,3,3,4 range:0:16
+numbers part 2 2 range:0:16 range:-1:6
+numbers port 1 1 range:0:16

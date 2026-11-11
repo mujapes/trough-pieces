@@ -1,0 +1,31 @@
+aesgcm fast.c seal open
+cert reference.c number bytes covers
+charset reference.c to_utf8 named
+cover reference.c check cover_path
+ecdsa fast.c verify
+exchange reference.c public shared
+fill fast.c check fill_path
+flac reference.c info decode
+font reference.c check draw measure draw_cached
+gif reference.c check size frames delay decode
+hash fast.c sha256 hmac_sha256 expand_label sha384 sha512
+home reference.c check render hit
+http reference.c status header body packed request
+image reference.c check blit scale smooth stretch
+inflate reference.c size unpack
+jpeg fast2.c check size decode
+listen-step reference.c migrate step
+page reference.c check render
+paint impl.S check clear fill_rect
+peak impl.S peak
+png fast.c check size decode
+rsa fast.c verify_pkcs1 verify_pss
+seal reference.c seal open
+shell reference.c migrate event render
+sound-measures impl.S energy climbs
+sound reference.c convert mix resample
+text reference.c check draw measure
+tls reference.c migrate begin feed send reset
+trust reference.c chain signed_handshake
+url reference.c resolve part port
+voice-policy reference.c skip_ahead duck_volume filler_wait points_wait join_wait

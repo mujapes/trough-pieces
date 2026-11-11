@@ -1,0 +1,5 @@
+state 12352
+surface 64 48
+entry check 0 0
+entry clear 0 0
+entry fill_rect 0 0

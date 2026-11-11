@@ -1,0 +1,20 @@
+state 4864
+target surface 40 30
+hold 0 file gif-still.fixture
+hold 3 file gif-interlaced-clear.fixture
+hold 4 file gif-two.fixture
+hold 5 file gif-wide.fixture
+hold 6 file gif-animation.fixture
+hold 7 file gif-cut.fixture
+hold 8 file gif-corrupt.fixture
+hold 9 file gif-not.fixture
+hold 2 block 5 30000
+entry check 0 0
+entry size 0 0
+entry frames 0 0
+entry delay 0 0
+entry decode 0 0
+numbers size 1 1 range:0:11
+numbers frames 1 1 range:0:11
+numbers delay 2 2 range:0:11 range:-1:7
+numbers decode 2 3 range:0:11 pick:2,2,2,2,2,2,2,1 range:-1:7

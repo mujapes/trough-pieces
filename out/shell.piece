@@ -1,0 +1,15 @@
+state 512
+target state 512
+fingerprint all
+hold 2 surface 120 200
+entry migrate 0 0
+entry event 0 0
+entry render 0 0
+numbers event 0 5 pick:1,1,2,3,3,4,5,9 range:-20:200 range:-20:260 range:-3:30 range:-5:70
+numbers render 0 1 pick:2,2,2,2,1
+needs 3
+needs 4
+needs 5
+needs 6
+needs 12
+needs 13

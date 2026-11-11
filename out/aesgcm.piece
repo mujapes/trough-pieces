@@ -1,0 +1,19 @@
+state 464
+target mask 20 20
+hold 0 file aesgcm-key.fixture
+hold 2 file aesgcm-key2.fixture
+hold 3 file aesgcm-nonce.fixture
+hold 4 file aesgcm-badkey.fixture
+hold 5 file aesgcm-badnonce.fixture
+hold 6 file aesgcm-extra.fixture
+hold 7 file aesgcm-none.fixture
+hold 8 file aesgcm-short.fixture
+hold 9 file aesgcm-msg64.fixture
+hold 10 file aesgcm-msg100.fixture
+hold 11 file aesgcm-big.fixture
+hold 12 file aesgcm-sealed.fixture
+hold 13 file aesgcm-sealed2.fixture
+entry seal 0 0
+entry open 0 0
+numbers seal 4 4 pick:0,0,0,2,2,2,4,1 pick:3,3,3,3,3,3,5,1 pick:6,6,6,7,7,8,9,1 pick:9,10,8,7,11,12,13,1
+numbers open 4 4 pick:0,0,0,2,2,2,4,1 pick:3,3,3,3,3,3,5,1 pick:6,6,6,7,7,8,9,1 pick:12,12,12,13,13,13,10,11
