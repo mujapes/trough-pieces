@@ -534,133 +534,118 @@ s_slow:                                 // a longer code, or none: bit by bit, a
 
 @KERNEL@
 // idct: the inverse transform of the 8 by 8 square of 32-bit values at x27, as dots at x28, rows STRIDE apart. Whole numbers,
-// the widely used "slow integer" method. Uses everything below x18, and x29, x30 (the return address waits in the frame).
+// the widely used "slow integer" method, four values at a time: the columns in two halves, then the rows four at once (the
+// square turned on its side in the registers and turned back as the dots are written). Uses x16, x17, v0-v7, v16-v31.
+    // TURN: four registers holding four rows become four registers holding four columns. Uses v28-v31.
+    .macro  TURN a, b, c, d
+    trn1    v28.4s, \a\().4s, \b\().4s
+    trn2    v29.4s, \a\().4s, \b\().4s
+    trn1    v30.4s, \c\().4s, \d\().4s
+    trn2    v31.4s, \c\().4s, \d\().4s
+    trn1    \a\().2d, v28.2d, v30.2d
+    trn1    \b\().2d, v29.2d, v31.2d
+    trn2    \c\().2d, v28.2d, v30.2d
+    trn2    \d\().2d, v29.2d, v31.2d
+    .endm
+    // RESULT: \x plus or minus \t, with the rounding in v26, shifted down -> \dst
+    .macro  COLOUT dst, op, x, t
+    \op     \dst\().4s, \x\().4s, \t\().4s
+    add     \dst\().4s, \dst\().4s, v26.4s
+    sshr    \dst\().4s, \dst\().4s, #10
+    .endm
+    .macro  ROWOUT dst, op, x, t
+    \op     \dst\().4s, \x\().4s, \t\().4s
+    add     \dst\().4s, \dst\().4s, v26.4s
+    sshr    \dst\().4s, \dst\().4s, #17
+    sqxtun  \dst\().4h, \dst\().4s      // squeezed into what a dot can hold: 0 to 255
+    uqxtn   \dst\().8b, \dst\().8h
+    .endm
+    // COLUMNS: four columns of the square (starting \at bytes into each row), transformed in place
+    .macro  COLUMNS at
+    ldr     q0, [x27, #(0 + \at)]
+    ldr     q1, [x27, #(32 + \at)]
+    ldr     q2, [x27, #(64 + \at)]
+    ldr     q3, [x27, #(96 + \at)]
+    ldr     q4, [x27, #(128 + \at)]
+    ldr     q5, [x27, #(160 + \at)]
+    ldr     q6, [x27, #(192 + \at)]
+    ldr     q7, [x27, #(224 + \at)]
+    VKERNEL
+    COLOUT  v0, add, v16, v1
+    COLOUT  v20, sub, v16, v1
+    COLOUT  v2, add, v17, v3
+    COLOUT  v21, sub, v17, v3
+    COLOUT  v4, add, v18, v5
+    COLOUT  v22, sub, v18, v5
+    COLOUT  v6, add, v19, v7
+    COLOUT  v23, sub, v19, v7
+    str     q0, [x27, #(0 + \at)]
+    str     q2, [x27, #(32 + \at)]
+    str     q4, [x27, #(64 + \at)]
+    str     q6, [x27, #(96 + \at)]
+    str     q23, [x27, #(128 + \at)]
+    str     q22, [x27, #(160 + \at)]
+    str     q21, [x27, #(192 + \at)]
+    str     q20, [x27, #(224 + \at)]
+    .endm
+    // ROWS: four rows of the square (starting at row \first), transformed and written as dots
+    .macro  ROWS first
+    ldr     q0, [x27, #(32 * \first)]
+    ldr     q1, [x27, #(32 * \first + 32)]
+    ldr     q2, [x27, #(32 * \first + 64)]
+    ldr     q3, [x27, #(32 * \first + 96)]
+    ldr     q4, [x27, #(32 * \first + 16)]
+    ldr     q5, [x27, #(32 * \first + 48)]
+    ldr     q6, [x27, #(32 * \first + 80)]
+    ldr     q7, [x27, #(32 * \first + 112)]
+    TURN    v0, v1, v2, v3
+    TURN    v4, v5, v6, v7
+    VKERNEL
+    ROWOUT  v0, add, v16, v1            // dot 0 of each of the four rows; then 7, 1, 6, 2, 5, 3, 4
+    ROWOUT  v20, sub, v16, v1
+    ROWOUT  v2, add, v17, v3
+    ROWOUT  v21, sub, v17, v3
+    ROWOUT  v4, add, v18, v5
+    ROWOUT  v22, sub, v18, v5
+    ROWOUT  v6, add, v19, v7
+    ROWOUT  v23, sub, v19, v7
+    zip1    v0.8b, v0.8b, v2.8b         // dots 0 and 1 of each row, side by side
+    zip1    v4.8b, v4.8b, v6.8b         // dots 2 and 3
+    zip1    v0.8h, v0.8h, v4.8h         // dots 0 to 3 of each row
+    zip1    v23.8b, v23.8b, v22.8b      // dots 4 and 5
+    zip1    v21.8b, v21.8b, v20.8b      // dots 6 and 7
+    zip1    v23.8h, v23.8h, v21.8h      // dots 4 to 7 of each row
+    ldr     x16, [sp]                   // the distance between rows (the kernel used w16 for its constants)
+    st1     {v0.s}[0], [x28]
+    add     x17, x28, #4
+    st1     {v23.s}[0], [x17]
+    add     x28, x28, x16
+    st1     {v0.s}[1], [x28]
+    add     x17, x28, #4
+    st1     {v23.s}[1], [x17]
+    add     x28, x28, x16
+    st1     {v0.s}[2], [x28]
+    add     x17, x28, #4
+    st1     {v23.s}[2], [x17]
+    add     x28, x28, x16
+    st1     {v0.s}[3], [x28]
+    add     x17, x28, #4
+    st1     {v23.s}[3], [x17]
+    add     x28, x28, x16
+    .endm
 idct:
-    str     x30, [x19, #IDCT_LR]
-    ADDR    x30, VBUF
-    mov     x29, #0
-i_col:
-    add     x16, x27, x29, lsl #2
-    ldr     w0, [x16]
-    ldr     w1, [x16, #32]
-    ldr     w2, [x16, #64]
-    ldr     w3, [x16, #96]
-    ldr     w4, [x16, #128]
-    ldr     w5, [x16, #160]
-    ldr     w6, [x16, #192]
-    ldr     w7, [x16, #224]
-    orr     w8, w1, w2
-    orr     w9, w3, w4
-    orr     w10, w5, w6
-    orr     w8, w8, w7
-    orr     w9, w9, w10
-    orr     w8, w8, w9
-    add     x16, x30, x29, lsl #2
-    cbnz    w8, 1f
-    lsl     w0, w0, #12                 // a column with only its first value: every result is the same
-    add     w0, w0, #512
-    asr     w0, w0, #10
-    str     w0, [x16]
-    str     w0, [x16, #32]
-    str     w0, [x16, #64]
-    str     w0, [x16, #96]
-    str     w0, [x16, #128]
-    str     w0, [x16, #160]
-    str     w0, [x16, #192]
-    str     w0, [x16, #224]
-    b       2f
-1:  KERNEL
-    add     x16, x30, x29, lsl #2
-    add     w8, w8, #512
-    add     w9, w9, #512
-    add     w10, w10, #512
-    add     w11, w11, #512
-    add     w12, w8, w1
-    asr     w12, w12, #10
-    str     w12, [x16]
-    sub     w12, w8, w1
-    asr     w12, w12, #10
-    str     w12, [x16, #224]
-    add     w12, w9, w3
-    asr     w12, w12, #10
-    str     w12, [x16, #32]
-    sub     w12, w9, w3
-    asr     w12, w12, #10
-    str     w12, [x16, #192]
-    add     w12, w10, w5
-    asr     w12, w12, #10
-    str     w12, [x16, #64]
-    sub     w12, w10, w5
-    asr     w12, w12, #10
-    str     w12, [x16, #160]
-    add     w12, w11, w7
-    asr     w12, w12, #10
-    str     w12, [x16, #96]
-    sub     w12, w11, w7
-    asr     w12, w12, #10
-    str     w12, [x16, #128]
-2:  add     x29, x29, #1
-    cmp     x29, #8
-    b.lo    i_col
-    mov     x29, #0
-i_row:
-    add     x16, x30, x29, lsl #5
-    ldp     w0, w1, [x16]
-    ldp     w2, w3, [x16, #8]
-    ldp     w4, w5, [x16, #16]
-    ldp     w6, w7, [x16, #24]
-    orr     w8, w1, w2
-    orr     w9, w3, w4
-    orr     w10, w5, w6
-    orr     w8, w8, w7
-    orr     w9, w9, w10
-    orr     w8, w8, w9
-    cbnz    w8, 3f
-    lsl     w0, w0, #12                 // a row with only its first value: eight dots alike
-    mov     w16, #0x1000000
-    add     w16, w16, #0x10000
-    add     w0, w0, w16
-    asr     w0, w0, #17
-    cmp     w0, #0
-    csel    w0, wzr, w0, lt
-    cmp     w0, #255
-    mov     w13, #255
-    csel    w0, w13, w0, gt
-    ldr     x13, =0x0101010101010101
-    mul     x0, x0, x13
-    str     x0, [x28]
-    b       4f
-3:  KERNEL
+    mov     w16, #512
+    dup     v26.4s, w16
+    COLUMNS 0
+    COLUMNS 16
     mov     w16, #0x1000000
     add     w16, w16, #0x10000          // rounding, and the 128 that centres the values
-    add     w8, w8, w16
-    add     w9, w9, w16
-    add     w10, w10, w16
-    add     w11, w11, w16
-    .macro  DOT a, op, b, at
-    \op     w12, \a, \b
-    asr     w12, w12, #17
-    cmp     w12, #0
-    csel    w12, wzr, w12, lt
-    cmp     w12, #255
-    mov     w13, #255
-    csel    w12, w13, w12, gt
-    strb    w12, [x28, #\at]
-    .endm
-    DOT     w8, add, w1, 0
-    DOT     w8, sub, w1, 7
-    DOT     w9, add, w3, 1
-    DOT     w9, sub, w3, 6
-    DOT     w10, add, w5, 2
-    DOT     w10, sub, w5, 5
-    DOT     w11, add, w7, 3
-    DOT     w11, sub, w7, 4
-4:  ldr     w16, [x19, #STRIDE]
-    add     x28, x28, x16
-    add     x29, x29, #1
-    cmp     x29, #8
-    b.lo    i_row
-    ldr     x30, [x19, #IDCT_LR]
+    dup     v26.4s, w16
+    ldr     w16, [x19, #STRIDE]
+    stp     x16, x30, [sp, #-16]!
+    ROWS    0
+    ROWS    4
+    ldp     x16, x30, [sp], #16
     ret
 
     .macro  ENTER
