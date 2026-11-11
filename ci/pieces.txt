@@ -3,7 +3,7 @@ cert reference.c number bytes covers
 charset impl.S to_utf8 named
 cover reference.c check cover_path
 ecdsa fast.c verify
-exchange reference.c public shared
+exchange impl.S public shared
 fill fast.c check fill_path
 flac reference.c info decode
 font reference.c check draw measure draw_cached
