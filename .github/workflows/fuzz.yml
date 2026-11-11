@@ -1,0 +1,13 @@
+name: overnight fuzz
+on:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+jobs:
+  certificates:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebuild, replay, then a long run of damaged certificates
+        run: FUZZ_ROUNDS=400000000 ./ci/run.sh

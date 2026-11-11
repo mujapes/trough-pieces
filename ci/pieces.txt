@@ -10,7 +10,7 @@ font reference.c check draw measure draw_cached
 gif reference.c check size frames delay decode
 hash fast.c sha256 hmac_sha256 expand_label sha384 sha512
 home reference.c check render hit
-http reference.c status header body packed request
+http impl.S status header body packed request
 image reference.c check blit scale smooth stretch
 inflate reference.c size unpack
 jpeg fast2.c check size decode
