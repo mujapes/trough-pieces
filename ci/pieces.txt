@@ -28,4 +28,4 @@ text reference.c check draw measure
 tls reference.c migrate begin feed send reset
 trust impl.S chain signed_handshake
 url impl.S resolve part port
-voice-policy reference.c skip_ahead duck_volume filler_wait points_wait join_wait
+voice-policy impl.S skip_ahead duck_volume filler_wait points_wait join_wait
