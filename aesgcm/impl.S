@@ -1,6 +1,6 @@
 // aesgcm, written by hand (ARM64). AES-GCM (NIST SP 800-38D), 16- or 32-byte key. The meaning is aesgcm/intent.md; the recorded
 // checks are the judge. The cipher round and the tag's multiplication are the processor's own instructions; nothing is indexed by a
-// secret. The repeated rounds are spelled out by a few lines of script kept in tools/aesgcm_asm.py.
+// secret. The repeated rounds were spelled out by a few lines of script; this file is the source.
 // Entries: x0 block, x1 numbers (16-bit), x2 how many, x3 argument, x4 call table.
 // Kept through an entry: x19 key, x20 nonce, x21 extra bytes, x22 how many, x23 message or sealed bytes, x24 how many, x25 output
 // bytes, x26 rounds (10 or 14), x27 the output block, x28 key bytes. v16-v30 the round keys, v8 zero, v9 the fold constant,

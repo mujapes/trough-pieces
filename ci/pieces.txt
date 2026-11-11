@@ -1,5 +1,5 @@
 aesgcm impl.S seal open
-cert reference.c number bytes covers
+cert impl.S number bytes covers
 charset impl.S to_utf8 named
 cover reference.c check cover_path
 ecdsa fast.c verify
