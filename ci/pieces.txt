@@ -2,7 +2,7 @@ aesgcm impl.S seal open
 cert impl.S number bytes covers
 charset impl.S to_utf8 named
 cover reference.c check cover_path
-ecdsa fast.c verify
+ecdsa impl.S verify
 exchange impl.S public shared
 fill fast.c check fill_path
 flac reference.c info decode
