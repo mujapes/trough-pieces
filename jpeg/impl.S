@@ -988,6 +988,7 @@ c_bx:
     ldrh    w10, [x27]
     mul     w9, w9, w10
     str     w9, [x19, #COEF]
+    str     wzr, [x19, #I2]             // (whether any other amount turns up)
     mov     x29, #1                     // the rest: runs of zeros and the amounts between them, in zigzag order
 2:  cmp     x29, #64
     b.ge    4f
@@ -1018,6 +1019,8 @@ c_bx:
     ldrb    w10, [x10, x29]
     add     x11, x19, #COEF
     str     w0, [x11, x10, lsl #2]
+    mov     w9, #1
+    str     w9, [x19, #I2]
     add     x29, x29, #1
     b       2b
 4:  cbnz    w26, c_bad
@@ -1038,9 +1041,34 @@ c_bx:
     add     x10, x10, x11
     ldr     x11, [x19, #PLANE]
     add     x28, x11, x10
-    add     x27, x19, #COEF
+    ldr     w9, [x19, #I2]
+    cbnz    w9, 6f
+    ldr     w9, [x19, #COEF]            // a flat square: only its average. The transform would give every dot this value.
+    lsl     w9, w9, #12
+    add     w9, w9, #512
+    asr     w9, w9, #10
+    lsl     w9, w9, #12
+    mov     w10, #0x1000000
+    add     w10, w10, #0x10000
+    add     w9, w9, w10
+    asr     w9, w9, #17
+    cmp     w9, #0
+    csel    w9, wzr, w9, lt
+    cmp     w9, #255
+    mov     w10, #255
+    csel    w9, w10, w9, gt
+    ldr     x10, =0x0101010101010101
+    mul     x9, x9, x10
+    ldr     w10, [x19, #STRIDE]
+    mov     w11, #8
+7:  str     x9, [x28]
+    add     x28, x28, x10
+    subs    w11, w11, #1
+    b.ne    7b
+    b       8f
+6:  add     x27, x19, #COEF
     bl      idct
-    ldr     w9, [x19, #CI]
+8:  ldr     w9, [x19, #CI]
     COMP    x28, x9
     ldr     w9, [x19, #BX]
     add     w9, w9, #1
@@ -1116,6 +1144,80 @@ c_y:
     cset    w14, ne
     sub     w30, w4, #1
     mov     w11, #0
+    ldr     w16, =91881                 // eight dots at a time while eight remain; the same whole-number arithmetic
+    dup     v24.4s, w16
+    ldr     w16, =22554
+    dup     v25.4s, w16
+    ldr     w16, =46802
+    dup     v26.4s, w16
+    ldr     w16, =116130
+    dup     v27.4s, w16
+    mov     w16, #32768
+    dup     v28.4s, w16
+    mov     w16, #128
+    dup     v29.8h, w16
+    movi    v3.8b, #255
+c_x8:
+    add     w16, w11, #8
+    cmp     w16, w3
+    b.hi    c_x
+    ldr     d16, [x10, x11]             // brightness
+    cmp     w6, #1
+    b.ne    1f
+    mov     v0.8b, v16.8b
+    mov     v1.8b, v16.8b
+    mov     v2.8b, v16.8b
+    b       3f
+1:  lsr     w16, w11, w30
+    cbz     w30, 2f
+    ldr     s17, [x12, x16]             // colour at half rate: each value serves two dots
+    ldr     s18, [x13, x16]
+    zip1    v17.8b, v17.8b, v17.8b
+    zip1    v18.8b, v18.8b, v18.8b
+    b       4f
+2:  ldr     d17, [x12, x16]
+    ldr     d18, [x13, x16]
+4:  uxtl    v16.8h, v16.8b
+    uxtl    v17.8h, v17.8b
+    uxtl    v18.8h, v18.8b
+    sub     v17.8h, v17.8h, v29.8h      // blue difference
+    sub     v18.8h, v18.8h, v29.8h      // red difference
+    uxtl    v19.4s, v16.4h
+    sxtl    v20.4s, v17.4h
+    sxtl    v21.4s, v18.4h
+    .macro  MIX r, g, b
+    shl     v19.4s, v19.4s, #16
+    add     v19.4s, v19.4s, v28.4s
+    mov     \r\().16b, v19.16b
+    mla     \r\().4s, v21.4s, v24.4s
+    mov     \g\().16b, v19.16b
+    mls     \g\().4s, v20.4s, v25.4s
+    mls     \g\().4s, v21.4s, v26.4s
+    mov     \b\().16b, v19.16b
+    mla     \b\().4s, v20.4s, v27.4s
+    sshr    \r\().4s, \r\().4s, #16
+    sshr    \g\().4s, \g\().4s, #16
+    sshr    \b\().4s, \b\().4s, #16
+    sqxtun  \r\().4h, \r\().4s
+    sqxtun  \g\().4h, \g\().4s
+    sqxtun  \b\().4h, \b\().4s
+    .endm
+    MIX     v0, v1, v2                  // the first four dots
+    uxtl2   v19.4s, v16.8h
+    sxtl2   v20.4s, v17.8h
+    sxtl2   v21.4s, v18.8h
+    MIX     v4, v5, v6                  // the other four
+    mov     v0.d[1], v4.d[0]
+    mov     v1.d[1], v5.d[0]
+    mov     v2.d[1], v6.d[0]
+    uqxtn   v0.8b, v0.8h                // squeezed into what a dot can hold
+    uqxtn   v1.8b, v1.8h
+    uqxtn   v2.8b, v2.8h
+3:  add     x16, x9, x11, lsl #2
+    st4     {v0.8b-v3.8b}, [x16]
+    add     x7, x7, #8
+    add     w11, w11, #8
+    b       c_x8
 c_x:
     cmp     w11, w3
     b.hs    c_y_next
