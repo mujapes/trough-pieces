@@ -35,3 +35,5 @@ not exactly 12, the block is one of the inputs, or the result does not fit in th
   lengths around every block boundary, a flipped bit anywhere refused with nothing written, changed extra
   bytes refused, wrong key and nonce sizes refused; and the published example of RFC 8439 section 2.8.2
   (`seal/checks/check.py`).
+
+- `impl.S` (live, 2026-11-11): written by hand in ARM64 (5,264 bytes against 8,080 compiled). The tag uses three wide limbs with full 64 x 64 multiplies. The first draft did the stream with one block held in four vectors and was slower than the compiled build (70 against 121 MB a second); the second keeps the sixteen words in plain registers with the ten double rounds written out: 166 against 154 MB a second on one pinned core. All 6,040 recorded checks and the same 228 library comparisons pass; tls passes its checks with it underneath and a real connection ran on it.
