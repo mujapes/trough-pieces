@@ -23,7 +23,7 @@ rsa impl.S verify_pkcs1 verify_pss
 seal impl.S seal open
 shell impl.S migrate event render
 sound-measures impl.S energy climbs
-sound reference.c convert mix resample
+sound impl.S convert mix resample
 text impl.S check draw measure
 tls reference.c migrate begin feed send reset
 trust impl.S chain signed_handshake
