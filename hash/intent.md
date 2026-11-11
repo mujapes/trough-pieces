@@ -41,3 +41,5 @@ SHA-256 and HMAC-SHA-256, the first pieces of Trough's own secure-connection sta
 - Both agree with Python's hashlib on 209 inputs of every length from 0 to 199 and around each block
   boundary up to a megabyte, on 110 key and message combinations for the keyed form, and on the published
   test values (`hash/checks/check.py`).
+
+- `impl.S` (live, 2026-11-11): written by hand in ARM64, generated with its constants by a small script that computes them from their definition (3,744 bytes against 10,128 compiled). SHA-256 through the processor's instructions, SHA-384/512 in plain 64-bit arithmetic. First run failed recorded check 27 (a value kept in a register the round routine also uses); fixed, then all 6,040 recorded checks and the same 737 comparisons with Python pass. On one pinned core, MB a second, compiled then by hand: SHA-256 432 / 554, SHA-512 106 / 115. tls, trust and rsa pass their own checks with it underneath.

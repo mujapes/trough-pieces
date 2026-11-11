@@ -8,7 +8,7 @@ fill fast.c check fill_path
 flac reference.c info decode
 font reference.c check draw measure draw_cached
 gif reference.c check size frames delay decode
-hash fast.c sha256 hmac_sha256 expand_label sha384 sha512
+hash impl.S sha256 hmac_sha256 expand_label sha384 sha512
 home reference.c check render hit
 http impl.S status header body packed request
 image reference.c check blit scale smooth stretch
