@@ -66,6 +66,9 @@ tests=[('three-deep chain, RSA root, P-384 and P-256 authorities',[leaf,good2,go
 wrong=0
 for what,ch,want in tests:
     g=ours('made.test',ch,now,'made.der'); wrong+= g!=want; print('%-58s -> %2d%s'%(what,g,'' if g==want else '   EXPECTED %d'%want))
+# a root that limits how many authorities may sit beneath it
+for limit,want in ((0,-5),(1,-5),(2,1)):
+    r=make('Made Root','Made Root',kr.public_key(),kr,ca=True,path=limit); open(T+'lim.der','wb').write(der(r)); g=ours('made.test',[leaf,good2,good1],now,'lim.der'); wrong+= g!=want; print('root allowing %d beneath it, chain has 2 -> %2d%s'%(limit,g,'' if g==want else '   EXPECTED %d'%want))
 print('wildcard name ->',ours('www.made.test',[leaf,good2,good1],now,'made.der'),'| two labels under the wildcard ->',ours('a.b.made.test',[leaf,good2,good1],now,'made.der'))
 print('permission cases wrong:',wrong)
 import pickle; pickle.dump({'root':der(root),'leaf':der(leaf),'mid2':der(good2),'mid1':der(good1),'plainleaf':der(tests[1][1][0]),'plain':der(tests[1][1][1])},open(T+'made.pickle','wb'))

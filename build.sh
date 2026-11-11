@@ -10,6 +10,10 @@ case "$SRC" in
            -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -fno-tree-loop-distribute-patterns -c "$SRC" -o "$OUT.o" ;;
   *)   gcc -c "$SRC" -o "$OUT.o" ;;
 esac
+# Some compilers turn a plain copy into a call to memcpy and friends. If that is all that is missing, build again with those
+# routines included in the piece itself (rt.h). Pieces that never needed them are built exactly as before.
+case "$SRC" in *.c) if nm -u "$OUT.o" | grep -q . && ! nm -u "$OUT.o" | grep -qvE ' (memcpy|memset|memmove)$'; then
+  gcc -O3 -mcpu=native -fPIC -fno-plt -ffreestanding -fno-builtin -fno-math-errno -ffp-contract=off -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -fno-tree-loop-distribute-patterns -include "$HERE/rt.h" -c "$SRC" -o "$OUT.o"; fi ;; esac
 # A piece must stand alone: any reference to something outside itself is refused here.
 if nm -u "$OUT.o" | grep -q .; then echo "piece refers to outside symbols:" >&2; nm -u "$OUT.o" >&2; exit 1; fi
 # One entry may not call another (or take the address of any exported thing): the compiler reaches those through an address

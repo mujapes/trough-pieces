@@ -30,6 +30,10 @@ From the site's certificate upward, at most 8 steps: a root that signed the curr
 otherwise the first certificate the server sent (in any order) that signed it becomes current, and must be
 in date, marked as an authority, allowed to sign certificates, and within any limit on authorities beneath it.
 
+A root's own limit on how many authorities may sit beneath it is honoured (version 2): a root that allows fewer than the
+path has is passed over. Checked with made-up roots allowing 0, 1 and 2 beneath a chain of 2 (`trust/checks/check.py`); the
+recorded checks have no such root, so they would not notice this rule being removed.
+
 ## Not done
 Revocation is not consulted. Name constraints are not enforced (a certificate carrying them as critical is
 refused). Signatures with SHA-1, Ed25519, P-521 or RSA-PSS in certificates are not accepted. Extended key

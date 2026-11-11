@@ -26,6 +26,9 @@ static int signed_by(void *const *table, const void *child, const void *parent) 
     int64_t kind = fact(table, child, 0); if (kind < 1 || kind > 6 || part(table, child, 0, tbs.head, 8192) < 0 || !digest(table, kind == 1 || kind == 4 ? 32 : kind == 2 || kind == 5 ? 48 : 64, &tbs, &dg)) return 0;
     if (kind <= 3) { if (part(table, child, 1, sa.head, 704) < 0) return 0; return check(table, parent, 1, &dg, &sa, &sa) == 1; }
     if (part(table, child, 2, sa.head, 704) < 0 || part(table, child, 3, sb.head, 704) < 0) return 0; return check(table, parent, 3, &dg, &sa, &sb) == 1; }
+/* A root may limit how many authorities sit beneath it, like any other authority: a root that says "none" does not vouch for a
+ * chain that has one. (Pointed out by an independent review, 2026-11-11; browsers apply a root's own limit too.) */
+static int within(void *const *table, const void *cert, int below) { int64_t most = fact(table, cert, 5); return most < 0 || most >= below; }
 static int in_date(void *const *table, const void *cert, int64_t now) { int64_t from = fact(table, cert, 3), until = fact(table, cert, 4); return from >= 0 && until >= 0 && now >= from && now <= until; }
 /* The chain: leaf first, then whatever else the server sent. Reasons for no: -2 the name is not covered, -3 a certificate is out of date,
  * -4 a certificate is used for something it does not allow (or carries a rule we cannot follow), -5 no path to a trusted root. -1: unusable input. */
@@ -40,7 +43,7 @@ int64_t chain(block *unused, const int16_t *p, int64_t n, int64_t now, void *con
         mid issuer, subject; big root; if (part(table, current, 6, issuer.head, 704) < 0) return -1; const uint8_t *r = roots->bytes; uint64_t left = roots->size - 64;
         while (left > 4) { uint64_t len; if (r[0] != 0x30) break; if (r[1] < 0x80) len = 2 + r[1]; else if (r[1] == 0x81) len = 3 + (uint64_t)r[2]; else if (r[1] == 0x82) len = 4 + (((uint64_t)r[2] << 8) | r[3]); else break; if (len > left) break;
             if (len <= 8192) { head(root.head, len); for (uint64_t i = 0; i < len; i++) root.b[i] = r[i];
-                if (part(table, &root, 7, subject.head, 704) >= 0 && same(issuer.head, subject.head) && in_date(table, &root, now) && signed_by(table, current, &root)) return 1; }
+                if (part(table, &root, 7, subject.head, 704) >= 0 && same(issuer.head, subject.head) && in_date(table, &root, now) && within(table, &root, below) && signed_by(table, current, &root)) return 1; }
             r += len; left -= len; }
         /* otherwise one of the certificates the server sent must have signed it, and must be allowed to */
         int next = -1; for (int i = 1; i < count && next < 0; i++) if (!used[i] && signed_by(table, current, sent[i])) next = i; if (next < 0) return -5; used[next] = 1; const void *up = sent[next];
