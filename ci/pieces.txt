@@ -1,4 +1,4 @@
-aesgcm fast.c seal open
+aesgcm impl.S seal open
 cert reference.c number bytes covers
 charset impl.S to_utf8 named
 cover reference.c check cover_path
