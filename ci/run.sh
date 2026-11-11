@@ -7,7 +7,7 @@ mkdir -p out
 gcc -O2 -o out/vectors loader/vectors.c loader/piece.c
 gcc -O2 -o out/certfuzz loader/certfuzz.c loader/piece.c
 fail=0
-while read -r name src entries; do ./build.sh "$name/reference.c" "out/$name.ref" $entries >/dev/null || { echo "BUILD FAILED $name reference"; fail=1; }; done < ci/pieces.txt
+while read -r name src entries; do ./build.sh "$name/reference.c" "out/$name.ref" $entries > out/build.txt 2>&1 || { tail -5 out/build.txt; echo "BUILD FAILED $name reference"; fail=1; }; done < ci/pieces.txt
 while read -r name src entries; do
   stem="out/$name.ref"
   if [ "$src" != reference.c ]; then ./build.sh "$name/$src" "out/$name.live" $entries >/dev/null && stem="out/$name.live" || { echo "BUILD FAILED $name $src"; fail=1; continue; }; fi
