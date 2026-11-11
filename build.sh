@@ -7,7 +7,7 @@ SRC=$1 OUT=$2; shift 2
 HERE=$(dirname "$0")
 case "$SRC" in
   *.c) gcc -O3 -mcpu=native -fPIC -fno-plt -ffreestanding -fno-builtin -fno-math-errno -ffp-contract=off \
-           -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -c "$SRC" -o "$OUT.o" ;;
+           -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -fno-tree-loop-distribute-patterns -c "$SRC" -o "$OUT.o" ;;
   *)   gcc -c "$SRC" -o "$OUT.o" ;;
 esac
 # A piece must stand alone: any reference to something outside itself is refused here.
