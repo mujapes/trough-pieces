@@ -29,3 +29,11 @@ Agrees with Python's own converters on 1,201 conversions: every byte value of wi
 strings (400 of them deliberately damaged, 200 random bytes), 400 UTF-16 strings in both byte orders with
 broken pairs and odd lengths, and 11 labels (`charset/checks/check.py`). The first run found one fault: a
 cut-off pair followed by a stray byte gave two marks, not one.
+
+## Implementations
+- `reference.c`: the meaning, compiled (4,496 bytes).
+- `impl.S` (live): written by hand in ARM64, no compiler involved (1,876 bytes, 42% of the compiled size). Passed the 6,040
+  recorded checks on its first complete run and agrees with Python on the same 1,201 conversions. On one pinned core, in MB a
+  second, compiled then by hand: plain English 536 / 679, mixed modern text 211 / 230, windows-1252 119 / 150, UTF-16 220 / 313.
+  The first draft called a subroutine per character and lost on plain text (261 against 418); a direct path for runs of plain
+  letters fixed that. Written in one pass with two instructions the assembler rejected.
