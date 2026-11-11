@@ -25,7 +25,7 @@ shell impl.S migrate event render
 sound-measures impl.S energy climbs
 sound impl.S convert mix resample
 text impl.S check draw measure
-tls reference.c migrate begin feed send reset
+tls impl.S migrate begin feed send reset
 trust impl.S chain signed_handshake
 url impl.S resolve part port
 voice-policy impl.S skip_ahead duck_volume filler_wait points_wait join_wait
