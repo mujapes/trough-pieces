@@ -30,3 +30,7 @@ result that does not fit the block.
 - 3,000 random links against Python's urllib: 2,380 identical; every other difference comes from two things
   that library does and the RFC does not (dropping an empty "?" or "#", squeezing "//" in a path), which this
   piece does not copy (`url/checks/check.py`).
+
+## Implementations
+- `reference.c`: the meaning, compiled (7,812 bytes).
+- `impl.S` (live): written by hand in ARM64 (2,508 bytes, 32%). Passed the 6,040 recorded checks and the 42 examples of RFC 3986 section 5.4 on its first complete run; same answers as the compiled build on the 3,000 random links. Speed not measured (a single address takes well under a microsecond either way).

@@ -27,5 +27,5 @@ sound reference.c convert mix resample
 text reference.c check draw measure
 tls reference.c migrate begin feed send reset
 trust reference.c chain signed_handshake
-url reference.c resolve part port
+url impl.S resolve part port
 voice-policy reference.c skip_ahead duck_volume filler_wait points_wait join_wait

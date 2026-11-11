@@ -4,16 +4,21 @@
 #include "curves.h"
 typedef struct { uint32_t kind, a, b, c; uint64_t size; uint8_t reserved[40]; uint8_t bytes[]; } block;
 typedef unsigned __int128 u128;
+#include "mont_asm.h"
 #define K 4
+#define MONT mont4
 #define N(x) x##_256
 #include "core.h"
 #undef K
 #undef N
+#undef MONT
 #define K 6
+#define MONT mont6
 #define N(x) x##_384
 #include "core.h"
 #undef K
 #undef N
+#undef MONT
 static const block *bytes_at(void *const *table, const int16_t *p, int64_t n, int which) { const block *b = (const block *)TROUGH_BLOCK(table, n > which ? p[which] : -1); return b && b->kind == 2 && b->size > 64 && b->size <= 64 + 80 ? b : 0; }
 int64_t verify(block *unused, const int16_t *p, int64_t n, int64_t a, void *const *table) { (void)unused; (void)a;
     int curve = n > 0 ? p[0] : 0; if (curve != 256 && curve != 384) return -1; int bytes = curve / 8;

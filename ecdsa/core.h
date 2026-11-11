@@ -22,11 +22,7 @@ typedef struct { uint64_t v[K]; } num;
 static int ge(const uint64_t *a, const uint64_t *b, int k) { for (int i = k - 1; i >= 0; i--) if (a[i] != b[i]) return a[i] > b[i]; return 1; }
 static int zero(const uint64_t *a, int k) { uint64_t any = 0; for (int i = 0; i < k; i++) any |= a[i]; return !any; }
 static uint64_t take(uint64_t *a, const uint64_t *b, int k) { uint64_t borrow = 0; for (int i = 0; i < k; i++) { u128 d = (u128)a[i] - b[i] - borrow; a[i] = (uint64_t)d; borrow = (uint64_t)(d >> 64) & 1; } return borrow; }
-static num mul(const field *m, num a, num b) { uint64_t t[K + 2]; int k = K; for (int i = 0; i < k + 2; i++) t[i] = 0;
-    for (int i = 0; i < k; i++) { u128 c = 0; for (int j = 0; j < k; j++) { c += (u128)a.v[j] * b.v[i] + t[j]; t[j] = (uint64_t)c; c >>= 64; } c += t[k]; t[k] = (uint64_t)c; t[k + 1] = (uint64_t)(c >> 64);
-        uint64_t q = t[0] * m->inv; c = (u128)q * m->n[0] + t[0]; c >>= 64; for (int j = 1; j < k; j++) { c += (u128)q * m->n[j] + t[j]; t[j - 1] = (uint64_t)c; c >>= 64; }
-        c += t[k]; t[k - 1] = (uint64_t)c; t[k] = t[k + 1] + (uint64_t)(c >> 64); }
-    if (t[k] || ge(t, m->n, k)) take(t, m->n, k); num r; for (int i = 0; i < K; i++) r.v[i] = i < k ? t[i] : 0; return r; }
+static num mul(const field *m, num a, num b) { num r; MONT(r.v, a.v, b.v, m->n, m->inv); return r; }   /* hand-written multiplication: ecdsa/mont_asm.h */
 static num add(const field *m, num a, num b) { uint64_t carry = 0; for (int i = 0; i < K; i++) { u128 s = (u128)a.v[i] + b.v[i] + carry; a.v[i] = (uint64_t)s; carry = (uint64_t)(s >> 64); } if (carry || ge(a.v, m->n, K)) take(a.v, m->n, K); return a; }
 static num sub(const field *m, num a, num b) { if (take(a.v, b.v, K)) { uint64_t carry = 0; for (int i = 0; i < K; i++) { u128 s = (u128)a.v[i] + m->n[i] + carry; a.v[i] = (uint64_t)s; carry = (uint64_t)(s >> 64); } } return a; }
 static num load(const uint8_t *d, uint64_t n, int k, int *fits) { num r; for (int i = 0; i < K; i++) r.v[i] = 0;
