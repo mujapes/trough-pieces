@@ -1,0 +1,4 @@
+keywords (id = place in this list):
+break case catch class const continue debugger default delete do else export extends finally for function if import in instanceof new return super switch this throw try typeof var void while with yield let static async await of get set null true false
+punctuation (id = place in this list; the longest that fits is taken):
+>>>= ... === !== **= <<= >>= >>> &&= ||= ??= => == != <= >= && || ?? ?. ++ -- += -= *= /= %= &= |= ^= << >> ** { } ( ) [ ] ; , < > + - * / % & | ^ ! ~ ? : = . @ #
