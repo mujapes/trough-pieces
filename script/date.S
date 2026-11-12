@@ -2,16 +2,33 @@
 // on these. The clock is what the host last gave through the entry `clock` (W_CLOCK, milliseconds since 1970 as a number;
 // W_TZ, the minutes the local time is ahead of universal time).
     .equ W_CLOCK, 480
-    .equ W_TZ, 488
-// 54 now(which): 0 the clock, anything else the minutes ahead
+    .equ W_TZ, 488                      // (a 32-bit number; the next 32 bits: 1 once the host has given a clock)
+    .equ W_WAKE, 512                    // (the header was lengthened to 576 for these two)
+    .equ W_JOBS_PC, 520
+// 54 now(which): 0 the clock, 1 the minutes ahead, 2 whether the host keeps the time
 n_now:
     NIN
     ARGNUM  0
     fcvtzs  x0, d0
     ldr     d0, [x19, #W_CLOCK]
     cbz     x0, n_num
-    ldr     x9, [x19, #W_TZ]
+    ldrsw   x9, [x19, #W_TZ]
+    ldr     w10, [x19, #(W_TZ + 4)]     // 2: has the host given a clock (1) or is time the program's own (0)
+    cmp     x0, #2
+    csel    x9, x10, x9, eq
     scvtf   d0, x9
+    b       n_num
+// 57 (time): the clock is moved there (for timers when no host keeps time). 58 (time): when the host should wake the
+// program next for its timers (-1: no need), read by the entry `clock` when asked with 0.
+n_setclock:
+    NIN
+    ARGNUM  0
+    str     d0, [x19, #W_CLOCK]
+    b       n_num
+n_setwake:
+    NIN
+    ARGNUM  0
+    str     d0, [x19, #W_WAKE]
     b       n_num
 // 55 (year, month from 0; whole numbers, the month any size) -> the days from 1 January 1970 to the first of that month.
 // By the 400-year turn of 146097 days, the year taken as beginning in March.

@@ -110,7 +110,20 @@ c_compile:
 1:  cbz     w23, 2f
     bl      c_stmt
     b       1b
-2:  OP      OP_HALT
+2:  ldr     x9, [x29, #F_LEN]           // (where that ending begins is kept: the entry `clock` sends a finished program
+    str     x9, [x19, #W_JOBS_PC]       //   back there, so its timers run without the program being loaded again)
+    adr     x9, c_jobsname              // the program ends by calling the prelude's __jobs: what promises and timers
+    sub     x25, x9, x20                //   have queued runs then (lib: prelude.js, its last part)
+    mov     x26, #6
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    OP      OP_CALL
+    mov     w0, #0
+    bl      c_byte
+    OP      OP_POP
+    OP      OP_HALT
     mov     x0, #1
     bl      c_patch
     ldr     x0, [x19, #W_STACK_END]
@@ -182,6 +195,8 @@ c_native_out:
     str     x6, [x5]
     ret
 k_n: .ascii "__n"
+    .balign 4
+c_jobsname: .ascii "__jobs"
     .balign 4
 c_prelude:
     .incbin "script/prelude.js"

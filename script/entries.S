@@ -164,11 +164,26 @@ clock:
     ldr     w10, =0x534a5254
     cmp     w9, w10
     b.ne    8f
-    and     x9, x3, #0xffffffffffff
+    cbnz    x3, 1f                      // argument 0 asks instead: when is the program's next timer due (milliseconds since
+    ldr     d0, [x19, #W_WAKE]          //   1970) -> that, or -1 if it has none. The host then gives the time
+    fcvtzs  x0, d0                      //   and calls run: a finished program runs what is due.                 
+    cmp     x0, #0                      //   (A piece has room for eight entries, so this shares one.)
+    csinv   x0, x0, xzr, gt
+    b       9f
+1:  and     x9, x3, #0xffffffffffff
     ucvtf   d0, x9
     str     d0, [x19, #W_CLOCK]
     asr     x9, x3, #48
-    str     x9, [x19, #W_TZ]
+    mov     w10, #1
+    str     w9, [x19, #W_TZ]
+    str     w10, [x19, #(W_TZ + 4)]
+    ldr     w9, [x19, #W_STATE]         // a program that has finished is set at its ending again: the next `run` runs
+    cmp     w9, #2                      //   whatever timers are due by the new time
+    b.ne    2f
+    ldr     x9, [x19, #W_JOBS_PC]
+    str     x9, [x19, #W_PC]
+    str     w10, [x19, #W_STATE]
+2:
     mov     x0, #1
     b       9f
 8:  mov     x0, #-1

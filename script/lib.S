@@ -866,6 +866,6 @@ n_table:
     .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table, n_ident - n_table
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
-    .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table
-    .equ    N_COUNT, 57
+    .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table
+    .equ    N_COUNT, 59
     .ltorg

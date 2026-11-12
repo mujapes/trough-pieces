@@ -18,7 +18,8 @@ def ref(cmd,path):
 files=sorted(glob.glob((sys.argv[2] if len(sys.argv)>2 and sys.argv[2]!='-v' else os.path.dirname(os.path.abspath(__file__))+'/programs')+'/*.js')) if not (len(sys.argv)>2 and sys.argv[2].endswith('.js')) else [sys.argv[2]]
 wrong=0; lines=0
 for f in files:
-    o,e,res=ours(f); n=ref(['node'],f); q=ref(['qjs'],f); lines+=n.count('\n')
+    o,e,res=ours(f); n=ref(['node'],f); q=n if 'setTimeout' in open(f).read() else ref(['qjs'],f);  # (this qjs has no timers)
+    lines+=n.count('\n')
     if '-v' in sys.argv: print(o,e,res)
     if o==n and n!=q: print('note %s: ours and node agree, this qjs differs'%os.path.basename(f))
     elif o!=n or n!=q:

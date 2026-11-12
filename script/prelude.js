@@ -196,3 +196,42 @@ function fmt(k){return function(){var t=this._t;if(t!==t)return 'Invalid Date';v
 return k===0?ds(p)+' '+ts(p)+' '+zone():k===1?ds(p):k===2?ts(p)+' '+zone():k===3?WD[p[7]]+', '+p2(p[2])+' '+MN[p[1]]+' '+yr(p[0])+' '+ts(p)+' GMT':k===4?(p[1]+1)+'/'+p[2]+'/'+p[0]:k===5?lt(p):(p[1]+1)+'/'+p[2]+'/'+p[0]+', '+lt(p)}}
 P.toString=P['@@toPrimitive']=fmt(0);P.toDateString=fmt(1);P.toTimeString=fmt(2);P.toUTCString=P.toGMTString=fmt(3);P.toLocaleDateString=fmt(4);P.toLocaleTimeString=fmt(5);P.toLocaleString=fmt(6);
 })(__n);
+var __q;if(!__q)__q={m:[],t:[],id:0};
+var Promise,setTimeout,setInterval,clearTimeout,clearInterval,queueMicrotask,__jobs;
+(function(n,Q){var now=n(54),setclock=n(57),setwake=n(58),F=Math.floor;
+function P(ex){if(!(this instanceof P))throw new TypeError("Promise constructor cannot be invoked without 'new'");if(typeof ex!=='function')throw new TypeError('Promise resolver '+ex+' is not a function');
+this._s=0;this._v=undefined;this._r=[];var p=this,done=false;
+try{ex(function(v){if(!done){done=true;res(p,v)}},function(e){if(!done){done=true;settle(p,2,e)}})}catch(e){if(!done){done=true;settle(p,2,e)}}}
+function res(p,v){if(v===p)return settle(p,2,new TypeError('Chaining cycle detected for promise #<Promise>'));
+if(v!==null&&(typeof v==='object'||typeof v==='function')){var o={},th,done=false;gt(v,o);th=o.t;if(o.b)return settle(p,2,th);
+if(typeof th==='function'){Q.m.push(function(){try{th.call(v,function(x){if(!done){done=true;res(p,x)}},function(e){if(!done){done=true;settle(p,2,e)}})}catch(e){if(!done){done=true;settle(p,2,e)}}});return}}
+settle(p,1,v)}
+function settle(p,s,v){if(p._s)return;p._s=s;p._v=v;var r=p._r,i;p._r=null;for(i=0;i<r.length;i++)react(p,r[i])}
+function react(p,r){Q.m.push(function(){var h=p._s===1?r.f:r.r,x;if(typeof h!=='function'){if(p._s===1)res(r.p,p._v);else settle(r.p,2,p._v);return}try{x=h(p._v)}catch(e){settle(r.p,2,e);return}res(r.p,x)})}
+function nop(){}
+function gt(v,o){try{o.t=v.then}catch(e){o.b=1;o.t=e}}
+var R=P.prototype;
+R.then=function(f,r){var q=new P(nop),e={f:f,r:r,p:q};if(this._s)react(this,e);else this._r.push(e);return q};
+R['catch']=function(r){return this.then(undefined,r)};
+R['finally']=function(f){if(typeof f!=='function')return this.then(f,f);return this.then(function(v){return P.resolve(f()).then(function(){return v})},function(e){return P.resolve(f()).then(function(){throw e})})};
+P.resolve=function(v){if(v instanceof P)return v;return new P(function(a){a(v)})};
+P.reject=function(e){return new P(function(a,b){b(e)})};
+function each(it,one,end){var k=0;for(var x of it)one(P.resolve(x),k++);end(k)}
+P.all=function(it){return new P(function(ok,no){var out=[],n=0;each(it,function(p,k){out.push(undefined);n++;p.then(function(v){out[k]=v;if(--n===0)ok(out)},no)},function(k){if(!k)ok(out)})})};
+P.allSettled=function(it){return new P(function(ok){var out=[],n=0;function put(k,o){out[k]=o;if(--n===0)ok(out)}
+each(it,function(p,k){out.push(undefined);n++;p.then(function(v){put(k,{status:'fulfilled',value:v})},function(e){put(k,{status:'rejected',reason:e})})},function(k){if(!k)ok(out)})})};
+P.race=function(it){return new P(function(ok,no){each(it,function(p){p.then(ok,no)},nop)})};
+P.any=function(it){return new P(function(ok,no){var errs=[],n=0;function fail(){var e=new Error('All promises were rejected');e.name='AggregateError';e.errors=errs;no(e)}
+each(it,function(p,k){errs.push(undefined);n++;p.then(ok,function(e){errs[k]=e;if(--n===0)fail()})},function(k){if(!k)fail()})})};
+Promise=P;
+function rest(a){var r=[],i;for(i=2;i<a.length;i++)r.push(a[i]);return r}
+function add(f,ms,a,ev){ms=+ms;ms=ms>=1&&ms<=2147483647?F(ms):1;var t={id:++Q.id,at:now(0)+ms,f:f,a:a,ev:ev?ms:0};Q.t.push(t);return t.id}
+setTimeout=function(f,ms){return add(f,ms,rest(arguments),0)};setInterval=function(f,ms){return add(f,ms,rest(arguments),1)};
+clearTimeout=clearInterval=function(id){var T=Q.t,i;for(i=0;i<T.length;i++)if(T[i].id===id){T.splice(i,1);return}};
+queueMicrotask=function(f){Q.m.push(f)};
+function micro(){var i=0;while(i<Q.m.length)Q.m[i++]();Q.m=[]}
+function run1(){var T=Q.t,i,b=-1,t;for(i=0;i<T.length;i++)if(b<0||T[i].at<T[b].at)b=i;if(b<0)return false;t=T[b];
+if(t.at>now(0)){if(now(2))return false;setclock(t.at)}T.splice(b,1);if(t.ev){t.at=(now(2)?now(0):t.at)+t.ev;T.push(t)}
+if(typeof t.f==='function')t.f.apply(undefined,t.a);micro();return true}
+__jobs=function(){micro();var k=0,T,i,b=-1;while(run1()&&++k<1e5);T=Q.t;for(i=0;i<T.length;i++)if(b<0||T[i].at<b)b=T[i].at;setwake(b)};
+})(__n,__q);

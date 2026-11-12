@@ -72,7 +72,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #56
+    mov     x12, #64
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -80,7 +80,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #512
+    mov     x11, #576
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]

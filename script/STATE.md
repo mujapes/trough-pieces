@@ -300,3 +300,22 @@ with an object; a valueOf that answers an object runs until the steps end; dayli
 run); zone names other than GMT+hhmm; toLocale* for other places or options; the host does not call `clock` yet (0 until it does).
 Next: Promise and timers (need the host: a queue of jobs the host drives; setTimeout through the clock); then hook the engine
 into the page piece's <script> elements; shapes; the fuzz job.
+**Stage 6, thirteenth unit: Promise, the job queue, timers. 37 of 37 programs (`promises.js`, 37 lines).**
+In prelude.js (its last part): the queue `__q` (a global that outlives loads: jobs `m`, timers `t`), Promise (then, catch, finally,
+resolve, reject, all, allSettled, race, any; adoption of thenables takes the standard's two turns), queueMicrotask, setTimeout,
+setInterval, clearTimeout, clearInterval, and `__jobs`. Machine code: every program now ends `__jobs()` before OP_HALT
+(compile.S, at the program's end; where that ending begins is W_JOBS_PC 520); built-ins 57 (move the clock) and 58 (say when to
+wake); `now(2)`: has the host given a clock. Two ways of time: no host clock (the bench): `__jobs` runs every timer in order of
+its time, moving the clock to each (virtual time: exact, instant); host clock given: only what is due runs, and
+`clock 0` answers when the next is due (-1: none); `clock T` then sets a finished program back at its ending, so the next
+`run` runs the due timers without loading anything (seen: set, not fired at +20 ms, fired at +60, then -1).
+The world's header is now 576 bytes (was 512: 336 to 383 is W_PROTOS's six values, NOT free; I wrote two fields there
+first and the bench crashed). A piece has room for eight entries (loader/piece.h), so `wake` is `clock 0`.
+run.py compares timer programs with node only (this qjs has no setTimeout); node's real timers jitter, so keep a test's
+due times 8 ms or more apart. 56 routines in machine code.
+Found, not made: a try/catch inside a block that holds a function (the catch variable is the function's; refused as "not made
+yet": prelude's `gt` works around it); unhandled rejections are silent; async functions and await (next: a translation onto
+promises, needs a function that can stop and go on: the machine's frames kept aside); each `load` still starts the
+instructions afresh, so functions of an earlier load cannot be called (several scripts in one page need appending).
+Next: async/await and generators (one mechanism: a kept frame); appending loads; running a page's <script> elements from
+host/browse.c (clock, run, `clock 0` for the wake time); shapes; the fuzz job.
