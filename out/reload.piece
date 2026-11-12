@@ -1,0 +1,15 @@
+state 16064
+target mask 160 100
+hold 0 file reload-two.fixture
+hold 3 file reload-cut.fixture
+hold 4 file reload-bent.fixture
+hold 5 file reload-badseal.fixture
+hold 6 file reload-badname.fixture
+hold 7 file reload-junk.fixture
+hold 8 file reload-half.fixture
+hold 9 file reload-long.fixture
+entry record 0 1
+entry part 0 1
+numbers record 1 1 pick:0,9,3,4,5,6,7,8
+numbers part 2 2 pick:0,0,3,4,5,6,7,8 range:-1:4
+needs 14

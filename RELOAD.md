@@ -49,8 +49,19 @@ on a build that kills the app (the trial).
 With no compiler between the description and the bytes, reload can be a stream instead of files: one append-only
 region (a growing file the app keeps mapped, or a pipe) into which sealed machine code is written as it is made,
 and which the app follows continuously, taking each record within milliseconds, not at a once-a-second look.
-Each record: piece name, entry list, code, seal. Two rules of the phone shape it: memory is never writable and
-runnable at once (new code goes into fresh pages, which are then made runnable); and running code is never
-patched in place (new code is appended and the socket is flipped; callers in flight finish in the old code).
+Each record: piece name, entry list, code, seal (the format and its judge: the `reload` piece). One rule is kept by
+choice: running code is not patched in place (new code is appended and the socket is flipped; callers in flight
+finish in the old code).
+
+Measured on this phone, 2026-11-12 (`/tmp/wx.c`, run in Trough's own userland, the app's own user): a page that
+is writable and runnable at once is ALLOWED for this app; and one stretch of memory seen through a writable window
+and a runnable window at once works too: bytes written through the first ran through the second, and new code
+was added beside running code and ran. (I had said the phone forbids the first; for this app it does not.) So a
+live region the app executes from while code is written into it is possible here as it stands.
+
+Built so far: `tools/stream.py` (`append`, `follow`, `list`) over `out/code.stream`. A record is judged by the
+reload piece, then put in place as the live sealed pair with the way back kept and the guard started: 8 to 10 ms
+from reading the record to the files being in place. The app still notices through its once-a-second look; the
+next step is the app following the stream itself, into a live region.
 The trial and roll-back above apply to each record unchanged. The assembler that turns written instructions into
 bytes is the last tool outside the system; it can become a piece.
