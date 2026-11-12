@@ -5,6 +5,7 @@
     .text
     .global check
     .global render
+    .global link
     // the layout
     .equ S, 0
     .equ TABLE, 8
@@ -29,7 +30,17 @@
     .equ LINE, 432
     .equ QBUF, 1240
     .equ SP3, 2056
-    .equ FRAME, 2160
+    // for "link": whether this is a probe and not a drawing, the point asked about, the address found, the address of the
+    // link being read, and for each link run begun on the line the address it leads to
+    .equ PROBE, 2064
+    .equ PXP, 2068
+    .equ PYP, 2072
+    .equ HIT_AT, 2080
+    .equ HIT_LEN, 2088
+    .equ HREF_AT, 2096
+    .equ HREF_LEN, 2104
+    .equ LHREF, 2112
+    .equ FRAME, 2848
 check:
     ldr     w9, [x0]
     cmp     w9, #1
@@ -108,6 +119,8 @@ f_run:
     mov     x11, #16
     sdiv    x12, x27, x11
     sxtw    x12, w12                    // where this run starts, in whole dots
+    ldr     w9, [x19, #PROBE]
+    cbnz    w9, f_probe
     mov     x2, #0
     ldr     w9, [x19, #FONT]
     strh    w9, [x1, x2, lsl #1]
@@ -161,6 +174,56 @@ f_next:
     mov     w26, w10
     add     w25, w25, #1
     b       f_run
+f_probe:                                // the same run, measured: is the point asked about inside it, and is it link text?
+    str     w10, [x19, #SP3]
+    str     w12, [x19, #(SP3 + 4)]
+    add     x13, x19, #LINE
+    add     x13, x13, #8
+    add     x14, x19, #QBUF
+    add     x14, x14, #4
+    mov     w15, w26
+    mov     x2, #0
+1:  cmp     w15, w10
+    b.ge    2f
+    ldrh    w16, [x13, x15, lsl #1]
+    strh    w16, [x14, x2, lsl #1]
+    add     x2, x2, #1
+    add     w15, w15, #1
+    b       1b
+2:  add     x0, x19, #QBUF
+    mov     w1, w2
+    bl      measure
+    cmp     x0, #0
+    csel    x0, xzr, x0, lt
+    ldr     w10, [x19, #SP3]
+    ldrsw   x12, [x19, #(SP3 + 4)]
+    lsl     x12, x12, #4
+    add     x27, x12, x0                // where the run ends, which is where the next begins
+    tbz     w25, #0, 3f
+    ldrsw   x9, [x19, #PXP]
+    lsl     x9, x9, #4
+    cmp     x9, x12
+    b.lt    3f
+    cmp     x9, x27
+    b.ge    3f
+    ldrsw   x9, [x19, #PYP]
+    ldrsw   x11, [x19, #SIZE]
+    sub     x13, x28, x11               // the line's top
+    cmp     x9, x13
+    b.lt    3f
+    add     x11, x11, x11, lsl #2
+    add     x13, x13, x11, asr #2       // and where the next line starts
+    cmp     x9, x13
+    b.ge    3f
+    sub     w9, w25, #1
+    add     x11, x19, #LHREF
+    add     x11, x11, x9, lsl #4
+    ldp     x13, x14, [x11]
+    add     x17, x19, #HIT_AT
+    stp     x13, x14, [x17]
+3:  mov     w26, w10
+    add     w25, w25, #1
+    b       f_run
 f_down:
     ldr     w9, [x19, #SIZE]
     add     w9, w9, w9, lsl #2
@@ -177,6 +240,10 @@ f_down:
     str     wzr, [x19, #LINK_FROM]      // a link continues onto the new line
     mov     w9, #1
     str     w9, [x19, #LINKS]
+    add     x17, x19, #HREF_AT
+    ldp     x12, x13, [x17]
+    add     x17, x19, #LHREF
+    stp     x12, x13, [x17]
 f_out:
     ldp     x25, x26, [sp, #16]
     ldp     x27, x28, [sp, #32]
@@ -253,6 +320,11 @@ set_link:
     ldr     w10, [x19, #LINE_N]
     add     x11, x19, #LINK_FROM
     str     w10, [x11, x9, lsl #2]
+    add     x11, x19, #LHREF
+    add     x11, x11, x9, lsl #4
+    add     x17, x19, #HREF_AT
+    ldp     x12, x13, [x17]
+    stp     x12, x13, [x11]
     add     w9, w9, #1
     str     w9, [x19, #LINKS]
 1:  ldr     w0, [sp, #16]
@@ -408,6 +480,9 @@ render:
     str     xzr, [x19, #LINE_W]
     str     wzr, [x19, #LINKS]
     str     wzr, [x19, #WORD_N]
+    str     wzr, [x19, #PROBE]
+    add     x17, x19, #HREF_AT
+    stp     xzr, xzr, [x17]
     add     x0, x19, #SP3
     mov     w9, #32
     strh    w9, [x0, #4]
@@ -422,6 +497,7 @@ render:
     ldr     x4, [x19, #TABLE]
     ldr     x9, [x4, #(3 * 8)]
     blr     x9
+r_start:
     mov     x22, #0
 r_loop:
     cmp     x22, x21
@@ -575,7 +651,9 @@ r_known:
     b       r_after
 1:  IS      t_a
     b.eq    1f
-    eor     w0, w25, #1
+    cbnz    x25, 20f
+    bl      find_href
+20: eor     w0, w25, #1
     bl      set_link
     b       r_after
 1:  mov     x27, #0                     // a heading's level, or 0
@@ -798,8 +876,118 @@ r_have:
 r_end:
     bl      end_word
     bl      flush_line
+    ldr     w9, [x19, #PROBE]
+    cbnz    w9, l_finish
     ldr     x0, [x19, #Y]
     add     x0, x0, #8
+    b       r_out
+// link: which address the text at a point leads to. Numbers: the page's handle, the font's handle, the text size, how far it is
+// scrolled, the point's x and y, and the screen's width and height (the block is where the address is written; it is not drawn on).
+// The page is laid out exactly as render lays it out, measuring where it would draw. -> the address's length (written from byte
+// 64), 0 if the point is not on link text, -1 if the numbers are not usable or the address does not fit.
+link:
+    sub     sp, sp, #FRAME
+    stp     x29, x30, [sp]
+    stp     x19, x20, [sp, #16]
+    stp     x21, x22, [sp, #32]
+    stp     x23, x24, [sp, #48]
+    stp     x25, x26, [sp, #64]
+    stp     x27, x28, [sp, #80]
+    add     x19, sp, #96
+    mov     x27, x1
+    mov     x28, x2
+    str     x0, [x19, #S]
+    str     x4, [x19, #TABLE]
+    cmp     x28, #8
+    b.lt    r_bad
+    ldr     x9, [x0, #16]
+    cmp     x9, #64
+    b.lo    r_bad
+    BLOCK   0, 0
+    mov     x20, x0
+    BLOCK   1, 0
+    cbz     x20, r_bad
+    cbz     x0, r_bad
+    ldr     w9, [x20]
+    cmp     w9, #2
+    b.ne    r_bad
+    ldr     w9, [x0]
+    cmp     w9, #2
+    b.ne    r_bad
+    ldr     x9, [x19, #S]
+    cmp     x20, x9
+    b.eq    r_bad
+    ldr     x21, [x20, #16]
+    cmp     x21, #64
+    b.lo    r_bad
+    sub     x21, x21, #64
+    add     x20, x20, #64
+    ldrsh   w11, [x27, #4]
+    cmp     w11, #6
+    b.lt    r_bad
+    cmp     w11, #200
+    b.gt    r_bad
+    ldrsh   w9, [x27, #2]
+    str     w9, [x19, #FONT]
+    str     w11, [x19, #BASE]
+    str     w11, [x19, #SIZE]
+    ldrsh   w9, [x27, #6]
+    str     w9, [x19, #SCROLL]
+    ldrsh   w9, [x27, #8]
+    str     w9, [x19, #PXP]
+    ldrsh   w9, [x27, #10]
+    str     w9, [x19, #PYP]
+    ldrsh   w9, [x27, #12]
+    ldrsh   w10, [x27, #14]
+    cmp     w9, #16
+    b.lt    r_bad
+    cmp     w10, #16
+    b.lt    r_bad
+    str     w9, [x19, #WIDTH]
+    str     w10, [x19, #HEIGHT]
+    mov     w9, #-1
+    str     w9, [x19, #CACHE]
+    str     w9, [x19, #SCRATCH]
+    str     wzr, [x19, #LINK]
+    mov     x9, #8
+    str     x9, [x19, #Y]
+    str     xzr, [x19, #PENDING]
+    str     wzr, [x19, #LINE_N]
+    str     xzr, [x19, #LINE_W]
+    str     wzr, [x19, #LINKS]
+    str     wzr, [x19, #WORD_N]
+    mov     w9, #1
+    str     w9, [x19, #PROBE]
+    add     x17, x19, #HREF_AT
+    stp     xzr, xzr, [x17]
+    add     x17, x19, #HIT_AT
+    stp     xzr, xzr, [x17]
+    add     x0, x19, #SP3
+    mov     w9, #32
+    strh    w9, [x0, #4]
+    mov     w1, #1
+    bl      measure
+    tbnz    w0, #31, r_bad
+    str     w0, [x19, #SPACE]
+    b       r_start
+l_finish:
+    add     x17, x19, #HIT_AT
+    ldp     x9, x10, [x17]
+    mov     x0, #0
+    cbz     x10, r_out
+    ldr     x11, [x19, #S]
+    ldr     x12, [x11, #16]
+    sub     x12, x12, #64
+    cmp     x10, x12
+    b.hi    r_bad
+    add     x11, x11, #64
+    mov     x12, #0
+1:  ldrb    w13, [x9, x12]
+    strb    w13, [x11, x12]
+    add     x12, x12, #1
+    cmp     x12, x10
+    b.lo    1b
+    mov     x0, x10
     b       r_out
 r_bad:
     mov     x0, #-1
@@ -812,6 +1000,77 @@ r_out:
     ldp     x27, x28, [sp, #80]
     add     sp, sp, #FRAME
     ret
+    .ltorg
+// find_href: where the address is written in the opening tag whose name is at x23 (x24 long) and which ends before x26:
+// after the word href (any case, with white space before it), an equals sign, then the address in either kind of quotes or
+// bare. Sets HREF_AT and HREF_LEN (0 if there is none). Uses x9-x14.
+find_href:
+    add     x17, x19, #HREF_AT
+    stp     xzr, xzr, [x17]
+    add     x9, x23, x24
+1:  add     x10, x9, #5
+    cmp     x10, x26
+    b.hs    9f
+    ldrb    w11, [x20, x9]
+    add     x9, x9, #1
+    cmp     w11, #' '
+    b.eq    2f
+    cmp     w11, #9
+    b.eq    2f
+    cmp     w11, #10
+    b.eq    2f
+    cmp     w11, #13
+    b.ne    1b
+2:  add     x12, x20, x9
+    ldr     w11, [x12]
+    orr     w11, w11, #0x20202020
+    ldr     w13, =0x66657268            // "href"
+    cmp     w11, w13
+    b.ne    1b
+    add     x10, x9, #4
+3:  cmp     x10, x26                    // white space, an equals sign, white space
+    b.hs    9f
+    ldrb    w11, [x20, x10]
+    cmp     w11, #' '
+    b.ne    4f
+    add     x10, x10, #1
+    b       3b
+4:  cmp     w11, #'='
+    b.ne    1b
+    add     x10, x10, #1
+5:  cmp     x10, x26
+    b.hs    9f
+    ldrb    w11, [x20, x10]
+    cmp     w11, #' '
+    b.ne    6f
+    add     x10, x10, #1
+    b       5b
+6:  mov     w14, #0                     // the quote that ends it, or 0 for a bare address
+    cmp     w11, #'"'
+    b.eq    7f
+    cmp     w11, #39
+    b.ne    8f
+7:  mov     w14, w11
+    add     x10, x10, #1
+8:  mov     x12, x10
+10: cmp     x10, x26
+    b.hs    11f
+    ldrb    w11, [x20, x10]
+    cmp     w11, #'>'
+    b.eq    11f
+    cbz     w14, 12f
+    cmp     w11, w14
+    b.eq    11f
+    b       13f
+12: cmp     w11, #' '
+    b.eq    11f
+13: add     x10, x10, #1
+    b       10b
+11: sub     x13, x10, x12
+    add     x12, x20, x12
+    add     x17, x19, #HREF_AT
+    stp     x12, x13, [x17]
+9:  ret
     .ltorg
 t_br:   .asciz "br"
 t_a:    .asciz "a"
