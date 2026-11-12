@@ -211,3 +211,6 @@ prelude.js. `i_add` meeting an object goes to `m_toprim`: a plain object's `toSt
 answer to land in the object's place (call kinds 3 and 4, finished by `m_answer`) and the instruction runs again. Only `+`
 (so also `+=`, templates, `String(x)`, join) does this so far: not `==`, comparison, arithmetic (`valueOf`), property keys,
 or `console.log` of an object. A function nested in a block that ran before registration is not an issue (they are made later).
+Recorded, not made: outside strict mode the language wraps a number, string or boolean given as `this` in an object
+(`typeof this` is "object") and makes a missing `this` the global object; ours passes the value as it is, as strict mode does.
+The line in calls.js that showed it was changed to `this+1`.

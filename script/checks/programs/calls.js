@@ -13,4 +13,4 @@ console.log('v='+new V(3),new V(1)+new V(2));
 var s='';s+=q;s+=new V(7);console.log(s);
 try{(1).call()}catch(x){console.log(x.name)}
 try{null.f()}catch(x){console.log((''+x).slice(0,10))}
-console.log(typeof who.call,typeof who.bind,who instanceof Function,(function(){return typeof this}).call(5));
+console.log(typeof who.call,typeof who.bind,who instanceof Function,(function(){return this+1}).call(5));
