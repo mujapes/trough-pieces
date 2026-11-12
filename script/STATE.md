@@ -191,3 +191,10 @@ RegExp; Map, Set, Symbol, Promise; `Function.prototype.call/apply/bind`; text of
 `Object.create/defineProperty/freeze`; hasOwnProperty on an array's items; sort does not move undefined last; case of letters
 past 255; `toString(radix)` of a fraction gives up to 52 digits rather than the shortest; prelude methods are slower than
 machine code would be (join and indexOf first to move into lib.S). Every load translates prelude.js again (about 9 KB).
+**Stage 6, second unit: `math.S`: exp, log, log2, log10, random, and `**`/`Math.pow` with powers that are not whole, in
+machine code.** Worked in pairs of doubles (`dd_mul`, `dd_add`, `dd_div`; about 105 bits), rounded once at the end.
+`python3 -I checks/curves.py out/script.asm [n] [seed]` compares with exact decimal arithmetic: 11000 random values over four
+seeds, 0 wrong, first run (run it with -I: `checks/numbers.py` shadows a standard module otherwise; more than about 600 per
+run overflows the world's printed text). Against node the fixed corner cases agree, except `1e308**1.0001` where ours is the
+exact answer and node is one unit off. 25 built-ins in machine code now. Next in Math: sin, cos, tan (cut the angle with a
+long 2/pi, then the series in pairs), atan, atan2, asin, acos, and expm1, log1p, sinh, cosh, tanh, cbrt, hypot.

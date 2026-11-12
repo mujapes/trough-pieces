@@ -3,7 +3,7 @@ __n(-7);
 function Object(){}function Array(){}function Function(){}function String(x){return arguments.length?''+x:''}
 function Number(x){return arguments.length?+x:0}function Boolean(x){return !!x}
 __n(-1,Object.prototype);__n(-2,Array.prototype);__n(-3,Function.prototype);__n(-4,String.prototype);__n(-5,Number.prototype);__n(-6,Boolean.prototype);
-var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),pow:function(a,b){return a**b},
+var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),exp:__n(20),log:__n(21),log2:__n(22),log10:__n(23),random:__n(24),pow:function(a,b){return a**b},
 PI:3.141592653589793,E:2.718281828459045,LN2:0.6931471805599453,LN10:2.302585092994046,LOG2E:1.4426950408889634,LOG10E:0.4342944819032518,SQRT2:1.4142135623730951,SQRT1_2:0.7071067811865476};
 function isNaN(x){x=+x;return x!==x}function isFinite(x){x=+x;return x-x===0}
 function parseInt(s,r){s=(''+s).trim();var i=0,g=1,l=s.length,c=s.charCodeAt(0);if(c===45){g=-1;i=1}else if(c===43)i=1;r=r|0;

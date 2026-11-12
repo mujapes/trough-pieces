@@ -1,13 +1,13 @@
 # script: the map (made by tools/scriptmap.py; do not edit)
 
 
-## world.S (154 lines)
+## world.S (155 lines)
 The world: everything a running program has, in one block the host owns (kind 6). Nothing in it is an address: every reference is a distance from the block's start, so a world can be moved, saved, or handed to a new build of this piece. x19 is the world's start wherever this file's routines are used.
-- 52 `VAL` VAL: a tagged value with no payload -> \reg
-- 58 `w_begin` w_begin: makes the block at x19 a fresh world -> x0 1, or -1 if it is not a world block or is under a megabyte. The room is shared out by size: an eighth for instructions, a thirty-second each for constants and globals, a sixteenth each for printed text and th
-- 107 `w_alloc` w_alloc: x0 bytes of the heap (rounded up to 8) -> x0 where (a distance from the world's start), or 0 if the world is full. Uses x9, x10.
-- 121 `w_string` w_string: a string value holding the x1 bytes at x0 -> x0 the value, or 0 if the world is full. A string in the heap is its length (8 bytes), then its bytes. Uses x9-x13.
-- 140 `w_out` w_out: the x1 bytes at x0 join what the program has printed (what does not fit is dropped). Uses x9-x12.
+- 53 `VAL` VAL: a tagged value with no payload -> \reg
+- 59 `w_begin` w_begin: makes the block at x19 a fresh world -> x0 1, or -1 if it is not a world block or is under a megabyte. The room is shared out by size: an eighth for instructions, a thirty-second each for constants and globals, a sixteenth each for printed text and th
+- 108 `w_alloc` w_alloc: x0 bytes of the heap (rounded up to 8) -> x0 where (a distance from the world's start), or 0 if the world is full. Uses x9, x10.
+- 122 `w_string` w_string: a string value holding the x1 bytes at x0 -> x0 the value, or 0 if the world is full. A string in the heap is its length (8 bytes), then its bytes. Uses x9-x13.
+- 141 `w_out` w_out: the x1 bytes at x0 join what the program has printed (what does not fit is dropped). Uses x9-x12.
 
 ## lex.S (932 lines)
 script, written by hand (ARM64): Trough's own JavaScript engine. The meaning and the plan are script/intent.md. This file: the words (stage 1). Entries: x0 block, x1 numbers (16-bit), x2 how many, x3 argument, x4 call table. Calls nothing. While words are being read: x20 the text, x21 how long, x22 where we are, w23 the word's kind, w24 its id (which keyword or punctuation), x25 where it starts, x26 how long it is, w27 whether a line ended before it, w28 whether a slash here would begin a pattern, d8 a number's value. Kinds: 0 the end, 1 name, 2 keyword, 3 number, 4 string, 5 template, 6 punctuation, 7 pattern, 8 a number meant as a big
@@ -179,7 +179,7 @@ The translator: the program's words become instructions for the machine, in one 
 - 4162 `c_try_exits` c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this function it leaves is ended and its finally run; inside a finally, the two places it was reached with are dropped.
 - 4234 `c_unscope_to` (inside c_try_exits) OP_UNSCOPE for each block's scope between where we are and the record x0
 
-## machine.S (1423 lines)
+## machine.S (1421 lines)
 The machine: runs the instructions the translator wrote. A stack machine: values go on a stack in the world; each instruction is one byte, some followed by a small number (low byte first). While it runs: x19 the world, x21 the next instruction, x22 the stack's top (the next free place), x23 the constants, x24 the globals, x25 steps left, x26 the stack's end.
 - 105 `v_text` In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in the heap because i
 - 151 `s_end` 
@@ -241,52 +241,52 @@ The machine: runs the instructions the translator wrote. A stack machine: values
 - 715 `i_mod` the remainder, exact, with the sign of the left side
 - 758 `m_fmod` m_fmod: the remainder of d2 by d3 (both above zero and finite, d2 not the smaller) -> d6, exact whatever their sizes: the digits of one are taken from the other a binary place at a time. Uses x0-x6.
 - 812 `i_pow` whole powers by repeated squaring; others are to come with the Math library
-- 881 `PAIRMUL` PAIRMUL: the pair (\ah, \al) times the pair (\bh, \bl) -> (\ah, \al). A pair is a double and the small amount by which it misses the true value; the fused multiply-add gives a product's own miss exactly. d21 holds infinity. Uses d18-d20.
-- 899 `m_powloop` the pair (d5, d16) to the whole power x0 -> the pair (d4, d17)
-- 910 `i_neg` 
-- 915 `i_plus` 
-- 919 `i_not` 
-- 924 `i_bitnot` 
-- 931 `i_typeof` 
-- 966 `m_bool` m_bool: the top of the stack becomes true or false by w0
-- 974 `ORDER` ORDER: the top two compared: text against text by its characters, anything else as numbers. -> flags as after comparing left with right (unordered if a not-a-number is involved); the stack loses one place.
-- 979 `m_order` 
-- 1019 `i_lt` 
-- 1023 `i_gt` 
-- 1027 `i_le` 
-- 1031 `i_ge` 
-- 1035 `i_eq` 
-- 1040 `i_ne` 
-- 1046 `i_seq` 
-- 1051 `i_sne` 
-- 1058 `BITS` BITS: the top two as 32-bit whole numbers -> w1 (left), w0 (right); the stack loses one place
-- 1068 `i_band` 
-- 1073 `i_bor` 
-- 1078 `i_bxor` 
-- 1083 `i_shl` 
-- 1088 `i_shr` 
-- 1093 `i_ushr` 
-- 1098 `FAR` macro reg
-- 1101 `i_jmp` 
-- 1105 `i_jf` 
-- 1112 `i_jt` 
-- 1119 `i_jfk` 
-- 1128 `i_jtk` 
-- 1137 `i_jnk` 
-- 1149 `i_print` a line of the values' texts, a space between
-- 1151 `m_print_n` 
-- 1183 `i_getl` 
-- 1188 `i_setl` 
-- 1194 `UPVAR` UPVAR: the place of a variable some scopes out -> x2 (its address); its number in x0
-- 1206 `i_getup` 
-- 1211 `i_setup` 
-- 1216 `i_closure` 
-- 1235 `i_callee` 
-- 1239 `i_call` 
-- 1241 `m_call_n` 
-- 1246 `m_call` w0 arguments from x1 on, the function under them; x11 this, x12 where the answer goes, x13 by `new`?
-- 1379 `i_ret` 
-- 1405 `m_table` 
+- 879 `PAIRMUL` PAIRMUL: the pair (\ah, \al) times the pair (\bh, \bl) -> (\ah, \al). A pair is a double and the small amount by which it misses the true value; the fused multiply-add gives a product's own miss exactly. d21 holds infinity. Uses d18-d20.
+- 897 `m_powloop` the pair (d5, d16) to the whole power x0 -> the pair (d4, d17)
+- 908 `i_neg` 
+- 913 `i_plus` 
+- 917 `i_not` 
+- 922 `i_bitnot` 
+- 929 `i_typeof` 
+- 964 `m_bool` m_bool: the top of the stack becomes true or false by w0
+- 972 `ORDER` ORDER: the top two compared: text against text by its characters, anything else as numbers. -> flags as after comparing left with right (unordered if a not-a-number is involved); the stack loses one place.
+- 977 `m_order` 
+- 1017 `i_lt` 
+- 1021 `i_gt` 
+- 1025 `i_le` 
+- 1029 `i_ge` 
+- 1033 `i_eq` 
+- 1038 `i_ne` 
+- 1044 `i_seq` 
+- 1049 `i_sne` 
+- 1056 `BITS` BITS: the top two as 32-bit whole numbers -> w1 (left), w0 (right); the stack loses one place
+- 1066 `i_band` 
+- 1071 `i_bor` 
+- 1076 `i_bxor` 
+- 1081 `i_shl` 
+- 1086 `i_shr` 
+- 1091 `i_ushr` 
+- 1096 `FAR` macro reg
+- 1099 `i_jmp` 
+- 1103 `i_jf` 
+- 1110 `i_jt` 
+- 1117 `i_jfk` 
+- 1126 `i_jtk` 
+- 1135 `i_jnk` 
+- 1147 `i_print` a line of the values' texts, a space between
+- 1149 `m_print_n` 
+- 1181 `i_getl` 
+- 1186 `i_setl` 
+- 1192 `UPVAR` UPVAR: the place of a variable some scopes out -> x2 (its address); its number in x0
+- 1204 `i_getup` 
+- 1209 `i_setup` 
+- 1214 `i_closure` 
+- 1233 `i_callee` 
+- 1237 `i_call` 
+- 1239 `m_call_n` 
+- 1244 `m_call` w0 arguments from x1 on, the function under them; x11 this, x12 where the answer goes, x13 by `new`?
+- 1377 `i_ret` 
+- 1403 `m_table` 
 
 ## objects.S (1319 lines)
 Objects, arrays and functions in the heap, and the instructions that work on them (stage 4, first part). Every one begins the same way: 0 its kind (1 function, 3 plain object, 4 array), 8 its prototype (an object value, or null), 16 where its own properties are (pairs: name, a string value; value), 24 how many (32 bits) and room for how many (32 bits). Then, a function: 32 its plan, 40 the scope it remembers, 48 the `this` it was made under (used by arrows). An array: 32 where its items are, 40 how many (32 bits) and room for how many (32 bits). An item never written reads undefined. Properties are searched in order, by text (the same string value is seen at once); shapes are to replace this
@@ -348,6 +348,40 @@ Objects, arrays and functions in the heap, and the instructions that work on the
 - 1276 `i_keys` value -> the array of names to loop over
 - 1282 `i_iter` value -> the array to loop over: an array is itself, a string gives its characters
 - 1299 `i_fornext` + 32 bits: how far to jump when there are no more. array, place -> array, place + 1, item
+
+## lib.S (444 lines)
+The library (stage 6): what the language has built in. Two halves. The routines here are the built-ins written in machine code; script/prelude.js (taken into compile.S as it stands, and translated before every program) gives them their names and writes the rest in the language itself: everything that calls a function it was handed (map, sort, ...) and whatever has not been written here yet. A routine moves from there to here by getting a number in n_table. A built-in function is a function whose plan has flag 32 and, where the instructions' start would be, its number. m_call hands over to m_native. The routine is called with w0 how many arguments, x1 where they are (at least four places
+- 9 `m_native` The library (stage 6): what the language has built in. Two halves. The routines here are the built-ins written in machine code; script/prelude.js (taken into compile.S as it stands, and translated before every program) gives them their names and writes the res
+- 42 `n_function` n_function: a built-in function for the routine numbered x0 -> x0 the value, or 0 if the world is full
+- 73 `NIN` Inside a routine: NIN keeps how many arguments (16), where (24) and `this` (32); 40 is free. ARGNUM: argument \n as a number -> d0. THISSTR: `this` as a string value -> x0 and kept at 32. n_num, n_bool: the answer d0, or w0 as true or false.
+- 78 `NOUT` macro
+- 82 `ARGNUM` macro n
+- 87 `THISSTR` macro
+- 93 `MATH1` macro name, ins
+- 113 `n_maker` 0, __n: with a number from 0 up, a built-in function for that routine; with -1 to -6 and an object, that object is what plain objects, arrays, functions, strings, numbers, booleans inherit from; with -7, none of them inherits anything yet.
+- 141 `n_round` 5 round: to the nearest whole number, halves upward; a zero keeps the number's sign
+- 159 `n_sign` 7 sign
+- 170 `n_min` 8 min, 9 max: of all the arguments; not a number if any is not
+- 199 `n_arr` n_arr: `this` must be an array -> x9 where it is. Uses x10, x16.
+- 218 `n_push` 10 push: each argument becomes the array's new last item -> its length
+- 238 `n_pop` 11 pop: the array loses its last item -> it
+- 250 `n_isarray` 12 Array.isArray
+- 263 `n_keys` 13 Object.keys: the value's own names, as an array of strings
+- 278 `n_hasown` 14 hasOwnProperty (an object's named properties only, so far: not an array's items or length)
+- 295 `n_charcode` 15 charCodeAt: the unit at that place, or not a number
+- 316 `n_fromcc` 16: a string of the one unit given (String.fromCharCode is built on it)
+- 325 `n_substring` 17 substring: the units from one place up to another (either order; each held within the string). Wide only if it must be.
+- 390 `n_upper` 18 toUpperCase, 19 toLowerCase: English and western European letters, so far (not ÿ, ß, µ, nor anything past 255)
+
+## math.S (314 lines)
+The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exactly. The answer is the pair rounded once, so it is the correctly rounded one except where the true value lies within about 2^-90 of halfway between two doubles (not proved absent; none met in the checks). dd_mul, dd_add, dd_div: the pair A (d0, d1) with the pair B (d2, d3) -> A. Use d16-d20 and nothing else.
+- 6 `dd_mul` The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exac
+- 59 `q_exp` q_exp: e to the power of the pair (d0, d1) -> d0. The power is cut to r = it - k ln 2, r / 512 goes through nine terms of the series 1 + r(1 + r/2(1 + r/3(...))), the sum is squared nine times and scaled by 2^k in two steps, the second a fused one so that the 
+- 134 `q_log` q_log: the natural logarithm of d0 (above zero, finite) -> the pair (d0, d1). The number is m 2^e with m between root a half and root two; ln m = 2 atanh s, s = (m - 1) / (m + 1), by 22 terms of s(1 + s^2/3 + s^4/5 + ...); then e ln 2 is added. Uses x9-x12, d0
+- 213 `q_logs` q_logs: the same for any number: not a number below zero, endless at zero and at the endless
+- 231 `m_powfrac` m_powfrac: from the power instruction: d1 to the power d0, which is not a whole number (or is not a number)
+- 268 `n_mexp` 20 exp, 21 log, 22 log2, 23 log10
+- 298 `n_random` 24 random: a number from 0 up to but not 1 (xorshift; the same run of numbers in every world until the host gives a seed)
 
 ## entries.S (232 lines)
 The entries. x0 block, x1 numbers (16-bit), x2 how many, x3 argument, x4 call table.

@@ -39,6 +39,7 @@
     .equ W_PROTOS, 336                  // six object values (0: not yet): what plain objects, arrays, functions, strings, numbers and booleans inherit from
     .equ W_NSP, 384                     // while a built-in routine runs: the processor's stack as the machine left it
     .equ W_OWNONLY, 392                 // not 0: m_keylist gives the value's own names only
+    .equ W_RNG, 400                     // Math.random's state
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below
     .equ T_UNDEF, 0xfff9

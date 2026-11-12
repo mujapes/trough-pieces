@@ -873,9 +873,7 @@ i_pow:                                  // whole powers by repeated squaring; ot
     fsqrt   d0, d1
     fabs    d0, d0
 82: RESULT
-81: ldr     x0, =0x7ff8000000000000
-    fmov    d0, x0
-    RESULT
+81: b       m_powfrac                   // any other power that is not whole: math.S
 // PAIRMUL: the pair (\ah, \al) times the pair (\bh, \bl) -> (\ah, \al). A pair is a double and the small amount by which it
 // misses the true value; the fused multiply-add gives a product's own miss exactly. d21 holds infinity. Uses d18-d20.
     .macro  PAIRMUL ah, al, bh, bl
