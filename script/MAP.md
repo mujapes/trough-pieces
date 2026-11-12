@@ -53,116 +53,118 @@ A number as text, exactly as the language says: the shortest digits that read ba
 - 339 `n_exp` very large or very small: one digit, a point, the rest, e, the power
 - 397 `n_high` n_high: does r + up reach s (pass it, when the range's ends do not round to the number) -> flags: hs if so
 
-## compile.S (3549 lines)
+## compile.S (3691 lines)
 The translator: the program's words become instructions for the machine, in one pass, nothing kept as a tree. Expressions by precedence climbing; jumps are written with room for their distance and filled in when the place is known. While it works: x19 the world, x20-x28 and d8 the word reader's (the current word is always read already), x29 this translator's own frame, set once by c_compile and never moved: an error anywhere drops the stack back to it. Stage 2: names are all globals (no block scope yet); functions, objects, arrays and templates are refused as not yet made.
-- 25 `ISP` ISP, ISK: is the current word this punctuation / this keyword; goes to \no if not
-- 31 `ISK` macro id, no
-- 38 `EXPECT` EXPECT: the current word must be this punctuation; steps past it
-- 42 `OP` macro op
-- 46 `NOLV` macro
-- 50 `DEEPER` macro
-- 57 `SHALLOWER` macro
-- 64 `c_compile` c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
-- 121 `c_out` 
-- 124 `c_prelude` 
-- 133 `c_prelude_end` 
-- 136 `c_unexpected` the ways it goes wrong: the message, with the line and column of the word it stopped at
-- 140 `c_notyet` 
-- 144 `c_badleft` 
-- 148 `c_noloop` 
-- 152 `c_toobig` 
-- 156 `c_toodeep` 
-- 160 `c_full` 
-- 163 `c_fail` 
-- 195 `c_m_end` 
-- 201 `c_w_end` 
-- 203 `c_w_arguments_end` 
-- 205 `c_prec` for each punctuation (by its id): how tightly it binds as an operator between two values (0: it is not one) and its instruction
-- 216 `c_asg` for each punctuation: the instruction it applies when it assigns (0: it does not assign; 255: plain =)
-- 224 `c_byte` Writing instructions. c_byte: the byte w0 joins them. Uses x9-x11.
-- 234 `c_op16` c_op16: the instruction w0 with the 16-bit number w1. Uses x9-x11, x13, x15.
-- 245 `c_jump` c_jump: the jump w0 with its distance left open -> x0 where the distance is to go. Uses x9-x11, x13, x15.
-- 257 `c_patch` c_patch: the jump whose distance is at x0 lands here. c_patch_to: lands at x1. Uses x9-x11.
-- 259 `c_patch_to` 
-- 266 `c_jump_to` c_jump_to: the jump w0 to the place x1 (already known). Uses x9-x11, x13-x16.
-- 274 `c_chain` c_chain: the jump w0 joins the chain whose head is at the address x1 (the chain runs through the open distances themselves).
-- 284 `c_resolve` c_resolve: every jump of the chain whose head is x0 lands at x1. Uses x9-x13.
-- 295 `c_const` c_const: the value x0 as a constant (one already there is used again), and the instruction that brings it. Uses x9-x17.
-- 303 `c_addconst` c_addconst: the value x0 as a constant -> w0 which. Uses x9-x12.
-- 328 `c_strconst` c_strconst: the same for the string value x0, which is the newest thing in the heap: if a constant already holds that text, it is used and the new copy's room goes back.
-- 370 `c_is` c_is: is the current word exactly the x1 bytes at x0 -> flags: eq if so. Uses x9-x11.
-- 384 `c_global` c_global: the global variable the current word names -> w0 which (made, holding undefined, if it is new)
-- 433 `c_lvalue` c_lvalue: the variable that was just read by name, to be assigned to -> w0 the reading instruction as written (its bytes); anything else is an error. Uses x9, x11, x12.
-- 456 `c_store` c_raw: writes the reading instruction w0 (as c_lvalue and c_ref give it). c_store: writes the storing one that matches it.
-- 458 `c_raw` 
-- 480 `c_lvdup` c_lvdup: before a property (whose reading instruction is w0, just written) is read to be changed and stored again, the object (and key) it is read from are doubled, so they are still there for the store. w0 stays. Uses x9-x12, x14, x16.
-- 504 `c_wordconst` c_keyconst: the string value x0 (the newest thing in the heap) as a constant -> w0 which; nothing is written. c_wordconst: the same for the current word's own text.
-- 511 `c_keyconst` 
-- 524 `c_scan_meth` c_scan_meth: called for each word while a body is read through in advance: a name, brackets, then { is a method written short in an object, an inner function like any other. Its state is kept at 88 in the frame. Uses x9-x12.
-- 580 `c_declare` c_declare: the current word as a variable of the function being translated -> w0 its number (made if new). Uses x1-x11.
-- 618 `c_declref` c_declref: the current word declared where we are (a function's variable, or a global) -> w0 its reading instruction
-- 642 `c_ref` c_ref: the variable the current word names, looked for in this function, then each one around it, then the globals -> w0 its reading instruction
-- 690 `c_hoist` c_hoist: the declared functions waiting (from the newest back to x0) are made and stored under their names
-- 712 `LEXSAVE` Looking ahead without moving: the word reader's place is kept and put back.
-- 720 `LEXBACK` macro
-- 729 `c_peek_each` c_peek_each: does a for's head begin (var) name in, or (var) name of -> w0 1 for in, 2 for of, 0 for neither
-- 772 `c_peek_name` c_peek_name: is the word after the current one => -> flags: eq if so
-- 786 `c_peek_paren` c_peek_paren: the current word is ( : is the word after its matching ) => -> flags: eq if so
-- 819 `c_scan_expr` c_scan_expr: an arrow's body that is an expression starts at the current word: does it hold an inner function? If so the function being translated is marked. Nothing moves.
-- 868 `c_scan_block` c_scan_block: the current word is the { of a function's body. Its words are read through once, to the matching }, to learn what the translator must know before it starts: the variables declared in it (var, let, const, and the names of functions declared at a s
-- 1014 `c_scan_inner` marks the function being translated as having inner functions. Uses x9, x10.
-- 1026 `c_function` c_function: a function, translated where it stands (jumped over when the program runs through), and its plan made a constant. w0 says which kind: 0 after the word "function" in an expression, 1 the same as a declaration (its making waits for the scope's start,
-- 1289 `c_skip_default` c_skip_default: steps over a parameter's default, from its first word to the , or ) that ends it (left as the current word)
-- 1315 `c_defaults` c_defaults: the parameters' defaults, translated at the body's start (when it is known where the variables live): the reader goes back to the first parameter (its place kept at x0), and for each one with a default: if it holds undefined, the default is worked 
-- 1413 `c_hexv` c_string: the quoted string that is the current word, its escapes worked out -> x0 a string value
-- 1424 `c_hex4` four hex digits at x3 (before x4) -> w5. Uses w6-w8, x16.
-- 1436 `c_string` 
-- 1622 `c_escapes` 
-- 1628 `c_expr` Expressions, loosest first. Each leaves exactly one value on the machine's stack. c_expr: with commas
-- 1640 `c_assign` c_assign: an assignment, or anything tighter
-- 1699 `c_cond` c_cond: a ? b : c
-- 1722 `c_binary` c_binary: operators between two values that bind at least as tightly as w0
-- 1771 `c_unary` c_unary: operators before a value
-- 1864 `c_postfix` c_postfix: x++ and x-- (the old value, as a number, is the result)
-- 1936 `c_method` c_method: a call is about to be written: if what was just read is a property, the object stays under the function to be its `this` -> w0 the calling instruction to use
-- 1970 `c_member` c_member: .name or [key] after a value, if that is what comes -> w0 1 if one was taken
-- 2005 `c_new` c_new: new F(a, b): the function (a value and its properties, no calls), then the arguments if there are any
-- 2030 `c_peek_acc` c_peek_acc: the current word is get or set: does a property's name follow (and not : ( , or }) -> flags: eq if so
-- 2047 `c_propkey` c_propkey: a property's name where one is being defined (a word, a string, a number, or [worked out]) -> instructions that leave it on the stack; steps past it
-- 2080 `c_object` c_object: { name: value, "text": value, 3: value, [key]: value, name, name(a) { } } -> the object. The } stays the current word. Kept: 8 the name's constant, 16 and 24 the name's word, 32 its kind, 40 and 48 the word after it.
-- 2165 `c_array` c_array: [a, b, c] -> the array. The ] stays the current word.
-- 2211 `c_args` c_args: the arguments of a call, from the word after the ( to past the ) -> w0 how many are on the stack, or -1 if one was spread, when they are all in one array instead
-- 2252 `c_template` c_template: `text ${value} text`: the pieces of text and the values between them, added together from the left. The reader gave the whole template as one word; it is sent back in to read each value. (A value is turned to text as + would, which differs from the
-- 2320 `c_destructure` Patterns: [a, , b = 1, ...rest] and {a, b: c, "d": e = 2, [key]: f}, each target a name, a place that can be assigned to, or another pattern. w0 says whether names are declared (1: var, let, const, parameters) or only assigned to (0). c_destructure: the curren
-- 2346 `c_skip_pattern` c_skip_pattern: from an opening bracket to the word after the one that closes it
-- 2369 `c_peek_pattern` c_peek_pattern: is the word after the bracket that closes the current one an = -> flags: eq if so
-- 2383 `c_hidden` c_hidden: one more variable of the function being translated, with no name (a parameter written as a pattern)
-- 2403 `c_pattern` c_pattern: the pattern at the current word, applied to the value on the stack (which stays); steps past its closing bracket. For each target: what it needs is put on the stack (an object, a key), then the item is fetched from the value under it, a default take
-- 2636 `c_super` c_super: super(a, b) calls the parent class on this same object; super.name is the property as the parent's side has it, and super.name(a) calls it with `this` unchanged. (Reached from c_primary, whose frame it leaves through.)
-- 2674 `c_w_proto_end` 
-- 2678 `c_find_ctor` c_find_ctor: the current word is the { of a class's body: is there a constructor in it -> flags: eq if so, the reader left at the ( after its name (the caller keeps and puts back the reader's place)
-- 2719 `c_class` c_class: a class, from the word `class` to past its closing }: the class (a function) is left on the stack, and with w0 1 also stored in the variable of its name. The constructor is found first, wherever it is written (without one: a plan with flag 16, which t
-- 2849 `c_primary` c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
-- 3000 `c_var` Statements. Each leaves the machine's stack as it found it. c_var: var, let or const (the current word) and what it declares, up to but not past the end of the statement
-- 3042 `c_semi` c_semi: the end of a statement: a ; or, where the language lets it be left out, a line end, a } or the end of the text
-- 3053 `LOOP_IN` macro
-- 3060 `LOOP_OUT` macro
-- 3065 `c_stmt` c_stmt: one statement. Its frame: 8, 16, 24, 56 for places in the instructions; 32-55 a loop's record.
-- 3086 `s_word` 
-- 3125 `s_expr` 
-- 3130 `s_var` 
-- 3134 `s_if` 
-- 3157 `s_while` 
-- 3182 `s_do` 
-- 3207 `s_for` 
-- 3276 `s_each` for (name in value), for (name of value): 24 the variable, 56 which (1 in, 2 of)
-- 3356 `s_return` 
-- 3376 `s_break` 
-- 3379 `s_continue` 
-- 3396 `s_done` 
-- 3400 `s_throw` 
-- 3410 `s_try` try { A } catch (e) { B } finally { C } is laid out as: TRY c; A; ENDTRY; JMP n; c: store e; TRY a; B; ENDTRY; JMP n; a: GOSUB f; THROW; n: UNDEF; GOSUB f; POP; JMP end; f: C; RETSUB; end. So C is written once and is reached with two places on the stack (somet
-- 3508 `c_try_exits` c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this function it leaves (for a break: those begun inside the loop) is ended and its finally run; inside a finally, the two places it was reached w
+- 26 `ISP` ISP, ISK: is the current word this punctuation / this keyword; goes to \no if not
+- 32 `ISK` macro id, no
+- 39 `EXPECT` EXPECT: the current word must be this punctuation; steps past it
+- 43 `OP` macro op
+- 47 `NOLV` macro
+- 51 `DEEPER` macro
+- 58 `SHALLOWER` macro
+- 65 `c_compile` c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
+- 123 `c_out` 
+- 126 `c_prelude` 
+- 135 `c_prelude_end` 
+- 138 `c_unexpected` the ways it goes wrong: the message, with the line and column of the word it stopped at
+- 142 `c_notyet` 
+- 146 `c_badleft` 
+- 150 `c_noloop` 
+- 154 `c_toobig` 
+- 158 `c_toodeep` 
+- 162 `c_full` 
+- 165 `c_fail` 
+- 197 `c_m_end` 
+- 203 `c_w_end` 
+- 205 `c_w_arguments_end` 
+- 207 `c_prec` for each punctuation (by its id): how tightly it binds as an operator between two values (0: it is not one) and its instruction
+- 218 `c_asg` for each punctuation: the instruction it applies when it assigns (0: it does not assign; 255: plain =)
+- 226 `c_byte` Writing instructions. c_byte: the byte w0 joins them. Uses x9-x11.
+- 236 `c_op16` c_op16: the instruction w0 with the 16-bit number w1. Uses x9-x11, x13, x15.
+- 247 `c_jump` c_jump: the jump w0 with its distance left open -> x0 where the distance is to go. Uses x9-x11, x13, x15.
+- 259 `c_patch` c_patch: the jump whose distance is at x0 lands here. c_patch_to: lands at x1. Uses x9-x11.
+- 261 `c_patch_to` 
+- 268 `c_jump_to` c_jump_to: the jump w0 to the place x1 (already known). Uses x9-x11, x13-x16.
+- 276 `c_chain` c_chain: the jump w0 joins the chain whose head is at the address x1 (the chain runs through the open distances themselves).
+- 286 `c_resolve` c_resolve: every jump of the chain whose head is x0 lands at x1. Uses x9-x13.
+- 297 `c_const` c_const: the value x0 as a constant (one already there is used again), and the instruction that brings it. Uses x9-x17.
+- 305 `c_addconst` c_addconst: the value x0 as a constant -> w0 which. Uses x9-x12.
+- 330 `c_strconst` c_strconst: the same for the string value x0, which is the newest thing in the heap: if a constant already holds that text, it is used and the new copy's room goes back.
+- 372 `c_is` c_is: is the current word exactly the x1 bytes at x0 -> flags: eq if so. Uses x9-x11.
+- 386 `c_global` c_global: the global variable the current word names -> w0 which (made, holding undefined, if it is new)
+- 435 `c_lvalue` c_lvalue: the variable that was just read by name, to be assigned to -> w0 the reading instruction as written (its bytes); anything else is an error. Uses x9, x11, x12.
+- 458 `c_store` c_raw: writes the reading instruction w0 (as c_lvalue and c_ref give it). c_store: writes the storing one that matches it.
+- 460 `c_raw` 
+- 482 `c_lvdup` c_lvdup: before a property (whose reading instruction is w0, just written) is read to be changed and stored again, the object (and key) it is read from are doubled, so they are still there for the store. w0 stays. Uses x9-x12, x14, x16.
+- 506 `c_wordconst` c_keyconst: the string value x0 (the newest thing in the heap) as a constant -> w0 which; nothing is written. c_wordconst: the same for the current word's own text.
+- 513 `c_keyconst` 
+- 526 `c_scan_meth` c_scan_meth: called for each word while a body is read through in advance: a name, brackets, then { is a method written short in an object, an inner function like any other. Its state is kept at 88 in the frame. Uses x9-x12.
+- 582 `c_declare` c_declare: the current word as a variable of the function being translated -> w0 its number (made if new). Uses x1-x11.
+- 620 `c_declref` c_declref: the current word declared where we are (a function's variable, or a global) -> w0 its reading instruction
+- 644 `c_ref` c_ref: the variable the current word names, looked for in this function, then each one around it, then the globals -> w0 its reading instruction
+- 692 `c_hoist` c_hoist: the declared functions waiting (from the newest back to x0) are made and stored under their names
+- 714 `LEXSAVE` Looking ahead without moving: the word reader's place is kept and put back.
+- 722 `LEXBACK` macro
+- 731 `c_peek_each` c_peek_each: does a for's head begin (var) name in, or (var) name of -> w0 1 for in, 2 for of, 0 for neither
+- 774 `c_peek_name` c_peek_name: is the word after the current one => -> flags: eq if so
+- 788 `c_peek_paren` c_peek_paren: the current word is ( : is the word after its matching ) => -> flags: eq if so
+- 821 `c_scan_expr` c_scan_expr: an arrow's body that is an expression starts at the current word: does it hold an inner function? If so the function being translated is marked. Nothing moves.
+- 870 `c_scan_block` c_scan_block: the current word is the { of a function's body. Its words are read through once, to the matching }, to learn what the translator must know before it starts: the variables declared in it (var, let, const, and the names of functions declared at a s
+- 1016 `c_scan_inner` marks the function being translated as having inner functions. Uses x9, x10.
+- 1028 `c_function` c_function: a function, translated where it stands (jumped over when the program runs through), and its plan made a constant. w0 says which kind: 0 after the word "function" in an expression, 1 the same as a declaration (its making waits for the scope's start,
+- 1291 `c_skip_default` c_skip_default: steps over a parameter's default, from its first word to the , or ) that ends it (left as the current word)
+- 1317 `c_defaults` c_defaults: the parameters' defaults, translated at the body's start (when it is known where the variables live): the reader goes back to the first parameter (its place kept at x0), and for each one with a default: if it holds undefined, the default is worked 
+- 1415 `c_hexv` c_string: the quoted string that is the current word, its escapes worked out -> x0 a string value
+- 1426 `c_hex4` four hex digits at x3 (before x4) -> w5. Uses w6-w8, x16.
+- 1438 `c_string` 
+- 1624 `c_escapes` 
+- 1630 `c_expr` Expressions, loosest first. Each leaves exactly one value on the machine's stack. c_expr: with commas
+- 1642 `c_assign` c_assign: an assignment, or anything tighter
+- 1701 `c_cond` c_cond: a ? b : c
+- 1724 `c_binary` c_binary: operators between two values that bind at least as tightly as w0
+- 1773 `c_unary` c_unary: operators before a value
+- 1866 `c_postfix` c_postfix: x++ and x-- (the old value, as a number, is the result)
+- 1938 `c_method` c_method: a call is about to be written: if what was just read is a property, the object stays under the function to be its `this` -> w0 the calling instruction to use
+- 1972 `c_member` c_member: .name or [key] after a value, if that is what comes -> w0 1 if one was taken
+- 2007 `c_new` c_new: new F(a, b): the function (a value and its properties, no calls), then the arguments if there are any
+- 2032 `c_peek_acc` c_peek_acc: the current word is get or set: does a property's name follow (and not : ( , or }) -> flags: eq if so
+- 2049 `c_propkey` c_propkey: a property's name where one is being defined (a word, a string, a number, or [worked out]) -> instructions that leave it on the stack; steps past it
+- 2082 `c_object` c_object: { name: value, "text": value, 3: value, [key]: value, name, name(a) { } } -> the object. The } stays the current word. Kept: 8 the name's constant, 16 and 24 the name's word, 32 its kind, 40 and 48 the word after it.
+- 2167 `c_array` c_array: [a, b, c] -> the array. The ] stays the current word.
+- 2213 `c_args` c_args: the arguments of a call, from the word after the ( to past the ) -> w0 how many are on the stack, or -1 if one was spread, when they are all in one array instead
+- 2254 `c_template` c_template: `text ${value} text`: the pieces of text and the values between them, added together from the left. The reader gave the whole template as one word; it is sent back in to read each value. (A value is turned to text as + would, which differs from the
+- 2322 `c_destructure` Patterns: [a, , b = 1, ...rest] and {a, b: c, "d": e = 2, [key]: f}, each target a name, a place that can be assigned to, or another pattern. w0 says whether names are declared (1: var, let, const, parameters) or only assigned to (0). c_destructure: the curren
+- 2348 `c_skip_pattern` c_skip_pattern: from an opening bracket to the word after the one that closes it
+- 2371 `c_peek_pattern` c_peek_pattern: is the word after the bracket that closes the current one an = -> flags: eq if so
+- 2385 `c_hidden` c_hidden: one more variable of the function being translated, with no name (a parameter written as a pattern)
+- 2405 `c_pattern` c_pattern: the pattern at the current word, applied to the value on the stack (which stays); steps past its closing bracket. For each target: what it needs is put on the stack (an object, a key), then the item is fetched from the value under it, a default take
+- 2638 `c_super` c_super: super(a, b) calls the parent class on this same object; super.name is the property as the parent's side has it, and super.name(a) calls it with `this` unchanged. (Reached from c_primary, whose frame it leaves through.)
+- 2676 `c_w_proto_end` 
+- 2680 `c_find_ctor` c_find_ctor: the current word is the { of a class's body: is there a constructor in it -> flags: eq if so, the reader left at the ( after its name (the caller keeps and puts back the reader's place)
+- 2721 `c_class` c_class: a class, from the word `class` to past its closing }: the class (a function) is left on the stack, and with w0 1 also stored in the variable of its name. The constructor is found first, wherever it is written (without one: a plan with flag 16, which t
+- 2851 `c_primary` c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
+- 3002 `c_var` Statements. Each leaves the machine's stack as it found it. c_var: var, let or const (the current word) and what it declares, up to but not past the end of the statement
+- 3044 `c_semi` c_semi: the end of a statement: a ; or, where the language lets it be left out, a line end, a } or the end of the text
+- 3055 `LOOP_IN` macro
+- 3066 `LOOP_OUT` macro
+- 3072 `c_stmt` c_stmt: one statement. Its frame: 8, 16, 24, 56 for places in the instructions; 32-55 a loop's record, which goes on at 64 (how many places the loop keeps on the machine's stack), 68 (1: it is a switch), 72 and 80 (its label).
+- 3075 `s_again` 
+- 3094 `s_word` 
+- 3135 `s_expr` 
+- 3155 `s_var` 
+- 3159 `s_if` 
+- 3182 `s_while` 
+- 3207 `s_do` 
+- 3232 `s_for` 
+- 3301 `s_each` for (name in value), for (name of value): 24 the variable, 56 which (1 in, 2 of)
+- 3383 `s_return` 
+- 3403 `s_break` 
+- 3406 `s_continue` 
+- 3455 `s_switch` switch (v) { case a: .. default: .. }: v stays on the stack; each case is JMP past its test (for the body above falling through), the test (DUP, a, SEQ, JF to the next test), then its body. When no test passes: to the default if there is one. 8 the open jump t
+- 3515 `s_done` 
+- 3520 `s_throw` 
+- 3530 `s_try` try { A } catch (e) { B } finally { C } is laid out as: TRY c; A; ENDTRY; JMP n; c: store e; TRY a; B; ENDTRY; JMP n; a: GOSUB f; THROW; n: UNDEF; GOSUB f; POP; JMP end; f: C; RETSUB; end. So C is written once and is reached with two places on the stack (somet
+- 3628 `c_try_exits` c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this function it leaves (for a break: those begun inside the loop) is ended and its finally run; inside a finally, the two places it was reached w
 
 ## machine.S (1360 lines)
 The machine: runs the instructions the translator wrote. A stack machine: values go on a stack in the world; each instruction is one byte, some followed by a small number (low byte first). While it runs: x19 the world, x21 the next instruction, x22 the stack's top (the next free place), x23 the constants, x24 the globals, x25 steps left, x26 the stack's end.

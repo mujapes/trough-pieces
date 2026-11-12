@@ -150,3 +150,15 @@ Not made: the catch variable is the function's (no block scope), `Error("m")` wi
 Next: block scope for let/const/class with the dead zone, a fresh loop variable for each turn of a `for (let ..)`, assigning to a
 const as TypeError, functions declared in blocks, `switch`, labelled break and continue: Gemini's check program for all of these is
 kept at `~/.trough/gem/stage5/scope.js` (8 lines on node; copy it into `checks/programs/` and make it pass). Then shapes.
+**Ninth unit: `switch` and labelled break/continue done: `switch.js` passes on its first run, 25 of 25 programs, 1307 lines.**
+`s_switch` (layout in its comment; a switch is a loop record with flag 68, so `break` works and `continue` passes it by);
+labels: `name:` before a statement is kept in F_LABEL and taken by the next LOOP_IN (record 72, 80); `c_try_exits` now also
+takes the loop being left to and drops what each loop on the way keeps on the stack (record 64: 2 for for..in/of, 1 for
+switch). c_stmt's frame is 96 bytes. Not made: a label on a plain block.
+Block scope, the plan (not begun): two cases. (1) A block with no function inside it: each let/const/class gets a new place
+among the function's variables (a new R_NAMES entry even when the name exists; `c_ref` already searches newest first), and
+the names are struck out when the block ends. At the top level there is no function record, so the program needs places of
+its own on the stack (a top record that `c_ref` passes through to the globals). (2) A block with a function inside: a scope
+object at run time (new instructions to enter, leave and, for `for (let ..)`, copy it each turn), a block record in the
+R_PARENT chain so hops count it; leaving by break, continue or return must drop scopes before any finally runs. Dead zone:
+places start as T_HOLE and GETL/GETUP of a let checks it. Check program: `~/.trough/gem/stage5/scope.js`.
