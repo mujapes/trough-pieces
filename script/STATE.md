@@ -105,9 +105,18 @@ would differ; tagged templates and `String.raw` not made). Spread: `c_args` (sha
 `c_array`: from the first `...` on, the items go into an array (OP_APPEND, OP_SPREAD), and a call takes it apart again
 (OP_APPLY + which call: `m_call_n`, `m_callm_n`, `m_new_n`, `m_print_n`). Spread takes arrays and strings only. Holes in array
 literals (`[1,,2]`) still refused; object spread not made.
-Next: destructuring. The check is waiting in `checks/pending/destructure.js` (drafted by the Gemini helper; runs on node and qjs);
-move it to `programs/` when it passes. Then classes, getters and setters, shapes.
+Destructuring done (sixth unit, same evening): **20 of 20 programs, 1250 lines.** `c_pattern` in `compile.S` (declare or assign
+mode; targets may be names, properties or patterns; holes, defaults, array rest by OP_TAIL, computed keys). The value comes first
+at run time though the pattern's text is first: its instructions are written, jumped over, and jumped back to (`c_destructure`
+for `var [..] = v` and `[..] = v`; the same in `c_defaults` for parameters and `s_each` for loop heads). A pattern parameter is a
+nameless variable (`c_hidden`); the names inside are declared by translating the patterns once with the instructions thrown
+away (c_function label 5), so a function written inside a parameter default is translated twice (harmless, wasteful).
+Not made: object rest `{...r}`, object spread, a rest parameter that is a pattern, patterns in catch.
+Next: classes, getters and setters, then shapes. Ask the Gemini helper for the check program first (it has been right twice).
 Help that saves usage: GitHub Actions (`../pieces-repo`, public, pushes with `trough-gh` credentials; `ci/run.sh` now builds
 the engine and runs `checks/run.py` there) and the Gemini helper for drafting check programs
 (`trough-model-helper ask gemini-auto --prompt-file F`; the reply is JSON, the text is in `.text`; `/tmp/gtools/split.py` shows
 how to split it). A random program generator for overnight differential fuzzing was asked of Gemini (`/tmp/gem/out2.txt`); if it is gone, ask again.
+CI note: the runner's qjs is older and differs from node on literals.js and numbers.js; `run.py` now counts a program wrong only
+when ours differs from node, and prints a note when only qjs differs. The generator request to `gemini-auto` failed once (likely
+its 180 second limit); asked again of `gemini-subscription-flash` with the same prompt (`/tmp/gem/p2.txt`).

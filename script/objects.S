@@ -639,6 +639,36 @@ i_spread:                               // array, array or string -> array, each
 8:  adr     x0, e_noiter
     mov     x1, #(e_noiter_end - e_noiter)
     b       m_fail
+i_tail:                                 // + 16 bits: from which item. array or string -> a new array of the items from there on
+    U16     w5
+    ldr     x0, [x22, #-8]
+    TAGIS   x0, T_STRING
+    b.ne    1f
+    str     x5, [sp, #-16]!
+    bl      m_chars
+    ldr     x5, [sp], #16
+    cbz     x0, m_full
+1:  TAGIS   x0, T_OBJECT
+    b.ne    8f
+    and     x1, x0, #0xffffffffffff
+    add     x1, x19, x1
+    ldr     x2, [x1]
+    cmp     x2, #4
+    b.ne    8f
+    ldr     w2, [x1, #A_LEN]
+    ldr     x3, [x1, #A_ITEMS]
+    add     x3, x19, x3
+    cmp     x5, x2
+    csel    x5, x2, x5, hi
+    add     x0, x3, x5, lsl #3
+    sub     x1, x2, x5
+    bl      a_from
+    cbz     x0, m_full
+    str     x0, [x22, #-8]
+    NEXT
+8:  adr     x0, e_noiter
+    mov     x1, #(e_noiter_end - e_noiter)
+    b       m_fail
 i_apply:                                // + 8 bits: which call. The array on top is taken apart into the call's arguments
     ldrb    w9, [x21], #1
     POP     x0

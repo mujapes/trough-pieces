@@ -704,18 +704,31 @@ c_peek_each:
     cmp     w24, #4
     b.ne    8f
 1:  bl      next_word
-2:  cmp     w23, #K_NAME
+2:  str     wzr, [sp, #72]
+    cmp     w23, #K_PUNCT
+    b.ne    21f
+    cmp     w24, #33
+    b.eq    22f
+    cmp     w24, #37
+    b.ne    8f
+22: bl      c_skip_pattern              // a pattern in the name's place: 4 is added to the answer
+    mov     w9, #4
+    str     w9, [sp, #72]
+    b       24f
+21: cmp     w23, #K_NAME
     b.ne    8f
     bl      next_word
-    cmp     w23, #K_KEYWORD
+24: cmp     w23, #K_KEYWORD
     b.ne    8f
     cmp     w24, #18
     b.eq    6f
     cmp     w24, #37
     b.ne    8f
     mov     w0, #2
-    b       9f
+    b       7f
 6:  mov     w0, #1
+7:  ldr     w9, [sp, #72]
+    orr     w0, w0, w9
     b       9f
 8:  mov     w0, #0
 9:  LEXBACK
@@ -977,8 +990,9 @@ c_scan_inner:                           // marks the function being translated a
 // 96 a declaration's variable (its reading instruction), 104 the variable holding itself (a named expression) plus one,
 // 112 the jump over it, 120 the jump to its declared functions' making, 128 where the body proper starts.
 c_function:
-    stp     x30, x0, [sp, #-224]!
+    stp     x30, x0, [sp, #-240]!
     DEEPER
+    stp     xzr, xzr, [sp, #224]        // 224: it has pattern parameters (then: how many names its defaults may see); 232: kept
     stp     xzr, xzr, [sp, #208]        // 208: it has defaults; 216: its last parameter gathers the rest (flag 4)
     ldr     x9, [x29, #F_FUNC]
     str     x9, [sp, #16 + R_PARENT]
@@ -1025,7 +1039,7 @@ c_function:
     cmp     w23, #K_PUNCT               // ...name: the rest, and it must be the last
     b.ne    34f
     cmp     w24, #1
-    b.ne    c_notyet
+    b.ne    34f
     bl      next_word
     cmp     w23, #K_NAME
     b.ne    c_notyet
@@ -1034,11 +1048,25 @@ c_function:
     str     x9, [sp, #216]
     bl      next_word
     b       32f
-34: cmp     w23, #K_NAME
-    b.ne    c_notyet                    // patterns: to come
+34: cmp     w23, #K_PUNCT               // a pattern: a parameter without a name holds the value; the pattern is stepped
+    b.ne    341f                        // over now and taken apart by c_defaults
+    cmp     w24, #33
+    b.eq    342f
+    cmp     w24, #37
+    b.ne    c_unexpected
+342:
+    bl      c_hidden
+    mov     x9, #1
+    str     x9, [sp, #208]
+    str     x9, [sp, #224]
+    bl      c_skip_pattern
+    b       35f
+341:
+    cmp     w23, #K_NAME
+    b.ne    c_unexpected
     bl      c_declare
     bl      next_word
-    ISP     55, 33f                     // a default: stepped over now (noting inner functions), translated by c_defaults
+35: ISP     55, 33f                     // a default: stepped over now (noting inner functions), translated by c_defaults
     mov     x9, #1
     str     x9, [sp, #208]
     bl      next_word
@@ -1051,6 +1079,47 @@ c_function:
 4:  bl      next_word
 5:  ldr     x9, [sp, #16 + R_COUNT]
     str     x9, [sp, #16 + R_PARAMS]
+    ldr     x9, [sp, #224]              // pattern parameters: the names inside them are declared now, after the parameters,
+    cbz     x9, 59f                     // by translating the patterns once and throwing the instructions away
+    LEXSAVE
+    add     x9, sp, #(144 + 64)
+    ldp     x22, x25, [x9]
+    ldp     x26, x23, [x9, #16]
+    ldp     x24, x27, [x9, #32]
+    ldr     x28, [x9, #48]
+    ldr     d8, [x9, #56]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #(232 + 64)]
+51: cmp     w23, #K_PUNCT
+    b.ne    53f
+    cmp     w24, #36
+    b.eq    58f
+    cmp     w24, #1
+    b.ne    52f
+    bl      next_word
+    b       51b
+52: cmp     w24, #33
+    b.eq    521f
+    cmp     w24, #37
+    b.ne    53f
+521:
+    mov     w0, #1
+    bl      c_pattern
+    b       54f
+53: bl      next_word
+54: ISP     55, 55f
+    bl      next_word
+    bl      c_skip_default
+55: ISP     40, 58f
+    bl      next_word
+    b       51b
+58: ldr     x9, [sp, #(232 + 64)]
+    str     x9, [x29, #F_LEN]
+    NOLV
+    LEXBACK
+    ldr     x9, [sp, #16 + R_COUNT]
+    str     x9, [sp, #224]
+59:
     ldr     w9, [sp, #8]
     cmp     w9, #2
     b.lo    6f
@@ -1180,7 +1249,7 @@ c_function:
     bl      next_word
 93: NOLV
     SHALLOWER
-    ldr     x30, [sp], #224
+    ldr     x30, [sp], #240
     ret
 // c_skip_default: steps over a parameter's default, from its first word to the , or ) that ends it (left as the current word)
 c_skip_default:
@@ -1216,14 +1285,60 @@ c_defaults:
     ldr     x10, [x9, #R_COUNT]
     str     x10, [sp, #96]
     ldr     x10, [x9, #R_PARAMS]
+    ldr     x11, [sp, #72]
+    ldr     x11, [x11, #80]             // (with pattern parameters: their names as well)
+    cmp     x11, #0
+    csel    x10, x11, x10, ne
     str     x10, [x9, #R_COUNT]
+    str     xzr, [sp, #104]             // which parameter
     ldr     x9, [sp, #72]
     ldp     x22, x25, [x9]
     ldp     x26, x23, [x9, #16]
     ldp     x24, x27, [x9, #32]
     ldr     x28, [x9, #48]
     ldr     d8, [x9, #56]
-1:  cmp     w23, #K_NAME
+1:  cmp     w23, #K_PUNCT
+    b.ne    10f
+    cmp     w24, #33
+    b.eq    11f
+    cmp     w24, #37
+    b.ne    9f
+11: ldr     w9, [sp, #104]              // a pattern: the nameless parameter's value (or its default) is taken apart
+    mov     w0, #OP_GETL
+    orr     w0, w0, w9, lsl #8
+    bl      c_raw
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #88]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #80]
+    mov     w0, #1
+    bl      c_pattern
+    mov     w0, #OP_JMP
+    bl      c_jump
+    ldr     x9, [sp, #88]
+    str     x0, [sp, #88]
+    mov     x0, x9
+    bl      c_patch
+    ISP     55, 12f
+    bl      next_word
+    OP      OP_DUP
+    OP      OP_UNDEF
+    OP      OP_SEQ
+    mov     w0, #OP_JF
+    ldr     x1, [sp, #80]
+    bl      c_jump_to
+    OP      OP_POP
+    bl      c_assign
+12: mov     w0, #OP_JMP
+    ldr     x1, [sp, #80]
+    bl      c_jump_to
+    ldr     x0, [sp, #88]
+    bl      c_patch
+    OP      OP_POP
+    NOLV
+    b       3f
+10: cmp     w23, #K_NAME
     b.ne    9f
     bl      c_declare
     str     x0, [sp, #80]
@@ -1248,7 +1363,10 @@ c_defaults:
     ldr     x0, [sp, #88]
     bl      c_patch
     NOLV
-3:  ISP     40, 9f
+3:  ldr     x9, [sp, #104]
+    add     x9, x9, #1
+    str     x9, [sp, #104]
+    ISP     40, 9f
     bl      next_word
     b       1b
 9:  ldr     x9, [x29, #F_FUNC]
@@ -1487,7 +1605,18 @@ c_expr:
 // c_assign: an assignment, or anything tighter
 c_assign:
     stp     x30, xzr, [sp, #-32]!
-    bl      c_cond
+    cmp     w23, #K_PUNCT               // [a, b] = v and {a, b} = v: a pattern if an = follows its closing bracket
+    b.ne    0f
+    cmp     w24, #33
+    b.eq    77f
+    cmp     w24, #37
+    b.ne    0f
+77: bl      c_peek_pattern
+    b.ne    0f
+    mov     w0, #0
+    bl      c_destructure
+    b       9f
+0:  bl      c_cond
     cmp     w23, #K_PUNCT
     b.ne    9f
     adr     x9, c_asg
@@ -2072,6 +2201,324 @@ c_template:
     SHALLOWER
     ldr     x30, [sp], #32
     ret
+// Patterns: [a, , b = 1, ...rest] and {a, b: c, "d": e = 2, [key]: f}, each target a name, a place that can be assigned to, or
+// another pattern. w0 says whether names are declared (1: var, let, const, parameters) or only assigned to (0).
+// c_destructure: the current word begins a pattern that an = and a value follow: the value is worked out first (the pattern's
+// instructions are written before it and reached by jumping back) and is left on the stack.
+c_destructure:
+    stp     x30, x0, [sp, #-32]!
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #16]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #24]
+    ldr     w0, [sp, #8]
+    bl      c_pattern
+    mov     w0, #OP_JMP
+    bl      c_jump
+    ldr     x9, [sp, #16]
+    str     x0, [sp, #16]
+    mov     x0, x9
+    bl      c_patch
+    EXPECT  55
+    bl      c_assign
+    mov     w0, #OP_JMP
+    ldr     x1, [sp, #24]
+    bl      c_jump_to
+    ldr     x0, [sp, #16]
+    bl      c_patch
+    NOLV
+    ldr     x30, [sp], #32
+    ret
+// c_skip_pattern: from an opening bracket to the word after the one that closes it
+c_skip_pattern:
+    stp     x30, xzr, [sp, #-16]!
+1:  cbz     w23, 8f
+    cmp     w23, #K_PUNCT
+    b.ne    6f
+    sub     w9, w24, #33
+    cmp     w9, #5
+    b.hi    6f
+    ldr     w10, [sp, #8]
+    tbz     w24, #0, 2f
+    add     w10, w10, #1
+    str     w10, [sp, #8]
+    b       6f
+2:  sub     w10, w10, #1
+    str     w10, [sp, #8]
+    cbnz    w10, 6f
+    bl      next_word
+    b       8f
+6:  bl      next_word
+    b       1b
+8:  ldr     x30, [sp], #16
+    ret
+// c_peek_pattern: is the word after the bracket that closes the current one an = -> flags: eq if so
+c_peek_pattern:
+    str     x30, [sp, #-16]!
+    LEXSAVE
+    bl      c_skip_pattern
+    mov     w0, #0
+    cmp     w23, #K_PUNCT
+    b.ne    1f
+    cmp     w24, #55
+    cset    w0, eq
+1:  LEXBACK
+    ldr     x30, [sp], #16
+    cmp     w0, #1
+    ret
+// c_hidden: one more variable of the function being translated, with no name (a parameter written as a pattern)
+c_hidden:
+    ldr     x1, [x29, #F_FUNC]
+    ldr     x3, [x1, #R_NAMES]
+    ldr     x4, [x1, #R_COUNT]
+    add     x5, x3, x4, lsl #4
+    add     x6, x5, #16
+    ldr     x7, [x29, #F_PTOP]
+    cmp     x6, x7
+    b.hi    c_toobig
+    stp     x25, xzr, [x5]
+    str     x6, [x29, #F_NTOP]
+    add     x4, x4, #1
+    str     x4, [x1, #R_COUNT]
+    ret
+// c_pattern: the pattern at the current word, applied to the value on the stack (which stays); steps past its closing bracket.
+// For each target: what it needs is put on the stack (an object, a key), then the item is fetched from the value under it,
+// a default takes the place of undefined, and it is stored. A pattern inside is jumped back to in the same way as above.
+// Kept: 8 declare?, 16 the target's reading instruction (-1 a pattern), 20 the key's kind (0 a name constant, 1 a number,
+// 2 worked out and on the stack), 24 an object pattern?, 28 which item, 32 the name constant, 36 the rest?, 40 the number,
+// 48 and 56 jumps, 64 and 72 a short name's word.
+c_pattern:
+    stp     x30, x0, [sp, #-80]!
+    DEEPER
+    cmp     w24, #33
+    cset    w9, eq
+    stp     w9, wzr, [sp, #24]
+    bl      next_word
+1:  ldr     w9, [sp, #24]
+    mov     w10, #38
+    mov     w11, #34
+    cmp     w9, #0
+    csel    w10, w11, w10, ne
+    cmp     w23, #K_PUNCT
+    b.ne    2f
+    cmp     w24, w10
+    b.eq    9f
+    cbnz    w9, 2f
+    cmp     w24, #40                    // nothing between commas: that item is passed over
+    b.ne    2f
+    ldr     w9, [sp, #28]
+    add     w9, w9, #1
+    str     w9, [sp, #28]
+    bl      next_word
+    b       1b
+2:  str     wzr, [sp, #36]
+    str     wzr, [sp, #20]
+    ISP     1, 20f
+    ldr     w9, [sp, #24]
+    cbnz    w9, c_notyet                // (the rest of an object: to come)
+    mov     w9, #1
+    str     w9, [sp, #36]
+    bl      next_word
+    b       30f
+20: ldr     w9, [sp, #24]
+    cbz     w9, 30f
+    cmp     w23, #K_PUNCT               // an object pattern: first the key
+    b.ne    21f
+    cmp     w24, #37
+    b.ne    c_unexpected
+    bl      next_word
+    bl      c_assign
+    EXPECT  38
+    mov     w9, #2
+    str     w9, [sp, #20]
+    b       25f
+21: cmp     w23, #K_STRING
+    b.ne    22f
+    bl      c_string
+    bl      c_keyconst
+    str     w0, [sp, #32]
+    bl      next_word
+    b       25f
+22: cmp     w23, #K_NUMBER
+    b.ne    23f
+    str     d8, [sp, #40]
+    mov     w9, #1
+    str     w9, [sp, #20]
+    bl      next_word
+    b       25f
+23: cmp     w23, #K_NAME
+    b.eq    24f
+    cmp     w23, #K_KEYWORD
+    b.ne    c_unexpected
+24: bl      c_wordconst
+    str     w0, [sp, #32]
+    stp     x25, x26, [sp, #64]
+    bl      next_word
+    ISP     54, 26f
+    b       251f
+25: ISP     54, c_unexpected
+251:
+    bl      next_word
+    b       30f
+26: ldp     x9, x10, [sp, #64]          // a name alone is its own target
+    stp     x25, x26, [sp, #64]
+    mov     x25, x9
+    mov     x26, x10
+    bl      70f
+    str     w0, [sp, #16]
+    ldp     x25, x26, [sp, #64]
+    b       40f
+30: cmp     w23, #K_PUNCT               // the target
+    b.ne    31f
+    cmp     w24, #33
+    b.eq    35f
+    cmp     w24, #37
+    b.eq    35f
+31: ldr     w9, [sp, #8]
+    cbz     w9, 32f
+    cmp     w23, #K_NAME
+    b.eq    311f
+    cmp     w23, #K_KEYWORD
+    b.ne    c_unexpected
+    sub     w9, w24, #33
+    cmp     w9, #6
+    b.hi    c_unexpected
+311:
+    bl      c_declref
+    str     w0, [sp, #16]
+    bl      next_word
+    b       40f
+32: bl      c_postfix                   // a place to assign to: its reading is taken back, what it reads from stays
+    bl      c_lvalue
+    str     w0, [sp, #16]
+    ldr     x9, [x29, #F_LV]
+    str     x9, [x29, #F_LEN]
+    NOLV
+    b       40f
+35: mov     w9, #-1                     // a pattern inside
+    str     w9, [sp, #16]
+    bl      60f
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #48]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #56]
+    ldr     w0, [sp, #8]
+    bl      c_pattern
+    mov     w0, #OP_JMP
+    bl      c_jump
+    ldr     x9, [sp, #48]
+    str     x0, [sp, #48]
+    mov     x0, x9
+    bl      c_patch
+    ISP     55, 36f
+    bl      next_word
+    OP      OP_DUP
+    OP      OP_UNDEF
+    OP      OP_SEQ
+    mov     w0, #OP_JF
+    ldr     x1, [sp, #56]
+    bl      c_jump_to
+    OP      OP_POP
+    bl      c_assign
+36: mov     w0, #OP_JMP
+    ldr     x1, [sp, #56]
+    bl      c_jump_to
+    ldr     x0, [sp, #48]
+    bl      c_patch
+    b       50f
+40: bl      60f
+    ISP     55, 45f
+    bl      next_word
+    OP      OP_DUP
+    OP      OP_UNDEF
+    OP      OP_SEQ
+    mov     w0, #OP_JF
+    bl      c_jump
+    str     x0, [sp, #48]
+    OP      OP_POP
+    bl      c_assign
+    ldr     x0, [sp, #48]
+    bl      c_patch
+45: ldr     w0, [sp, #16]
+    bl      c_store
+50: OP      OP_POP
+    ldr     w9, [sp, #20]
+    cmp     w9, #2
+    b.ne    51f
+    OP      OP_POP
+51: NOLV
+    ldr     w9, [sp, #28]
+    add     w9, w9, #1
+    str     w9, [sp, #28]
+    ISP     40, 52f
+    bl      next_word
+    b       1b
+52: ldr     w9, [sp, #24]
+    mov     w10, #38
+    mov     w11, #34
+    cmp     w9, #0
+    csel    w10, w11, w10, ne
+    cmp     w23, #K_PUNCT
+    b.ne    c_unexpected
+    cmp     w24, w10
+    b.ne    c_unexpected
+9:  bl      next_word
+    NOLV
+    SHALLOWER
+    ldr     x30, [sp], #80
+    ret
+60: str     x30, [sp, #-16]!            // the item is fetched: a copy of the value (it lies under what the target put down)
+    ldr     w9, [sp, #16 + 20]
+    cmp     w9, #2
+    cset    w10, eq
+    ldr     w9, [sp, #16 + 16]
+    and     w9, w9, #0xff
+    cmp     w9, #OP_GETP
+    cinc    w10, w10, eq
+    cmp     w9, #OP_GETE
+    b.ne    61f
+    add     w10, w10, #2
+61: str     w10, [sp, #8]
+    OP      OP_PICK
+    ldr     w0, [sp, #8]
+    bl      c_byte
+    ldr     w9, [sp, #16 + 24]
+    cbnz    w9, 63f
+    ldr     w9, [sp, #16 + 36]
+    cbnz    w9, 62f
+    ldr     w9, [sp, #16 + 28]
+    ucvtf   d0, w9
+    fmov    x0, d0
+    bl      c_const
+    OP      OP_GETE
+    b       69f
+62: mov     w0, #OP_TAIL
+    ldr     w1, [sp, #16 + 28]
+    bl      c_op16
+    b       69f
+63: ldr     w9, [sp, #16 + 20]
+    cbnz    w9, 64f
+    mov     w0, #OP_GETP
+    ldr     w1, [sp, #16 + 32]
+    bl      c_op16
+    b       69f
+64: cmp     w9, #1
+    b.ne    65f
+    ldr     x0, [sp, #16 + 40]
+    bl      c_const
+    OP      OP_GETE
+    b       69f
+65: OP      OP_PICK
+    ldr     w0, [sp, #8]
+    bl      c_byte
+    OP      OP_GETE
+69: ldr     x30, [sp], #16
+    ret
+70: ldr     w9, [sp, #8]
+    cbz     w9, c_ref
+    b       c_declref
 // c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
 c_primary:
     stp     x30, xzr, [sp, #-16]!
@@ -2221,7 +2668,17 @@ c_var:
     stp     x30, xzr, [sp, #-32]!
     str     w24, [sp, #8]
 1:  bl      next_word
-    cmp     w23, #K_NAME
+    cmp     w23, #K_PUNCT
+    b.ne    11f
+    cmp     w24, #33
+    b.eq    12f
+    cmp     w24, #37
+    b.ne    c_unexpected
+12: mov     w0, #1
+    bl      c_destructure
+    OP      OP_POP
+    b       5f
+11: cmp     w23, #K_NAME
     b.eq    2f
     cmp     w23, #K_KEYWORD
     b.ne    c_unexpected
@@ -2475,7 +2932,32 @@ s_for:
     b       s_done
 s_each:                                 // for (name in value), for (name of value): 24 the variable, 56 which (1 in, 2 of)
     str     w0, [sp, #56]
+    tbz     w0, #2, 0f
+    and     w9, w0, #3                  // a pattern: its instructions are written here and jumped over; each item comes
+    str     w9, [sp, #56]               // back to them (28 where they start, 60 the jump out of them)
+    mov     w9, #0
     cmp     w23, #K_KEYWORD
+    b.ne    77f
+    bl      next_word
+    mov     w9, #1
+77: str     w9, [sp, #28]
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #8]
+    ldr     x9, [x29, #F_LEN]
+    ldr     w0, [sp, #28]
+    str     w9, [sp, #28]
+    bl      c_pattern
+    OP      OP_POP
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     w0, [sp, #60]
+    ldr     x0, [sp, #8]
+    bl      c_patch
+    mov     w9, #-1
+    str     w9, [sp, #24]
+    b       3f
+0:  cmp     w23, #K_KEYWORD
     b.ne    1f
     bl      next_word
     bl      c_declref
@@ -2483,7 +2965,7 @@ s_each:                                 // for (name in value), for (name of val
 1:  bl      c_ref
 2:  str     w0, [sp, #24]
     bl      next_word
-    bl      next_word
+3:  bl      next_word
     bl      c_expr
     EXPECT  36
     ldr     w9, [sp, #56]
@@ -2500,8 +2982,17 @@ s_each:                                 // for (name in value), for (name of val
     bl      c_jump
     str     x0, [sp, #16]
     ldr     w0, [sp, #24]
+    cmn     w0, #1
+    b.eq    4f
     bl      c_store
     OP      OP_POP
+    b       5f
+4:  mov     w0, #OP_JMP
+    ldr     w1, [sp, #28]
+    bl      c_jump_to
+    ldr     w0, [sp, #60]
+    bl      c_patch
+5:
     LOOP_IN
     bl      c_stmt
     LOOP_OUT

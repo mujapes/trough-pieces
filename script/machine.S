@@ -78,7 +78,8 @@
     .equ OP_APPEND, 74                  // array, value -> array with the value added at its end
     .equ OP_SPREAD, 75                  // array, array or string -> array with each of its items added
     .equ OP_APPLY, 76                   // + 8 bits: which call (0 plain, 1 on an object, 2 new, 3 print); the array on top is its arguments
-    .equ OP_COUNT, 77
+    .equ OP_TAIL, 77                    // + 16 bits: from which item. array or string -> a new array of the items from there on
+    .equ OP_COUNT, 78
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -1082,5 +1083,5 @@ m_table:
     .word   i_swap - m_table, i_rot - m_table, i_pick - m_table, i_dup2 - m_table
     .word   i_in - m_table, i_instof - m_table, i_delp - m_table, i_dele - m_table
     .word   i_keys - m_table, i_iter - m_table, i_fornext - m_table
-    .word   i_append - m_table, i_spread - m_table, i_apply - m_table
+    .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table
     .ltorg
