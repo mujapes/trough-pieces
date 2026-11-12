@@ -13,6 +13,10 @@
     .equ F_NTOP, 72                     // names of variables, 16 bytes each (where in the text, how long), kept during
     .equ F_TRY, 96                      // the innermost try's record (on the stack: outer record, 1 while its finally is still to come, the chain of jumps to its finally, the loop and the function it is in), or 0
     .equ F_LABEL, 120                   // a label just read (where in the text, how long; 0 0: none), for the loop that follows
+    .equ F_CONSTPOS, 136                // where a read of a const was just written (so an assignment to it can be refused), or -1
+    .equ F_BLOCK, 144                   // the innermost block's record (see c_block_in), or 0
+    .equ F_DECLKIND, 152                // 32 bits: what is declaring names just now: 0 var and the like, 1 let, 2 const
+    .equ F_FORIN, 156                   // 32 bits: 1 while a for statement is being read inside the block made for it
     .equ F_PTOP, 80                     // translation in the machine's idle stack; from its other end, declared functions waiting
     .equ C_DEEPEST, 400
     // a function's record
@@ -63,8 +67,11 @@
 
 // c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
 c_compile:
-    stp     x29, x30, [sp, #-144]!
+    stp     x29, x30, [sp, #-160]!
     mov     x29, sp
+    mov     x9, #-1
+    stp     x9, xzr, [x29, #F_CONSTPOS]
+    str     xzr, [x29, #F_DECLKIND]
     stp     xzr, xzr, [x29, #F_LABEL]
     stp     x20, x21, [x29, #104]
     str     xzr, [x29, #F_TRY]
@@ -121,7 +128,7 @@ c_compile:
     str     w9, [x19, #W_STATE]
     mov     x0, #1
 c_out:
-    ldp     x29, x30, [sp], #144
+    ldp     x29, x30, [sp], #160
     ret
 c_prelude:
     .ascii "class Error{constructor(m){if(m!==undefined)this.message=\"\"+m}toString(){return this.message===\"\"?this.name:this.name+\": \"+this.message}}"
@@ -453,7 +460,13 @@ c_lvalue:
     ldr     x12, [x29, #F_LEN]
     cmp     x11, x12
     b.ne    c_badleft
-    ret
+    ldr     x12, [x29, #F_CONSTPOS]     // a const: what is written instead reads nothing and, as a store, throws
+    cmp     x12, x9
+    b.ne    3f
+    mov     w0, #OP_CONSTGET
+    mov     x12, #-1
+    str     x12, [x29, #F_CONSTPOS]
+3:  ret
 // c_raw: writes the reading instruction w0 (as c_lvalue and c_ref give it). c_store: writes the storing one that matches it.
 c_store:
     add     w0, w0, #1
@@ -581,6 +594,7 @@ c_scan_meth:
 // c_declare: the current word as a variable of the function being translated -> w0 its number (made if new). Uses x1-x11.
 c_declare:
     ldr     x1, [x29, #F_FUNC]
+c_declare_in:                           // the same in the record x1 (which, if it is not the innermost, must have the name already)
     ldr     x3, [x1, #R_NAMES]
     ldr     x4, [x1, #R_COUNT]
     mov     x2, #0
@@ -588,7 +602,7 @@ c_declare:
     b.hs    5f
     add     x5, x3, x2, lsl #4
     ldp     x6, x7, [x5]
-    cmp     x7, x26
+    cmp     w7, w26
     b.ne    4f
     add     x6, x20, x6
     add     x8, x20, x25
@@ -602,7 +616,10 @@ c_declare:
     b.eq    3b
 4:  add     x2, x2, #1
     b       1b
-5:  add     x5, x3, x4, lsl #4
+5:  ldr     x7, [x29, #F_FUNC]
+    cmp     x1, x7
+    b.ne    c_notyet
+    add     x5, x3, x4, lsl #4
     add     x6, x5, #16
     ldr     x7, [x29, #F_PTOP]
     cmp     x6, x7
@@ -616,42 +633,163 @@ c_declare:
     str     x4, [x1, #R_COUNT]
 6:  mov     x0, x2
     ret
-// c_declref: the current word declared where we are (a function's variable, or a global) -> w0 its reading instruction
+// c_realfn: the function being translated, passing by the records of blocks -> x1 (0 at the top level). Uses x9.
+c_realfn:
+    ldr     x1, [x29, #F_FUNC]
+1:  cbz     x1, 2f
+    ldr     x9, [x1, #R_FLAGS]
+    tbz     x9, #8, 2f
+    ldr     x1, [x1, #R_PARENT]
+    b       1b
+2:  ret
+// c_declare_new: the current word as one more variable of the record x1, whatever names it has: a let or const of a block
+// (bit 62 of the length word; bit 63 for a const) -> w0 its number. Uses x3-x9.
+c_declare_new:
+    ldr     x3, [x1, #R_NAMES]
+    ldr     x4, [x1, #R_COUNT]
+    add     x5, x3, x4, lsl #4
+    add     x6, x5, #16
+    ldr     x7, [x29, #F_PTOP]
+    cmp     x6, x7
+    b.hi    c_toobig
+    mov     x7, #0xfff0
+    cmp     x4, x7
+    b.hs    c_toobig
+    ldr     w9, [x29, #F_DECLKIND]
+    mov     x7, #(1 << 62)
+    orr     x7, x7, x26
+    cmp     w9, #2
+    b.ne    1f
+    orr     x7, x7, #(1 << 63)
+1:  stp     x25, x7, [x5]
+    str     x6, [x29, #F_NTOP]
+    add     x7, x4, #1
+    str     x7, [x1, #R_COUNT]
+    mov     x0, x4
+    ret
+// c_alias_new: a let or const of a block at the top level, where no function has places to give: a global with no name
+// of its own, and an entry in the list of such names (kept where a function's names would be; bits 32-47 say which global)
+// -> w0 which global
+c_alias_new:
+    str     x30, [sp, #-16]!
+    ldr     x2, [x19, #W_GLOB_N]
+    ldr     x9, [x19, #W_GLOB_CAP]
+    cmp     x2, x9
+    b.hs    c_toobig
+    mov     x9, #0xffff
+    cmp     x2, x9
+    b.hs    c_toobig
+    mov     x0, x20
+    mov     x1, #0
+    bl      w_string
+    cbz     x0, c_full
+    ldr     x1, [x19, #W_GLOB]
+    add     x1, x19, x1
+    ldr     x2, [x19, #W_GLOB_N]
+    add     x5, x1, x2, lsl #4
+    VAL     x6, T_UNDEF
+    stp     x0, x6, [x5]
+    add     x9, x2, #1
+    str     x9, [x19, #W_GLOB_N]
+    ldr     x5, [x29, #F_NTOP]
+    add     x6, x5, #16
+    ldr     x7, [x29, #F_PTOP]
+    cmp     x6, x7
+    b.hi    c_toobig
+    ldr     w9, [x29, #F_DECLKIND]
+    mov     x7, #(1 << 62)
+    orr     x7, x7, x26
+    orr     x7, x7, x2, lsl #32
+    cmp     w9, #2
+    b.ne    1f
+    orr     x7, x7, #(1 << 63)
+1:  stp     x25, x7, [x5]
+    str     x6, [x29, #F_NTOP]
+    mov     x0, x2
+    ldr     x30, [sp], #16
+    ret
+// c_declref: the current word declared where we are -> w0 its reading instruction. A let or const directly inside a block
+// belongs to the block; anything else to the function (passing by the records of blocks), or to the globals.
 c_declref:
     str     x30, [sp, #-16]!
+    ldr     w9, [x29, #F_DECLKIND]
+    cbz     w9, 5f
+    ldr     x10, [x29, #F_BLOCK]
+    cbz     x10, 5f
+    ldr     x11, [x10, #8]
     ldr     x1, [x29, #F_FUNC]
-    cbz     x1, 1f
-    bl      c_declare
+    cmp     x11, x1
+    b.ne    5f
+    cbz     x1, 4f
+    bl      c_declare_new
+    ldr     x1, [x29, #F_FUNC]
+    ldr     x9, [x1, #R_FLAGS]
     mov     w1, #OP_GETL
+    tbz     x9, #8, 2f
+    lsl     w0, w0, #16
+    mov     w1, #OP_GETUP
+    orr     w0, w0, w1
+    b       9f
+4:  bl      c_alias_new
+    mov     w1, #OP_GETG
     b       2f
+5:  ldr     x1, [x29, #F_FUNC]
+    cbz     x1, 1f
+    ldr     x9, [x1, #R_FLAGS]
+    tbnz    x9, #8, 6f
+    bl      c_declare
+    ldr     w9, [x29, #F_DECLKIND]
+    cmp     w9, #2
+    b.ne    51f
+    ldr     x1, [x29, #F_FUNC]
+    ldr     x3, [x1, #R_NAMES]
+    add     x5, x3, x0, lsl #4
+    ldr     x6, [x5, #8]
+    orr     x6, x6, #(1 << 63)
+    str     x6, [x5, #8]
+51: mov     w1, #OP_GETL
+    b       2f
+6:  bl      c_realfn
+    cbz     x1, 7f
+    bl      c_declare_in
+    b       8f
+7:  bl      c_global
+    bl      c_unhole
+8:  bl      c_ref
+    b       9f
 1:  bl      c_global
-    ldr     x9, [x19, #W_GLOB]          // declared: it holds undefined from the start
+    bl      c_unhole
+    mov     w1, #OP_GETG
+2:  orr     w0, w1, w0, lsl #8
+9:  ldr     x30, [sp], #16
+    ret
+c_unhole:                               // the global w0 is declared: it holds undefined from the start. Uses x9-x11.
+    ldr     x9, [x19, #W_GLOB]
     add     x9, x19, x9
     add     x9, x9, x0, lsl #4
     ldr     x10, [x9, #8]
     lsr     x11, x10, #48
-    mov     w1, #T_HOLE
-    cmp     w11, w1
-    b.ne    3f
+    mov     w10, #T_HOLE
+    cmp     w11, w10
+    b.ne    1f
     VAL     x10, T_UNDEF
     str     x10, [x9, #8]
-3:  mov     w1, #OP_GETG
-2:  orr     w0, w1, w0, lsl #8
-    ldr     x30, [sp], #16
-    ret
-// c_ref: the variable the current word names, looked for in this function, then each one around it, then the globals
-// -> w0 its reading instruction
+1:  ret
+// c_ref: the variable the current word names, looked for in this function (its newest names first, so a block's own win),
+// then each record around it, then the top level's block names, then the globals -> w0 its reading instruction
 c_ref:
     ldr     x1, [x29, #F_FUNC]
     mov     w2, #0
-    cbz     x1, 7f
+    mov     x9, #-1
+    str     x9, [x29, #F_CONSTPOS]
+    cbz     x1, 70f
 1:  ldr     x3, [x1, #R_NAMES]
     ldr     x4, [x1, #R_COUNT]
 2:  cbz     x4, 5f
     sub     x4, x4, #1
     add     x5, x3, x4, lsl #4
     ldp     x6, x7, [x5]
-    cmp     x7, x26
+    cmp     w7, w26
     b.ne    2b
     add     x6, x20, x6
     add     x8, x20, x25
@@ -664,9 +802,17 @@ c_ref:
     cmp     w10, w11
     b.eq    3b
     b       2b
-4:  cbnz    w2, 41f
+4:  tbz     x7, #63, 40f
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [x29, #F_CONSTPOS]
+40: cbnz    w2, 41f
+    ldr     x5, [x1, #R_FLAGS]
+    tbnz    x5, #8, 42f
     mov     w0, #OP_GETL
     orr     w0, w0, w4, lsl #8
+    ret
+42: mov     w0, #OP_GETUP               // a block's own scope is the nearest one
+    orr     w0, w0, w4, lsl #16
     ret
 41: ldr     x5, [x29, #F_FUNC]          // scopes out: one fewer if this function keeps no scope of its own
     ldr     x5, [x5, #R_FLAGS]
@@ -679,15 +825,297 @@ c_ref:
     orr     w0, w0, w2, lsl #8
     orr     w0, w0, w4, lsl #16
     ret
-5:  ldr     x1, [x1, #R_PARENT]
+5:  ldr     x5, [x1, #R_PARENT]
     add     w2, w2, #1
-    cbnz    x1, 1b
+    cbz     x5, 71f
+    mov     x1, x5
+    b       1b
+70: ldr     x3, [x29, #F_NTOP]
+    b       72f
+71: ldr     x3, [x1, #R_NAMES]
+72: ldr     x4, [x19, #W_STACK]
+    add     x4, x19, x4
+73: cmp     x3, x4
+    b.ls    7f
+    sub     x3, x3, #16
+    ldp     x6, x7, [x3]
+    cmp     w7, w26
+    b.ne    73b
+    add     x6, x20, x6
+    add     x8, x20, x25
+    mov     x9, #0
+74: cmp     x9, x26
+    b.hs    75f
+    ldrb    w10, [x6, x9]
+    ldrb    w11, [x8, x9]
+    add     x9, x9, #1
+    cmp     w10, w11
+    b.eq    74b
+    b       73b
+75: tbz     x7, #63, 76f
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [x29, #F_CONSTPOS]
+76: ubfx    x0, x7, #32, #16
+    lsl     w0, w0, #8
+    mov     w1, #OP_GETG
+    orr     w0, w0, w1
+    ret
 7:  str     x30, [sp, #-16]!
     bl      c_global
     mov     w1, #OP_GETG
     orr     w0, w1, w0, lsl #8
     ldr     x30, [sp], #16
     ret
+// c_scan_fn: is there a function somewhere in what begins at the current word: a block (w0 0: to its closing brace) or a
+// for statement (w0 1: its head and body) -> w0 1 or 0. The reader is put back. A function is: the word function or class,
+// an arrow, or name(..){ as an object's short method. Saying yes too often only costs a scope at run time.
+c_scan_fn:
+    stp     x30, x0, [sp, #-48]!        // 8 which, 16 depth, 20 found, 24 the depth a short method's ( was at (-1), 28 was the last word a name
+    stp     xzr, xzr, [sp, #16]
+    mov     w9, #-1
+    str     w9, [sp, #24]
+    sub     sp, sp, #64
+    stp     x22, x25, [sp]
+    stp     x26, x23, [sp, #16]
+    stp     x24, x27, [sp, #32]
+    str     x28, [sp, #48]
+    str     d8, [sp, #56]
+1:  cbz     w23, 9f
+    cmp     w23, #K_KEYWORD
+    b.ne    2f
+    cmp     w24, #15
+    b.eq    8f
+    cmp     w24, #3
+    b.eq    8f
+    b       6f
+2:  cmp     w23, #K_PUNCT
+    b.ne    6f
+    cmp     w24, #11
+    b.eq    8f
+    cmp     w24, #35
+    b.ne    21f
+    ldp     w9, w10, [sp, #64 + 24]
+    ldr     w11, [sp, #64 + 16]
+    cbz     w10, 20f
+    cmn     w9, #1
+    b.ne    20f
+    str     w11, [sp, #64 + 24]
+20: add     w11, w11, #1
+    str     w11, [sp, #64 + 16]
+    b       6f
+21: cmp     w24, #37
+    b.eq    22f
+    cmp     w24, #33
+    b.ne    23f
+22: ldr     w11, [sp, #64 + 16]
+    add     w11, w11, #1
+    str     w11, [sp, #64 + 16]
+    b       6f
+23: cmp     w24, #36
+    b.ne    24f
+    ldr     w11, [sp, #64 + 16]
+    subs    w11, w11, #1
+    b.lt    9f
+    str     w11, [sp, #64 + 16]
+    ldr     w9, [sp, #64 + 24]
+    cmp     w9, w11
+    b.ne    6f
+    mov     w9, #-1
+    str     w9, [sp, #64 + 24]
+    str     wzr, [sp, #64 + 28]
+    bl      next_word
+    cmp     w23, #K_PUNCT
+    b.ne    1b
+    cmp     w24, #33
+    b.eq    8f
+    b       1b
+24: cmp     w24, #38
+    b.ne    25f
+    ldr     w11, [sp, #64 + 16]
+    subs    w11, w11, #1
+    b.lt    9f
+    str     w11, [sp, #64 + 16]
+    b       6f
+25: cmp     w24, #34
+    b.ne    26f
+    ldr     w11, [sp, #64 + 16]
+    subs    w11, w11, #1
+    b.lt    9f
+    str     w11, [sp, #64 + 16]
+    cbnz    w11, 6f
+    ldr     w9, [sp, #64 + 8]
+    cbz     w9, 9f
+    str     wzr, [sp, #64 + 28]
+    bl      next_word                   // a for's body in braces is over, unless it was an if's or a try's with more to come
+    cmp     w23, #K_KEYWORD
+    b.ne    9f
+    cmp     w24, #10
+    b.eq    1b
+    cmp     w24, #2
+    b.eq    1b
+    cmp     w24, #13
+    b.eq    1b
+    b       9f
+26: cmp     w24, #39
+    b.ne    6f
+    ldr     w11, [sp, #64 + 16]
+    cbz     w11, 9f
+6:  mov     w9, #0                      // can this word be the name before a short method's (
+    cmp     w23, #K_NAME
+    b.eq    61f
+    cmp     w23, #K_KEYWORD
+    b.ne    62f
+    cmp     w24, #16
+    b.eq    62f
+    cmp     w24, #14
+    b.eq    62f
+    cmp     w24, #30
+    b.eq    62f
+    cmp     w24, #23
+    b.eq    62f
+    cmp     w24, #2
+    b.eq    62f
+    cmp     w24, #31
+    b.eq    62f
+61: mov     w9, #1
+62: str     w9, [sp, #64 + 28]
+    bl      next_word
+    b       1b
+8:  mov     w9, #1
+    str     w9, [sp, #64 + 20]
+9:  ldp     x22, x25, [sp]
+    ldp     x26, x23, [sp, #16]
+    ldp     x24, x27, [sp, #32]
+    ldr     x28, [sp, #48]
+    ldr     d8, [sp, #56]
+    add     sp, sp, #64
+    ldr     w0, [sp, #20]
+    ldr     x30, [sp], #48
+    ret
+// A block's record, 128 bytes that the statement keeps on the stack while the block is read (x0 at c_block_in; F_BLOCK
+// after): 0 the block around, 8 the record its let and const names go into (the function's, or 0 at the top level, or its
+// own), 16 how many names that had (at the top level: where the list ended), 24 where its OP_SCOPE is written (0: it has no
+// scope of its own at run time, having no function inside), 32 the jump to where its declared functions are made, 40 where
+// its body starts, 48 the waiting functions as they stood, 56 where its OP_COPYSCOPE is (a loop), 64-111 its own record
+// in the chain of functions (flag 256: a block), 112 the way back.
+// c_block_in: begins a block; w1 says whether there is a function inside.
+c_block_in:
+    str     x30, [x0, #112]
+    str     xzr, [x0, #24]
+    str     xzr, [x0, #56]
+    ldr     x9, [x29, #F_BLOCK]
+    str     x9, [x0]
+    str     x0, [x29, #F_BLOCK]
+    cbz     w1, 3f
+    ldr     x9, [x29, #F_FUNC]
+    str     x9, [x0, #64 + R_PARENT]
+    ldr     x9, [x29, #F_NTOP]
+    stp     x9, xzr, [x0, #64 + R_NAMES]
+    mov     x9, #0x101
+    stp     x9, xzr, [x0, #64 + R_FLAGS]
+    str     xzr, [x0, #64 + R_START]
+    add     x9, x0, #64
+    str     x9, [x29, #F_FUNC]
+    ldr     x9, [x29, #F_PTOP]
+    str     x9, [x0, #48]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [x0, #24]
+    mov     w0, #OP_SCOPE
+    mov     w1, #0
+    bl      c_op16
+    mov     w0, #OP_JMP
+    bl      c_jump
+    ldr     x9, [x29, #F_BLOCK]
+    str     x0, [x9, #32]
+    ldr     x10, [x29, #F_LEN]
+    str     x10, [x9, #40]
+3:  ldr     x9, [x29, #F_BLOCK]
+    ldr     x10, [x29, #F_FUNC]
+    str     x10, [x9, #8]
+    ldr     x11, [x29, #F_NTOP]
+    cbz     x10, 4f
+    ldr     x11, [x10, #R_COUNT]
+4:  str     x11, [x9, #16]
+    ldr     x30, [x9, #112]
+    ret
+// c_block_out: ends the innermost block: its names are struck out; with a scope of its own, its declared functions are
+// made (at its start, by a jump down here and back), the scope's size is written in, and the scope is left.
+c_block_out:
+    ldr     x9, [x29, #F_BLOCK]
+    str     x30, [x9, #112]
+    ldp     x10, x11, [x9, #8]
+    cbnz    x10, 1f
+    str     x11, [x29, #F_NTOP]
+    b       4f
+1:  ldr     x12, [x10, #R_NAMES]
+    ldr     x13, [x10, #R_COUNT]
+2:  cmp     x11, x13
+    b.hs    4f
+    add     x14, x12, x11, lsl #4
+    ldr     x15, [x14, #8]
+    add     x11, x11, #1
+    tbz     x15, #62, 2b
+    and     x15, x15, #0xffffffff00000000
+    str     x15, [x14, #8]
+    b       2b
+4:  ldr     x10, [x9, #24]
+    cbz     x10, 8f
+    mov     w0, #OP_JMP
+    bl      c_jump
+    ldr     x9, [x29, #F_BLOCK]
+    str     x0, [x9, #64 + R_START]
+    ldr     x0, [x9, #32]
+    bl      c_patch
+    ldr     x9, [x29, #F_BLOCK]
+    ldr     x0, [x9, #48]
+    bl      c_hoist
+    ldr     x9, [x29, #F_BLOCK]
+    ldr     x1, [x9, #40]
+    mov     w0, #OP_JMP
+    bl      c_jump_to
+    ldr     x9, [x29, #F_BLOCK]
+    ldr     x0, [x9, #64 + R_START]
+    bl      c_patch
+    ldr     x9, [x29, #F_BLOCK]
+    ldr     x10, [x9, #64 + R_COUNT]
+    ldr     x11, [x29, #F_CODE]
+    ldr     x12, [x9, #24]
+    add     x12, x11, x12
+    strh    w10, [x12, #1]
+    ldr     x12, [x9, #56]
+    cbz     x12, 5f
+    add     x12, x11, x12
+    strh    w10, [x12, #1]
+5:  OP      OP_UNSCOPE
+    ldr     x9, [x29, #F_BLOCK]
+    ldr     x10, [x9, #64 + R_NAMES]
+    str     x10, [x29, #F_NTOP]
+    ldr     x10, [x9, #64 + R_PARENT]
+    str     x10, [x29, #F_FUNC]
+8:  ldr     x9, [x29, #F_BLOCK]
+    ldr     x30, [x9, #112]
+    ldr     x10, [x9]
+    str     x10, [x29, #F_BLOCK]
+    ret
+// c_copyscope: in a loop whose block has a scope of its own: each turn goes on with a copy, so that functions made in one
+// turn keep that turn's variables
+c_copyscope:
+    ldr     x9, [x29, #F_BLOCK]
+    cbz     x9, 1f
+    ldr     x10, [x9, #24]
+    cbz     x10, 1f
+    ldr     x10, [x9, #56]
+    cbnz    x10, 1f
+    add     x10, x9, #64
+    ldr     x11, [x29, #F_FUNC]
+    cmp     x10, x11
+    b.ne    1f
+    ldr     x10, [x29, #F_LEN]
+    str     x10, [x9, #56]
+    mov     w0, #OP_COPYSCOPE
+    mov     w1, #0
+    b       c_op16
+1:  ret
 // c_hoist: the declared functions waiting (from the newest back to x0) are made and stored under their names
 c_hoist:
     stp     x30, x0, [sp, #-32]!
@@ -3002,7 +3430,17 @@ c_primary:
 c_var:
     stp     x30, xzr, [sp, #-32]!
     str     w24, [sp, #8]
-1:  bl      next_word
+    ldr     w9, [x29, #F_DECLKIND]
+    str     w9, [sp, #16]
+1:  ldr     w9, [sp, #8]
+    mov     w10, #0
+    cmp     w9, #33
+    cinc    w10, w10, eq
+    cmp     w9, #4
+    mov     w11, #2
+    csel    w10, w11, w10, eq
+    str     w10, [x29, #F_DECLKIND]
+    bl      next_word
     cmp     w23, #K_PUNCT
     b.ne    11f
     cmp     w24, #33
@@ -3038,6 +3476,8 @@ c_var:
     mov     w9, #40
     ccmp    w24, w9, #0, eq
     b.eq    1b
+    ldr     w9, [sp, #16]
+    str     w9, [x29, #F_DECLKIND]
     ldr     x30, [sp], #32
     ret
 // c_semi: the end of a statement: a ; or, where the language lets it be left out, a line end, a } or the end of the text
@@ -3057,6 +3497,8 @@ c_semi:
     stp     x9, xzr, [sp, #32]
     str     xzr, [sp, #48]
     str     xzr, [sp, #64]
+    ldr     x9, [x29, #F_FUNC]
+    str     x9, [sp, #88]
     ldp     x9, x10, [x29, #F_LABEL]
     stp     x9, x10, [sp, #72]
     stp     xzr, xzr, [x29, #F_LABEL]
@@ -3081,6 +3523,12 @@ s_again:
     b       s_done
 1:  cmp     w24, #33
     b.ne    s_expr
+    sub     sp, sp, #128
+    mov     w0, #0
+    bl      c_scan_fn
+    mov     w1, w0
+    mov     x0, sp
+    bl      c_block_in
     bl      next_word
 2:  cmp     w23, #K_PUNCT
     mov     w9, #34
@@ -3089,7 +3537,26 @@ s_again:
     cbz     w23, c_unexpected
     bl      c_stmt
     b       2b
-3:  bl      next_word
+3:  bl      c_block_out
+    add     sp, sp, #128
+    bl      next_word
+    b       s_done
+s_forw:                                 // a for statement is read inside a block of its own, for the let of its head
+    ldr     w9, [x29, #F_FORIN]
+    cbz     w9, 1f
+    str     wzr, [x29, #F_FORIN]
+    b       s_for
+1:  sub     sp, sp, #128
+    mov     w0, #1
+    bl      c_scan_fn
+    mov     w1, w0
+    mov     x0, sp
+    bl      c_block_in
+    mov     w9, #1
+    str     w9, [x29, #F_FORIN]
+    bl      c_stmt
+    bl      c_block_out
+    add     sp, sp, #128
     b       s_done
 s_word:
     cmp     w23, #K_KEYWORD
@@ -3107,7 +3574,7 @@ s_word:
     cmp     w24, #9
     b.eq    s_do
     cmp     w24, #14
-    b.eq    s_for
+    b.eq    s_forw
     cmp     w24, #0
     b.eq    s_break
     cmp     w24, #5
@@ -3274,6 +3741,7 @@ s_for:
     str     x0, [sp, #56]
     ldr     x9, [x29, #F_LEN]
     str     x9, [sp, #24]
+    bl      c_copyscope
     bl      c_expr
     OP      OP_POP
     mov     w0, #OP_JMP
@@ -3300,6 +3768,15 @@ s_for:
     b       s_done
 s_each:                                 // for (name in value), for (name of value): 24 the variable, 56 which (1 in, 2 of)
     str     w0, [sp, #56]
+    mov     w9, #0                      // let or const: the name is the loop's own block's
+    cmp     w23, #K_KEYWORD
+    b.ne    78f
+    cmp     w24, #33
+    mov     w10, #4
+    ccmp    w24, w10, #4, ne
+    cset    w9, eq
+78: str     w9, [x29, #F_DECLKIND]
+    ldr     w0, [sp, #56]
     tbz     w0, #2, 0f
     and     w9, w0, #3                  // a pattern: its instructions are written here and jumped over; each item comes
     str     w9, [sp, #56]               // back to them (28 where they start, 60 the jump out of them)
@@ -3333,7 +3810,8 @@ s_each:                                 // for (name in value), for (name of val
 1:  bl      c_ref
 2:  str     w0, [sp, #24]
     bl      next_word
-3:  bl      next_word
+3:  str     wzr, [x29, #F_DECLKIND]
+    bl      next_word
     bl      c_expr
     EXPECT  36
     ldr     w9, [sp, #56]
@@ -3349,6 +3827,7 @@ s_each:                                 // for (name in value), for (name of val
     mov     w0, #OP_FORNEXT
     bl      c_jump
     str     x0, [sp, #16]
+    bl      c_copyscope
     ldr     w0, [sp, #24]
     cmn     w0, #1
     b.eq    4f
@@ -3381,8 +3860,8 @@ s_each:                                 // for (name in value), for (name of val
     OP      OP_POP
     b       s_done
 s_return:
-    ldr     x9, [x29, #F_FUNC]
-    cbz     x9, c_unexpected
+    bl      c_realfn
+    cbz     x1, c_unexpected
     bl      next_word
     cbz     w23, 1f
     cbnz    w27, 1f
@@ -3530,26 +4009,28 @@ s_throw:
 s_try:
     bl      next_word
     ISP     33, c_unexpected
-    sub     sp, sp, #48
+    sub     sp, sp, #64
     ldr     x9, [x29, #F_TRY]
     mov     x10, #1
     stp     x9, x10, [sp]
     ldr     x9, [x29, #F_LOOP]
     stp     xzr, x9, [sp, #16]
-    ldr     x9, [x29, #F_FUNC]
-    stp     x9, xzr, [sp, #32]
+    bl      c_realfn
+    stp     x1, xzr, [sp, #32]
+    ldr     x9, [x29, #F_FUNC]          // 48: the record of the block it is in, whose scope its finally runs in
+    str     x9, [sp, #48]
     mov     x9, sp
     str     x9, [x29, #F_TRY]
-    str     xzr, [sp, #48 + 24]
+    str     xzr, [sp, #64 + 24]
     mov     w0, #OP_TRY
     bl      c_jump
-    str     x0, [sp, #48 + 8]
+    str     x0, [sp, #64 + 8]
     bl      c_stmt
     OP      OP_ENDTRY
     mov     w0, #OP_JMP
     bl      c_jump
-    str     x0, [sp, #48 + 16]
-    ldr     x0, [sp, #48 + 8]
+    str     x0, [sp, #64 + 16]
+    ldr     x0, [sp, #64 + 8]
     bl      c_patch
     ISK     2, 4f
     mov     x9, #1
@@ -3570,30 +4051,30 @@ s_try:
     EXPECT  36
     b       2f
 1:  bl      c_declref
-    str     w0, [sp, #48 + 56]
+    str     w0, [sp, #64 + 56]
     bl      next_word
     EXPECT  36
-    ldr     w0, [sp, #48 + 56]
+    ldr     w0, [sp, #64 + 56]
     bl      c_store
 2:  OP      OP_POP
     ISP     33, c_unexpected
     mov     w0, #OP_TRY
     bl      c_jump
-    str     x0, [sp, #48 + 8]
+    str     x0, [sp, #64 + 8]
     bl      c_stmt
     OP      OP_ENDTRY
     mov     w0, #OP_JMP
     bl      c_jump
-    str     x0, [sp, #48 + 24]
-    ldr     x0, [sp, #48 + 8]
+    str     x0, [sp, #64 + 24]
+    ldr     x0, [sp, #64 + 8]
     bl      c_patch
 4:  mov     w0, #OP_GOSUB
     add     x1, sp, #16
     bl      c_chain
     OP      OP_THROW
-    ldr     x0, [sp, #48 + 16]
+    ldr     x0, [sp, #64 + 16]
     bl      c_patch
-    ldr     x0, [sp, #48 + 24]
+    ldr     x0, [sp, #64 + 24]
     cbz     x0, 5f
     bl      c_patch
 5:  OP      OP_UNDEF
@@ -3603,7 +4084,7 @@ s_try:
     OP      OP_POP
     mov     w0, #OP_JMP
     bl      c_jump
-    str     x0, [sp, #48 + 8]
+    str     x0, [sp, #64 + 8]
     ldr     x0, [sp, #16]
     ldr     x1, [x29, #F_LEN]
     bl      c_resolve
@@ -3616,25 +4097,28 @@ s_try:
 6:  ldr     x9, [sp, #40]
     cbz     x9, c_unexpected
 7:  OP      OP_RETSUB
-    ldr     x0, [sp, #48 + 8]
+    ldr     x0, [sp, #64 + 8]
     bl      c_patch
     ldr     x9, [sp]
     str     x9, [x29, #F_TRY]
-    add     sp, sp, #48
+    add     sp, sp, #64
     b       s_done
-// c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this
-// function it leaves (for a break: those begun inside the loop) is ended and its finally run; inside a finally, the two
-// places it was reached with are dropped instead.
+// c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of
+// this function it leaves is ended and its finally run; inside a finally, the two places it was reached with are dropped.
 c_try_exits:                            // w0 as above; for a break or continue, x1 the loop it goes to: the loops left on
-    stp     x30, x0, [sp, #-48]!        // the way drop what they keep on the stack. 8 which, 16 the try, 24 the loop, 32 the goal
-    str     x1, [sp, #32]
+    stp     x30, x0, [sp, #-64]!        // the way drop what they keep on the stack, and blocks' scopes are left in step.
+    str     x1, [sp, #32]               // 8 which, 16 the try, 24 the loop, 32 the goal, 40 a count, 48 the block we are in, 56 the function
     ldr     x9, [x29, #F_LOOP]
     str     x9, [sp, #24]
+    ldr     x9, [x29, #F_FUNC]
+    str     x9, [sp, #48]
+    bl      c_realfn
+    str     x1, [sp, #56]
     ldr     x9, [x29, #F_TRY]
 1:  str     x9, [sp, #16]
     cbz     x9, 7f
     ldr     x10, [x9, #32]
-    ldr     x11, [x29, #F_FUNC]
+    ldr     x11, [sp, #56]
     cmp     x10, x11
     b.ne    7f
     ldr     x12, [sp, #8]
@@ -3643,7 +4127,11 @@ c_try_exits:                            // w0 as above; for a break or continue,
     ldr     x11, [sp, #24]
     cmp     x10, x11
     b.ne    7f
-2:  ldr     x10, [x9, #8]
+2:  ldr     x0, [x9, #48]
+    bl      c_unscope_to
+    ldr     x9, [sp, #16]
+    ldr     x12, [sp, #8]
+    ldr     x10, [x9, #8]
     cbz     x10, 5f
     cbnz    x12, 3f
     OP      OP_ENDTRY
@@ -3670,7 +4158,7 @@ c_try_exits:                            // w0 as above; for a break or continue,
     cbnz    x12, 9f
     ldp     x9, x10, [sp, #24]
     cmp     x9, x10
-    b.eq    9f
+    b.eq    6f
     cbz     x9, 9f
     ldr     w9, [x9, #32]
     str     x9, [sp, #40]
@@ -3685,6 +4173,23 @@ c_try_exits:                            // w0 as above; for a break or continue,
     str     x9, [sp, #24]
     ldr     x9, [sp, #16]
     b       1b
-9:  ldr     x30, [sp], #48
+6:  ldr     x0, [x10, #56]
+    bl      c_unscope_to
+9:  ldr     x30, [sp], #64
     ret
+c_unscope_to:                           // (inside c_try_exits) OP_UNSCOPE for each block's scope between where we are and the record x0
+    mov     x15, x30
+    mov     x14, x0
+1:  ldr     x13, [sp, #48]
+    cmp     x13, x14
+    b.eq    2f
+    cbz     x13, 2f
+    ldr     x12, [x13, #R_FLAGS]
+    tbz     x12, #8, 2f
+    ldr     x12, [x13, #R_PARENT]
+    str     x12, [sp, #48]
+    mov     w0, #OP_UNSCOPE
+    bl      c_byte
+    b       1b
+2:  ret     x15
     .ltorg

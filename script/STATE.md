@@ -155,10 +155,22 @@ kept at `~/.trough/gem/stage5/scope.js` (8 lines on node; copy it into `checks/p
 labels: `name:` before a statement is kept in F_LABEL and taken by the next LOOP_IN (record 72, 80); `c_try_exits` now also
 takes the loop being left to and drops what each loop on the way keeps on the stack (record 64: 2 for for..in/of, 1 for
 switch). c_stmt's frame is 96 bytes. Not made: a label on a plain block.
-Block scope, the plan (not begun): two cases. (1) A block with no function inside it: each let/const/class gets a new place
-among the function's variables (a new R_NAMES entry even when the name exists; `c_ref` already searches newest first), and
-the names are struck out when the block ends. At the top level there is no function record, so the program needs places of
-its own on the stack (a top record that `c_ref` passes through to the globals). (2) A block with a function inside: a scope
-object at run time (new instructions to enter, leave and, for `for (let ..)`, copy it each turn), a block record in the
-R_PARENT chain so hops count it; leaving by break, continue or return must drop scopes before any finally runs. Dead zone:
-places start as T_HOLE and GETL/GETUP of a let checks it. Check program: `~/.trough/gem/stage5/scope.js`.
+**Tenth unit: block scope done: Gemini's `scope.js` and my `scope2.js` pass, 27 of 27 programs, 1332 lines.**
+How (all in `compile.S`; the comment above `c_block_in` gives the block record): every `{}` statement and every `for` (read
+inside a block of its own, `s_forw`) is a block. `c_scan_fn` looks ahead for a function inside it. Without one, a let or const
+is one more place among the function's variables (`c_declare_new`: a new name entry with bit 62, bit 63 for const; `c_ref`
+searches newest first; `c_block_out` strikes the entries out), or at the top level a nameless global found through a list of
+names kept where a function's names would be (`c_alias_new`). With one, the block has a scope object at run time (OP_SCOPE,
+OP_UNSCOPE, and OP_COPYSCOPE once per turn of a loop: 89-91) and a record of its own in the R_PARENT chain (flag 256), read by
+OP_GETUP 0; functions declared in it are made at its start. `c_declref` decides by F_DECLKIND (set by `c_var`, `s_each`).
+Leaving early: `c_try_exits` leaves scopes in step (`c_unscope_to`; loop record 88 and try record 48 hold the block they
+began in). Const: `c_ref` notes the read in F_CONSTPOS and `c_lvalue` swaps it for OP_CONSTGET/OP_CONSTERR (92, 93).
+`c_realfn` gives the real function past block records (used by return and try).
+Not made / soft: the dead zone proper (a let read before its line resolves outward: an undeclared global raises
+ReferenceError, an outer variable is silently used); a top-level `const` outside any block can be assigned; class
+declarations are var-like; `arguments` or a pattern `var` first met inside a block that has a scope (the second is refused);
+a `for (let ..;;)` with no step part does not copy its scope per turn; switch bodies are not blocks of their own; a scope
+object per entry of a block with a function is never given back until stage 7.
+**Stage 5 is complete apart from those notes.** Next: shapes (property lookup by shared layout), then stage 6, the library
+(Object, Array, String, Number, Math, JSON first: this is where page scripts start to run; needs native functions callable
+from the language and text of an object by its toString). Ask Gemini for each check program first.

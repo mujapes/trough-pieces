@@ -90,7 +90,12 @@
     .equ OP_GOSUB, 86                   // + 32 bits: goes there, leaving on the stack where to come back to (a finally)
     .equ OP_RETSUB, 87                  // comes back
     .equ OP_GETGQ, 88                   // + 16 bits: a global read that does not mind the name never having been declared (typeof)
-    .equ OP_COUNT, 89
+    .equ OP_SCOPE, 89                   // + 16 bits: how many variables: a block's own scope begins, inside the one before
+    .equ OP_UNSCOPE, 90                 // and ends
+    .equ OP_COPYSCOPE, 91               // + 16 bits: how many: the scope is exchanged for a copy of itself (a loop's next turn)
+    .equ OP_CONSTGET, 92                // + 16 bits (not used): stands where a const would be read to be assigned to: undefined
+    .equ OP_CONSTERR, 93                // + 16 bits (not used): the assignment itself: TypeError
+    .equ OP_COUNT, 94
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -558,6 +563,51 @@ i_getg:
 e_referr: .ascii "ReferenceError"
 e_notdef: .ascii " is not defined"
 e_notdef_end:
+    .balign 4
+i_scope:
+    U16     w4
+    add     x0, x4, #1
+    lsl     x0, x0, #3
+    bl      w_alloc
+    cbz     x0, m_full
+    add     x9, x19, x0
+    str     x28, [x9], #8
+    VAL     x10, T_UNDEF
+1:  cbz     x4, 2f
+    str     x10, [x9], #8
+    sub     x4, x4, #1
+    b       1b
+2:  mov     x28, x0
+    NEXT
+i_unscope:
+    ldr     x28, [x19, x28]
+    NEXT
+i_copyscope:
+    U16     w4
+    add     x0, x4, #1
+    lsl     x0, x0, #3
+    bl      w_alloc
+    cbz     x0, m_full
+    add     x9, x19, x0
+    add     x10, x19, x28
+    add     x4, x4, #1
+1:  ldr     x11, [x10], #8
+    str     x11, [x9], #8
+    subs    x4, x4, #1
+    b.ne    1b
+    mov     x28, x0
+    NEXT
+i_constget:
+    add     x21, x21, #2
+    VAL     x0, T_UNDEF
+    PUSH    x0
+    NEXT
+i_consterr:
+    adr     x0, e_const
+    mov     x1, #(e_const_end - e_const)
+    b       m_fail
+e_const: .ascii "TypeError: Assignment to constant variable."
+e_const_end:
     .balign 4
 i_getgq:                                // the same read under typeof, where such a name is just undefined
     U16     w0
@@ -1356,4 +1406,5 @@ m_table:
     .word   i_keys - m_table, i_iter - m_table, i_fornext - m_table
     .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
     .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table, i_getgq - m_table
+    .word   i_scope - m_table, i_unscope - m_table, i_copyscope - m_table, i_constget - m_table, i_consterr - m_table
     .ltorg
