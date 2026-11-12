@@ -41,7 +41,9 @@ m_answer:
     str     x0, [x12]
     add     x22, x12, #8
     NEXT
-1:  TAGIS   x0, T_OBJECT
+1:  cmp     x13, #5
+    b.eq    3f
+    TAGIS   x0, T_OBJECT
     b.ne    2f
     mov     x4, x12
     mov     x5, x13
@@ -53,6 +55,28 @@ m_answer:
     sub     x13, x13, #2
     add     x22, x12, x13, lsl #3
     NEXT
+3:  str     x0, [x12]
+    add     x22, x12, #8
+    NEXT
+// m_drain: from an instruction of x6 bytes that wants an array to go through and met, on top, something else: the
+// prelude's function (W_ITERFN) is called with it (call kind 5), its answer takes the value's place and the instruction
+// runs again.
+m_drain:
+    ldr     x4, [x19, #W_ITERFN]
+    cbz     x4, 1f
+    sub     x21, x21, x6
+    ldr     x0, [x22, #-8]
+    sub     x12, x22, #8
+    VAL     x11, T_UNDEF
+    PUSH    x4
+    mov     x1, x22
+    PUSH    x0
+    mov     x0, #1
+    mov     x13, #5
+    b       m_call
+1:  adr     x0, e_noiter
+    mov     x1, #(e_noiter_end - e_noiter)
+    b       m_fail
 // m_toprim: from an instruction of one byte that met an object where it wants text or a number: x5 the object, x4 1 if it
 // is the top value, 2 if the one under. A plain object with a toString that is a function has it called, and the
 // instruction runs again with the answer in the object's place; any other object becomes its usual text at once.
@@ -260,10 +284,23 @@ n_maker:
     b.ne    3b
     str     x10, [x13, #O_PROTO]
     b       3b
-2:  stp     xzr, xzr, [x11]
+2:  cmp     x9, #7
+    b.ne    4f
+    ldr     x1, [sp, #24]
+    ldr     x10, [x1, #8]
+    str     x10, [x19, #W_ITERFN]
+    b       n_undef
+4:  stp     xzr, xzr, [x11]
     stp     xzr, xzr, [x11, #16]
     stp     xzr, xzr, [x11, #32]
     b       n_undef
+// 42: a number that is an object's alone for as long as the world lasts (where it lies); Map and Set tell objects apart by it
+n_ident:
+    ldr     x9, [x1]
+    and     x9, x9, #0xffffffffffff
+    ucvtf   d0, x9
+    fmov    x0, d0
+    ret
 // Math. 1 floor, 2 ceil, 3 abs, 4 sqrt, 6 trunc: one instruction each on this processor.
     MATH1   n_floor, frintm
     MATH1   n_ceil, frintp
@@ -574,6 +611,6 @@ n_table:
     .word   n_log2 - n_table, n_log10 - n_table, n_random - n_table, n_sin - n_table, n_cos - n_table, n_tan - n_table
     .word   n_undef - n_table, n_undef - n_table, n_jparse - n_table
     .word   n_atan - n_table, n_atan2 - n_table, n_asin - n_table, n_acos - n_table, n_expm1 - n_table, n_log1p - n_table
-    .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table
-    .equ    N_COUNT, 42
+    .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table, n_ident - n_table
+    .equ    N_COUNT, 43
     .ltorg

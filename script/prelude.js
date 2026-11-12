@@ -95,3 +95,31 @@ if(r){i=0;while(1){if(i===a.length){a.push(1);break}a[i]=a[i]+1;if(a[i]<10)break
 s='';for(i=a.length-1;i>=0;i--)s+=a[i];i=0;while(i<s.length-1&&s.charCodeAt(i)===48)i++;s=s.substring(i);while(s.length<=f)s='0'+s}
 if(f)s=s.substring(0,s.length-f)+'.'+s.substring(s.length-f);return g+s};
 })(Array.prototype,String.prototype,Number.prototype,__n);
+var Symbol={iterator:'@@iterator',asyncIterator:'@@asyncIterator'},Map,Set;
+(function(n,A){
+var id=n(42),D={};
+function AI(a,m){this.a=a;this.i=0;this.m=m}
+AI.prototype.next=function(){var a=this.a,i=this.i,m=this.m;if(i>=a.length)return{value:undefined,done:true};this.i=i+1;return{value:m===0?a[i]:m===1?i:[i,a[i]],done:false}};
+AI.prototype['@@iterator']=function(){return this};
+A.values=A['@@iterator']=function(){return new AI(this,0)};A.keys=function(){return new AI(this,1)};A.entries=function(){return new AI(this,2)};
+n(-8,function(o){var f,t,a,r;if(o==null||typeof(f=o['@@iterator'])!=='function')throw new TypeError('the value is not iterable');
+t=f.call(o);if(Array.isArray(t))return t;if(t instanceof AI&&t.m===0&&t.i===0){t.i=t.a.length;return t.a}a=[];while(!(r=t.next()).done)a.push(r.value);return a});
+function key(k){var t=typeof k;return t==='string'?'s'+k:t==='number'?'n'+k:(t==='object'&&k!==null)||t==='function'?'o'+id(k):'x'+k}
+function pack(m){var k=m._k,v=m._v,nk=[],nv=[],h={},i;for(i=0;i<k.length;i++)if(k[i]!==D){h[key(k[i])]=nk.length;nk.push(k[i]);if(v)nv.push(v[i])}m._k=nk;if(v)m._v=nv;m._h=h;m._d=0}
+function list(m,w){var k=m._k,v=m._v,a=[],i;for(i=0;i<k.length;i++)if(k[i]!==D)a.push(w===0?k[i]:w===1?v[i]:w===2?[k[i],v[i]]:[k[i],k[i]]);return a}
+function has(k){return this._h[key(k)]!==undefined}
+function del(k){var s=key(k),i=this._h[s];if(i===undefined)return false;this._h[s]=undefined;this._k[i]=D;if(this._v)this._v[i]=undefined;this.size--;this._d++;if(this._d>32&&this._d>this.size)pack(this);return true}
+Map=function Map(it){if(!(this instanceof Map))throw new TypeError("Constructor Map requires 'new'");this._h={};this._k=[];this._v=[];this.size=0;this._d=0;if(it!=null)for(var e of it)this.set(e[0],e[1])};
+var M=Map.prototype;M.has=has;M['delete']=del;
+M.get=function(k){var i=this._h[key(k)];return i===undefined?undefined:this._v[i]};
+M.set=function(k,v){var s=key(k),i=this._h[s];if(i===undefined){this._h[s]=this._k.length;this._k.push(k===0?0:k);this._v.push(v);this.size++}else this._v[i]=v;return this};
+M.clear=function(){this._h={};this._k=[];this._v=[];this.size=0;this._d=0};
+M.forEach=function(f,t){var i;for(i=0;i<this._k.length;i++)if(this._k[i]!==D)f.call(t,this._v[i],this._k[i],this)};
+M.keys=function(){return new AI(list(this,0),0)};M.values=function(){return new AI(list(this,1),0)};M.entries=M['@@iterator']=function(){return new AI(list(this,2),0)};
+Set=function Set(it){if(!(this instanceof Set))throw new TypeError("Constructor Set requires 'new'");this._h={};this._k=[];this.size=0;this._d=0;if(it!=null)for(var e of it)this.add(e)};
+var S=Set.prototype;S.has=has;S['delete']=del;
+S.add=function(k){var s=key(k);if(this._h[s]===undefined){this._h[s]=this._k.length;this._k.push(k===0?0:k);this.size++}return this};
+S.clear=function(){this._h={};this._k=[];this.size=0;this._d=0};
+S.forEach=function(f,t){var i,k;for(i=0;i<this._k.length;i++)if((k=this._k[i])!==D)f.call(t,k,k,this)};
+S.values=S.keys=S['@@iterator']=function(){return new AI(list(this,0),0)};S.entries=function(){return new AI(list(this,3),0)};
+})(__n,Array.prototype);

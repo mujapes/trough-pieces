@@ -2890,7 +2890,10 @@ c_pattern:
     cmp     w24, #33
     cset    w9, eq
     stp     w9, wzr, [sp, #24]
-    bl      next_word
+    cbnz    w9, 0f                      // a list pattern takes its items from anything that can be gone through
+    mov     w0, #OP_ITER
+    bl      c_byte
+0:  bl      next_word
 1:  ldr     w9, [sp, #24]
     mov     w10, #38
     mov     w11, #34

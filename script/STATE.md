@@ -231,3 +231,16 @@ to u^30) carries all four arc functions (asin and acos hand it x and the root of
 hypot squares exactly as pairs after scaling by 2^600 either way. 40 routines in machine code. Not made: asinh, acosh, atanh,
 fround, clz32, imul; a hypot that lies exactly half way between two doubles (possible, not met) may round either way.
 Next: Map, Set, Symbol.iterator enough for for..of over them.
+**Stage 6, seventh unit: Map, Set, and going through anything iterable. `collections.js` and `math2.js` (Gemini's draft)
+pass: 33 of 33 programs.** How: an instruction that wants an array to go through (OP_ITER, spread, the rest of a list) and
+meets something else calls the prelude's function registered by `__n(-8, f)` (W_ITERFN; `m_drain` in lib.S, call kind 5:
+the answer takes the value's place and the instruction runs again). That function calls the value's `'@@iterator'` method
+(`Symbol.iterator` is that string: `Symbol` is a plain object, not a new kind of value) and drains `next()` into an array.
+A list pattern `[a, b] = v` now begins with OP_ITER. Map and Set are in prelude.js: a plain object as the index (keys 's' +
+text, 'n' + number, 'o' + built-in 42 `n_ident`, the object's place in the world, 'x' + the rest), arrays of keys and
+values in order, holes packed away after deletions. Arrays have values, keys, entries and `[Symbol.iterator]`.
+Soft / not made: an iterator is drained whole before the loop begins (an endless one never ends; changes made to a Map
+during its loop are not seen); real symbols; WeakMap, WeakSet; a Map's `_h`, `_k`, `_v`, `_d` and its methods show in
+for..in (no hidden properties yet); `[a, b] = v` as an expression gives the array made from v, not v; text of a function.
+`Math.expm1(1)`: node is one unit off, ours is the exact rounding (that one line is skipped in math2.js).
+Next: asinh, acosh, atanh, fround, clz32, imul; then join, indexOf, slice into lib.S; shapes; RegExp.

@@ -42,6 +42,7 @@
     .equ W_RNG, 400                     // Math.random's state
     .equ W_K_TOSTRING, 408
     .equ W_JWIDE, 416                   // JSON.parse: 1 if the text it is reading has two bytes a unit
+    .equ W_ITERFN, 424                  // the prelude's function that turns anything loopable into an array (0: not yet)
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below
     .equ T_UNDEF, 0xfff9

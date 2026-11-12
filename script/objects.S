@@ -874,9 +874,8 @@ i_spread:                               // array, array or string -> array, each
 3:  add     sp, sp, #16
     sub     x22, x22, #8
     NEXT
-8:  adr     x0, e_noiter
-    mov     x1, #(e_noiter_end - e_noiter)
-    b       m_fail
+8:  mov     x6, #1
+    b       m_drain
 i_tail:                                 // + 16 bits: from which item. array or string -> a new array of the items from there on
     U16     w5
     ldr     x0, [x22, #-8]
@@ -904,9 +903,8 @@ i_tail:                                 // + 16 bits: from which item. array or 
     cbz     x0, m_full
     str     x0, [x22, #-8]
     NEXT
-8:  adr     x0, e_noiter
-    mov     x1, #(e_noiter_end - e_noiter)
-    b       m_fail
+8:  mov     x6, #3
+    b       m_drain
 i_apply:                                // + 8 bits: which call. The array on top is taken apart into the call's arguments
     ldrb    w9, [x21], #1
     POP     x0
@@ -1323,9 +1321,8 @@ i_iter:                                 // value -> the array to loop over: an a
     ldr     x1, [x19, x1]
     cmp     x1, #4
     b.eq    m_next
-2:  adr     x0, e_noiter
-    mov     x1, #(e_noiter_end - e_noiter)
-    b       m_fail
+2:  mov     x6, #1
+    b       m_drain
 i_fornext:                              // + 32 bits: how far to jump when there are no more. array, place -> array, place + 1, item
     FAR     x1
     ldp     x0, x2, [x22, #-16]
