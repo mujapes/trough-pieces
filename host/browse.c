@@ -16,8 +16,9 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
 typedef long long (*entry5)(void *, const int16_t *, long long, long long, void *const *);
-static void *table[512]; static piece loaded[64]; static char stems[64][256]; static int count; static const char *dir;
+static __thread void *table[512]; static void *sockets[256]; static piece loaded[64]; static char stems[64][256]; static int count; static const char *dir;
 static piece *get(const char *name) { char stem[600]; snprintf(stem, sizeof stem, "%s/%s", dir, name); for (int i = 0; i < count; i++) if (!strcmp(stems[i], stem)) return &loaded[i];
     if (count >= 64 || piece_load(&loaded[count], stem)) { fprintf(stderr, "cannot load piece %s\n", stem); exit(3); } strncpy(stems[count], stem, 255); return &loaded[count++]; }
 static entry5 entry(const char *piece_name, const char *name) { entry5 e = (entry5)piece_entry(get(piece_name), name); if (!e) { fprintf(stderr, "no entry %s in %s\n", name, piece_name); exit(3); } return e; }
@@ -130,19 +131,29 @@ static int get_picture(pic *p, const char *page_address, const uint8_t *roots) {
     uint8_t *whole = surface(1, iw, ih, 4), *scratch = block(5, 64 + 24ull * iw * ih + 8ull * ih + 70000 + 20480); at(37, whole); at(38, scratch);
     long long ok = entry(kind, "decode")(whole, qp, !strcmp(kind, "gif") ? 3 : 2, 0, table); free(scratch); free(body); if (ok < 0) { free(whole); return 0; }
     p->ready = surface(1, p->w, p->h, 4); entry("paint", "clear")(p->ready, 0, 0, 0xffffffffll, table); int16_t qi[5] = {37, 0, 0, (int16_t)p->w, (int16_t)p->h}; entry("image", iw > p->w ? "smooth" : iw < p->w ? "stretch" : "blit")(p->ready, qi, iw == p->w && ih == p->h ? 3 : 5, 0, table); free(whole); return 1; }
+/* A page's pictures are fetched by a thread of their own, one after another, so touches are never kept waiting. The thread has its
+ * own handles (the table is per thread) and the same sockets. When the page is left, whoever lets go last frees the job. */
+typedef struct { pic p[32]; int n; char address[2048]; const uint8_t *roots; volatile int cancel; int owner; } job;
+static void job_free(job *j) { for (int i = 0; i < j->n; i++) free(j->p[i].ready); free(j); }
+static void *picture_worker(void *arg) { job *j = arg; memcpy(table, sockets, sizeof sockets);
+    for (int i = 0; i < j->n && !j->cancel; i++) { pic got = j->p[i]; int ok = get_picture(&got, j->address, j->roots); j->p[i].ready = got.ready; __atomic_store_n(&j->p[i].state, ok ? 1 : 2, __ATOMIC_SEQ_CST); }
+    if (__atomic_exchange_n(&j->owner, 2, __ATOMIC_SEQ_CST) == 1) job_free(j); return 0; }
+static void job_leave(job *j) { if (!j) return; j->cancel = 1; if (__atomic_exchange_n(&j->owner, 1, __ATOMIC_SEQ_CST) == 2) job_free(j); }
 static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     if (argc < 7) { fprintf(stderr, "browse <pieces out dir> --serve <picture file> <events file> <width> <height> [address]\n"); return 2; }
     uint32_t W = (uint32_t)atoi(argv[5]), H = (uint32_t)atoi(argv[6]); if (W < 16 || H < 16 || W > 4096 || H > 4096) return 2; size_t bytes = 64 + 4ull * W * H;
     int fd = open(argv[3], O_RDWR | O_CREAT, 0600); if (fd < 0 || ftruncate(fd, (off_t)bytes)) { fprintf(stderr, "cannot make the picture file\n"); return 1; }
     uint8_t *screen = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (screen == MAP_FAILED) return 1; uint64_t z = bytes, counter = 0; uint32_t head[4] = {1, W, H, 4 * W}; memset(screen, 0, 64); memcpy(screen, head, 16); memcpy(screen + 16, &z, 8);
     FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
-    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; static pic pics[PICS]; int pic_n = 0; static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
+    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; job *now = 0; static int applied[PICS]; pic *pics = 0; int pic_n = 0;
+    { const char *need[][2] = {{"url","resolve"},{"url","part"},{"url","port"},{"http","request"},{"http","status"},{"http","header"},{"http","packed"},{"http","body"},{"inflate","unpack"},{"tls","feed"},{"png","decode"},{"jpeg","decode"},{"gif","decode"},{"image","blit"},{"image","smooth"},{"image","stretch"},{"paint","clear"},{"page","pictures"},{"page","link"}}; for (size_t i = 0; i < sizeof need / sizeof need[0]; i++) entry(need[i][0], need[i][1]); }   /* every piece is loaded before a second thread exists */ static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
     for (;;) {
         if (fresh) { fresh = 0; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
-            for (int i = 0; i < pic_n; i++) { free(pics[i].ready); pics[i].ready = 0; } pic_n = 0;
+            job_leave(now); now = 0; pics = 0; pic_n = 0; memset(applied, 0, sizeof applied);
             if (body) { at(34, body); at(35, font); uint8_t *list = block(2, 65536); int16_t qq[4] = {34, 35, (int16_t)size_px, (int16_t)W}; long long ln = entry("page", "pictures")(list, qq, 4, 0, table);
+                now = calloc(1, sizeof *now); pics = now->p; snprintf(now->address, sizeof now->address, "%s", address); now->roots = roots;
                 for (long long o = 0; o + 20 <= ln && pic_n < PICS; ) { uint32_t f[5]; memcpy(f, list + 64 + o, 20); if (f[4] < sizeof pics[0].src && f[2] && f[3]) { pic *p = &pics[pic_n++]; p->x = f[0]; p->y = f[1]; p->w = f[2]; p->h = f[3]; size_t k = 0; for (uint32_t i = 0; i < f[4]; i++) { char c = (char)list[64 + o + 20 + i]; p->src[k++] = c; if (c == '&' && i + 4 < f[4] && !memcmp(list + 64 + o + 21 + i, "amp;", 4)) i += 4; } p->src[k] = 0; p->state = 0; p->ready = 0; } o += 20 + ((f[4] + 3) & ~3u); }
-                free(list); printf("%d pictures to fetch\n", pic_n); fflush(stdout); }
+                free(list); now->n = pic_n; printf("%d pictures to fetch\n", pic_n); fflush(stdout); pthread_t th; if (pic_n && !pthread_create(&th, 0, picture_worker, now)) pthread_detach(th); else { free(now); now = 0; pics = 0; pic_n = 0; } }
             if (!body) { char sorry[600]; int n = snprintf(sorry, sizeof sorry, "<h2>This page could not be opened</h2><p>%s</p><p>%s</p>", address, why); body = text_block(sorry, (size_t)n); } }
         if (dirty) { dirty = 0; int drawn = 0; double t = now_ms(); at(34, body); at(35, font); memcpy(&counter, screen + 24, 8); { /* the page shows from row (scroll - BAR) of its own height; each strip of TILE rows is drawn by the pieces once and kept */
               long long first = scroll - BAR; size_t rowbytes = 4 * (size_t)W;
@@ -171,15 +182,14 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
                 else if (line[0] == 'g' && sscanf(line + 1, "%d", &y) == 1) { long long limit = tall + BAR > (long long)H ? tall + BAR - H : 0; scroll = y < 0 ? 0 : y > limit ? limit : y; dirty = 1; }   /* go to that row of the page */
                 else if (line[0] == 'q') return 0; } }
         else if (st.st_size < read_to) read_to = 0;
-        if (!dirty && !fresh) { int todo = -1; for (int i = 0; i < pic_n && todo < 0; i++) if (pics[i].state == 0) todo = i;
-            if (todo >= 0) { double t = now_ms(); pic *p = &pics[todo]; p->state = get_picture(p, address, roots) ? 1 : 2; printf("picture %d of %d (%u x %u at row %u) %s in %.0f ms: %.80s\n", todo + 1, pic_n, p->w, p->h, p->y, p->state == 1 ? "ready" : "could not be shown", now_ms() - t, p->src); fflush(stdout);
-                if (p->state == 1) { for (int i = 0; i < KEPT; i++) if (strip_at[i] >= 0 && (long long)p->y < (strip_at[i] + 1) * TILE && (long long)p->y + p->h > strip_at[i] * TILE) strip_at[i] = -1; dirty = 1; } }
-            else usleep(4000); } } }
+        for (int i = 0; i < pic_n; i++) if (!applied[i] && __atomic_load_n(&pics[i].state, __ATOMIC_SEQ_CST)) { applied[i] = 1;   /* a picture has arrived (or failed): the strips it sits in are drawn again */
+            if (pics[i].state == 1) { for (int k = 0; k < KEPT; k++) if (strip_at[k] >= 0 && (long long)pics[i].y < (strip_at[k] + 1) * TILE && (long long)pics[i].y + pics[i].h > strip_at[k] * TILE) strip_at[k] = -1; dirty = 1; } }
+        if (!dirty && !fresh) usleep(4000); } }
 int main(int argc, char **argv) {
     if (argc < 4) { fprintf(stderr, "browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]\n   or: browse <pieces out dir> --ask <key file> <model> <prompt file> [most tokens]\n"); return 2; }
     dir = argv[1]; int size_px = argc > 4 ? atoi(argv[4]) : 26, scroll = argc > 5 ? atoi(argv[5]) : 0; uint32_t W = argc > 6 ? (uint32_t)atoi(argv[6]) : 720, H = argc > 7 ? (uint32_t)atoi(argv[7]) : 1280; double started = now_ms();
     char path[600]; snprintf(path, sizeof path, "%s/../slots.txt", dir); FILE *f = fopen(path, "r"); if (!f) { fprintf(stderr, "no slots.txt\n"); return 3; }
-    char line[256]; while (fgets(line, sizeof line, f)) { int slot; char name[64], en[64]; if (line[0] == '#' || sscanf(line, "%d %63s %63s", &slot, name, en) != 3) continue; if (slot >= 0 && slot < 256) table[slot] = piece_entry(get(name), en); } fclose(f);
+    char line[256]; while (fgets(line, sizeof line, f)) { int slot; char name[64], en[64]; if (line[0] == '#' || sscanf(line, "%d %63s %63s", &slot, name, en) != 3) continue; if (slot >= 0 && slot < 256) table[slot] = piece_entry(get(name), en); } fclose(f); memcpy(sockets, table, sizeof sockets);
     snprintf(path, sizeof path, "%s/android-roots.der", dir); uint8_t *roots = file_block(path); if (argc > 2 && !strcmp(argv[2], "--ask")) return ask(argc, argv, roots); if (argc > 2 && !strcmp(argv[2], "--serve")) { snprintf(path, sizeof path, "%s/font.fixture", dir); return serve(argc, argv, roots, file_block(path)); } snprintf(path, sizeof path, "%s/font.fixture", dir); uint8_t *font = file_block(path);
     entry5 resolve = entry("url", "resolve"), part = entry("url", "part"), port_of = entry("url", "port"), request_of = entry("http", "request"), status_of = entry("http", "status"), header = entry("http", "header"), packed_of = entry("http", "packed"), body_of = entry("http", "body"), unpack = entry("inflate", "unpack");
     uint8_t *address = text_block(argv[2], strlen(argv[2])), *reply = 0; char why[400] = ""; const char *secure = ""; long long status = -1;
