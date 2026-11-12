@@ -221,6 +221,8 @@ m_keys:
     str     x0, [x19, #W_K_CONSTRUCTOR]
     LIT     k_tostring, k_end
     str     x0, [x19, #W_K_TOSTRING]
+    LIT     e_full, e_wrong
+    str     x0, [x19, #W_K_FULL]
     ldr     x30, [sp], #16
     ret
 k_length:      .ascii "length"

@@ -258,3 +258,8 @@ about 20 ms; the prelude's join filled the 1.2 MB test world after about five (a
 before stage 7), so no time comparison was had. Found, not made: empty places in a list `[, 'a', ,]` are a SyntaxError;
 a full world ends the run with no error text. 49 routines in machine code.
 Next: shapes; string indexOf, slice, split, trim, concat and array includes, lastIndexOf, concat into lib.S; RegExp.
+**Small repairs after the ninth unit:** empty places in a list (`[, 'a', ,]`) are taken (kept as undefined, not as true
+holes); a full world now stops with "RangeError: the world is full" (its text is made at the start, W_K_FULL). 34 of 34.
+**Order changed (my judgement, said to the user):** RegExp comes before shapes. Shapes only make lookups faster; page
+scripts cannot run at all without RegExp, Date, Promise and timers. Next: RegExp (read intent.md's stage list first; ask
+Gemini for the check program with tight instructions: no "-0" in labels, no exact digits of curved functions).

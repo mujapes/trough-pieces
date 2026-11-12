@@ -499,7 +499,9 @@ i_retsub:
     NEXT
 m_fatal:
     bl      w_string
-    str     x0, [x19, #W_ERR]
+    cbnz    x0, 1f
+    ldr     x0, [x19, #W_K_FULL]        // no room even for the error's text: the one made at the start
+1:  str     x0, [x19, #W_ERR]
     mov     w9, #3
     str     w9, [x19, #W_STATE]
     mov     x0, #-1

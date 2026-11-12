@@ -2654,7 +2654,13 @@ c_array:
     b.ne    2f
     cmp     w24, #38
     b.eq    9f
-2:  ISP     1, 4f                       // ...v: from the first of these on, the array is made and items are added to it
+2:  cmp     w23, #K_PUNCT               // a comma where an item should be: an empty place, kept as undefined
+    b.ne    21f
+    cmp     w24, #40
+    b.ne    21f
+    OP      OP_UNDEF
+    b       41f
+21: ISP     1, 4f                       // ...v: from the first of these on, the array is made and items are added to it
     ldr     w9, [sp, #12]
     cbnz    w9, 3f
     mov     w0, #OP_ARRAY
@@ -2667,7 +2673,7 @@ c_array:
     OP      OP_SPREAD
     b       6f
 4:  bl      c_assign
-    ldr     w9, [sp, #12]
+41: ldr     w9, [sp, #12]
     cbz     w9, 5f
     OP      OP_APPEND
     b       6f
