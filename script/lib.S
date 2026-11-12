@@ -112,23 +112,34 @@ m_drain:
 // m_toprim: from an instruction of one byte that met an object where it wants text or a number: x5 the object, x4 1 if it
 // is the top value, 2 if the one under. A plain object with a toString that is a function has it called, and the
 // instruction runs again with the answer in the object's place; any other object becomes its usual text at once.
-m_toprim:
-    sub     x21, x21, #1
+m_tonum:                                // the same where a number is wanted: valueOf first, then toString
+    mov     x7, #1
+    b       0f
+m_toprim:                               // (for +: first the object's own '@@toPrimitive', which a Date has; then as for a number)
+    mov     x7, #2
+0:  sub     x21, x21, #1
     and     x6, x5, #0xffffffffffff
     ldr     x6, [x19, x6]
     cmp     x6, #3
     b.ne    5f
-    stp     x4, x5, [sp, #-16]!
+1:  stp     x4, x5, [sp, #-32]!
+    stp     x7, x8, [sp, #16]
     mov     x0, x5
     ldr     x1, [x19, #W_K_TOSTRING]
+    ldr     x2, [x19, #W_K_VALUEOF]
+    ldr     x3, [x19, #W_K_TOPRIM]
+    cmp     x7, #1
+    csel    x1, x1, x2, lo
+    csel    x1, x1, x3, ls
     bl      o_get
-    ldp     x4, x5, [sp], #16
+    ldp     x7, x8, [sp, #16]
+    ldp     x4, x5, [sp], #32
     TAGIS   x0, T_OBJECT
-    b.ne    5f
+    b.ne    4f
     and     x6, x0, #0xffffffffffff
     ldr     x6, [x19, x6]
     cmp     x6, #1
-    b.ne    5f
+    b.ne    4f
     sub     x12, x22, x4, lsl #3
     mov     x11, x5
     PUSH    x0
@@ -136,6 +147,8 @@ m_toprim:
     mov     x0, #0
     add     x13, x4, #2
     b       m_call
+4:  subs    x7, x7, #1                  // not a function: the next of the three is tried
+    b.ge    1b
 5:  str     x4, [sp, #-16]!
     mov     x0, x5
     bl      v_text
@@ -853,5 +866,6 @@ n_table:
     .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table, n_ident - n_table
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
-    .equ    N_COUNT, 54
+    .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table
+    .equ    N_COUNT, 57
     .ltorg

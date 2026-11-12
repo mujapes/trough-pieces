@@ -9,6 +9,7 @@
     .global run
     .global text
     .global error
+    .global clock
     .include "script/world.S"
     .include "script/lex.S"
     .include "script/tokens.S"
@@ -21,5 +22,6 @@
     .include "script/lib.S"
     .include "script/math.S"
     .include "script/regex.S"
+    .include "script/date.S"
     .include "script/json.S"
     .include "script/entries.S"

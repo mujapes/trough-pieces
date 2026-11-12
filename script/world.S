@@ -44,6 +44,8 @@
     .equ W_JWIDE, 416                   // JSON.parse: 1 if the text it is reading has two bytes a unit
     .equ W_ITERFN, 424                  // the prelude's function that turns anything loopable into an array (0: not yet)
     .equ W_FALLBACK, 432                // three functions of the prelude: join, indexOf, slice in the language, for what built-ins 49-51 do not take
+    .equ W_K_TOPRIM, 504                // the text "@@toPrimitive"
+    .equ W_K_VALUEOF, 496               // the text "valueOf"
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below

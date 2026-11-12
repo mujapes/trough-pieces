@@ -156,6 +156,23 @@ text:
     b       9f
 8:  mov     x0, #-1
 9:  LEAVE
+// clock: the host gives the time: the argument's low 48 bits are the milliseconds since 1970, its top 16 the minutes local
+// time is ahead of universal time (signed) -> 1, or -1 if the block is not a world
+clock:
+    ENTER
+    ldr     w9, [x19, #W_MAGIC]
+    ldr     w10, =0x534a5254
+    cmp     w9, w10
+    b.ne    8f
+    and     x9, x3, #0xffffffffffff
+    ucvtf   d0, x9
+    str     d0, [x19, #W_CLOCK]
+    asr     x9, x3, #48
+    str     x9, [x19, #W_TZ]
+    mov     x0, #1
+    b       9f
+8:  mov     x0, #-1
+9:  LEAVE
 // error: the last error of the world at the handle, as "message (line L, column C)", into this block from byte 64
 // -> how many bytes (0 if there is none), or -1
 error:

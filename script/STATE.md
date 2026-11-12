@@ -9,7 +9,7 @@ Done and tested (2026-11-12, second session):
 - `num.S` (number to text, exact): `checks/numbers.py out/script.asm` → 2637 numbers, 0 wrong.
 - `compile.S` (words → instructions, one pass; its head comment says how), `values.S`, `machine.S`, and the entries
   `load`, `run`, `text`, `error` in `entries.S`. Build:
-  `./build.sh script/impl.S out/script.asm begin tokens numtext load run text error`
+  `./build.sh script/impl.S out/script.asm begin tokens numtext load run text error clock`
 - `checks/run.py out/script.asm` runs every `checks/programs/*.js` through ours, `qjs` and `node` (node's console habit of
   printing -0 is evened out). 11 programs, 1171 lines. Right: first, flow, strings, numbers, unary,
   pairs0-2 (30 values × 30 values × 22 operators), remainder (exact long division, m_fmod).
@@ -286,3 +286,17 @@ and its kin; a literal directly after `}` or `)` is read by the reader's simple 
 was an error); asked again for a 120-line usage program into /tmp/gout3.json (strip any fences, run with run.py, keep it as
 `regexp3.js` if the references agree with each other).
 Next: Date; Promise and timers (need the host); shapes; the overnight differential fuzz job.
+**Stage 6, twelfth unit: Date, and objects as numbers. 36 of 36 programs (`dates.js`, 19 lines; 14 right on the first run).**
+`date.S` (new): built-ins 54 now(0 clock, 1 minutes ahead), 55 (year, month) -> days from 1970, 56 days -> (year*12+month)*32+day,
+by the 400-year turn. New entry `clock` (argument: low 48 bits the milliseconds, top 16 the minutes local time is ahead; kept in
+W_CLOCK 480, W_TZ 488): the build line now ends `... error clock`; seen right with a fixed time and +120 minutes. The Date object
+is in prelude.js (its time in `_t`): constructor, UTC, parse (the ISO form by our own patterns; "Feb 29, 2024 10:20:30",
+"29 February 2024", toString's and toUTCString's forms, m/d/yyyy), all getters and setters, toISOString, toJSON, toString and kin,
+en-US toLocale*. `m_tonum` (lib.S, beside m_toprim): arithmetic (`TWO`'s slow path), comparison, unary + and - meeting a plain
+object call its valueOf, else its toString, and run again; `+` tries '@@toPrimitive' (a Date's: its text), then valueOf, then
+toString. 54 routines in machine code.
+Not made: built-ins given an object where a number is wanted (`Math.max(date1, date2)` is NaN: they cannot call back); `==`
+with an object; a valueOf that answers an object runs until the steps end; daylight saving (one fixed offset for the whole
+run); zone names other than GMT+hhmm; toLocale* for other places or options; the host does not call `clock` yet (0 until it does).
+Next: Promise and timers (need the host: a queue of jobs the host drives; setTimeout through the clock); then hook the engine
+into the page piece's <script> elements; shapes; the fuzz job.

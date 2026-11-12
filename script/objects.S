@@ -221,6 +221,12 @@ m_keys:
     str     x0, [x19, #W_K_CONSTRUCTOR]
     LIT     k_tostring, k_end
     str     x0, [x19, #W_K_TOSTRING]
+    LIT     k_valueof, k_toprim
+    str     x0, [x19, #W_K_VALUEOF]
+    LIT     k_toprim, k_toprim_end
+    str     x0, [x19, #W_K_TOPRIM]
+    ldr     x0, [x19, #W_K_VALUEOF]
+    str     x0, [x19, #W_K_VALUEOF]
     LIT     e_full, e_wrong
     str     x0, [x19, #W_K_FULL]
     ldr     x30, [sp], #16
@@ -230,6 +236,9 @@ k_prototype:   .ascii "prototype"
 k_constructor: .ascii "constructor"
 k_tostring:    .ascii "toString"
 k_end:
+k_valueof:     .ascii "valueOf"
+k_toprim:      .ascii "@@toPrimitive"
+k_toprim_end:
 e_noprops: .ascii "TypeError: Cannot read properties of undefined or null"
 e_noprops_end:
     .balign 4

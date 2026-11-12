@@ -659,6 +659,18 @@ i_void:
     NEXT
     .endm
 m_two_slow:                             // not both numbers: each is made one, by the language's rules
+    ldp     x0, x1, [x22, #-16]         // (an object first by its own valueOf or toString: the instruction runs again)
+    mov     w16, #T_OBJECT
+    mov     x4, #1
+    mov     x5, x1
+    lsr     x2, x1, #48
+    cmp     w2, w16
+    b.eq    m_tonum
+    mov     x4, #2
+    mov     x5, x0
+    lsr     x2, x0, #48
+    cmp     w2, w16
+    b.eq    m_tonum
     stp     x29, x30, [sp, #-32]!
     ldr     x0, [x22, #-16]
     bl      v_number
@@ -917,11 +929,23 @@ m_powloop:                              // the pair (d5, d16) to the whole power
 3:  ret
 i_neg:
     ldr     x0, [x22, #-8]
+    mov     w16, #T_OBJECT
+    mov     x4, #1
+    mov     x5, x0
+    lsr     x2, x0, #48
+    cmp     w2, w16
+    b.eq    m_tonum
     bl      v_number
     fneg    d0, d0
     RESULT
 i_plus:
     ldr     x0, [x22, #-8]
+    mov     w16, #T_OBJECT
+    mov     x4, #1
+    mov     x5, x0
+    lsr     x2, x0, #48
+    cmp     w2, w16
+    b.eq    m_tonum
     bl      v_number
     RESULT
 i_not:
