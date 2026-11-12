@@ -862,7 +862,18 @@ i_pow:                                  // whole powers by repeated squaring; ot
     bl      m_powloop
 4:  fmov    d0, d4
     RESULT
-8:  ldr     x0, =0x7ff8000000000000
+8:  fmov    d6, #0.5                    // the power one half is the square root, which the processor has exactly;
+    fcmp    d0, d6                      // every other power that is not whole waits for logarithms (the Math library)
+    b.ne    81f
+    fabs    d0, d1
+    ldr     x0, =0x7ff0000000000000
+    fmov    d6, x0
+    fcmp    d0, d6
+    b.eq    82f
+    fsqrt   d0, d1
+    fabs    d0, d0
+82: RESULT
+81: ldr     x0, =0x7ff8000000000000
     fmov    d0, x0
     RESULT
 // PAIRMUL: the pair (\ah, \al) times the pair (\bh, \bl) -> (\ah, \al). A pair is a double and the small amount by which it
@@ -1248,6 +1259,7 @@ m_call:                                 // w0 arguments from x1 on, the function
     ldr     w5, [x4, #16]
     ldr     w6, [x4, #20]
     ldr     x9, [x4, #24]
+    tbnz    x9, #5, m_native            // a built-in routine (lib.S)
     tbz     x9, #4, 88f                 // a class written without a constructor: the call goes on to the parent class,
     ldr     x3, [x2, #O_PROTO]          // or, with none, is over at once
     lsr     x4, x3, #48

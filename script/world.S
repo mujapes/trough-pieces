@@ -33,6 +33,12 @@
     .equ W_K_LENGTH, 280                // names the machine itself knows, as string values (made when first run)
     .equ W_K_PROTOTYPE, 288
     .equ W_K_CONSTRUCTOR, 296
+    .equ W_NGLOB, 312                   // the library's way in (see lib.S): which global holds the maker of built-in functions, plus one;
+    .equ W_NNAME, 320                   // its name while the opening lines are translated; the empty name it has afterwards
+    .equ W_NEMPTY, 328
+    .equ W_PROTOS, 336                  // six object values (0: not yet): what plain objects, arrays, functions, strings, numbers and booleans inherit from
+    .equ W_NSP, 384                     // while a built-in routine runs: the processor's stack as the machine left it
+    .equ W_OWNONLY, 392                 // not 0: m_keylist gives the value's own names only
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below
     .equ T_UNDEF, 0xfff9

@@ -93,6 +93,7 @@ c_compile:
     stp     x9, x10, [x29, #F_NTOP]
     mov     w0, #OP_JMP                 // first to the end, where the declared functions are made; then back here
     bl      c_jump
+    bl      c_native_in
     adr     x20, c_prelude              // first the few lines of the language that make the error classes
     mov     x21, #(c_prelude_end - c_prelude)
     mov     x22, #0
@@ -101,7 +102,8 @@ c_compile:
 3:  cbz     w23, 4f
     bl      c_stmt
     b       3b
-4:  ldp     x20, x21, [x29, #104]
+4:  bl      c_native_out
+    ldp     x20, x21, [x29, #104]
     mov     x22, #0
     mov     w28, #1
     bl      next_word
@@ -130,7 +132,59 @@ c_compile:
 c_out:
     ldp     x29, x30, [sp], #160
     ret
+// c_native_in: the opening lines can name the maker of built-in functions, `__n` (a global, made the first time);
+// c_native_out: nothing after them can: its name becomes the empty one.
+c_native_in:
+    str     x30, [sp, #-16]!
+    ldr     x9, [x19, #W_NGLOB]
+    cbnz    x9, 5f
+    adr     x0, k_n
+    mov     x1, #3
+    bl      w_string
+    cbz     x0, c_full
+    str     x0, [x19, #W_NNAME]
+    adr     x0, k_n
+    mov     x1, #0
+    bl      w_string
+    cbz     x0, c_full
+    str     x0, [x19, #W_NEMPTY]
+    mov     x0, #0
+    bl      n_function
+    cbz     x0, c_full
+    ldr     x2, [x19, #W_GLOB_N]
+    ldr     x9, [x19, #W_GLOB_CAP]
+    cmp     x2, x9
+    b.hs    c_toobig
+    ldr     x1, [x19, #W_GLOB]
+    add     x1, x19, x1
+    add     x5, x1, x2, lsl #4
+    ldr     x6, [x19, #W_NNAME]
+    stp     x6, x0, [x5]
+    add     x9, x2, #1
+    str     x9, [x19, #W_GLOB_N]
+    str     x9, [x19, #W_NGLOB]
+    b       9f
+5:  sub     x9, x9, #1
+    ldr     x1, [x19, #W_GLOB]
+    add     x1, x19, x1
+    add     x5, x1, x9, lsl #4
+    ldr     x6, [x19, #W_NNAME]
+    str     x6, [x5]
+9:  ldr     x30, [sp], #16
+    ret
+c_native_out:
+    ldr     x9, [x19, #W_NGLOB]
+    sub     x9, x9, #1
+    ldr     x1, [x19, #W_GLOB]
+    add     x1, x19, x1
+    add     x5, x1, x9, lsl #4
+    ldr     x6, [x19, #W_NEMPTY]
+    str     x6, [x5]
+    ret
+k_n: .ascii "__n"
+    .balign 4
 c_prelude:
+    .incbin "script/prelude.js"
     .ascii "class Error{constructor(m){if(m!==undefined)this.message=\"\"+m}toString(){return this.message===\"\"?this.name:this.name+\": \"+this.message}}"
     .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";"
     .ascii "class TypeError extends Error{}TypeError.prototype.name=\"TypeError\";"

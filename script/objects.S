@@ -134,8 +134,21 @@ o_make:
     cmp     x10, x11
     b.lo    1b
     str     x14, [x9]
-    VAL     x10, T_NULL
-    str     x10, [x9, #O_PROTO]
+    VAL     x10, T_NULL                 // what it inherits from, by its kind, once the library has said (see lib.S)
+    cmp     x14, #3
+    b.eq    2f
+    cmp     x14, #4
+    b.eq    3f
+    cmp     x14, #1
+    b.ne    5f
+    ldr     x11, [x19, #(W_PROTOS + 16)]
+    b       4f
+2:  ldr     x11, [x19, #W_PROTOS]
+    b       4f
+3:  ldr     x11, [x19, #(W_PROTOS + 8)]
+4:  cbz     x11, 5f
+    mov     x10, x11
+5:  str     x10, [x9, #O_PROTO]
 9:  ret     x12
 // a_set: the array at the address x0 gets x2 as its item number x1; it grows as needed -> x0 not 0, or 0 if there is no room
 // (an item number of sixteen million or more is refused for now)
@@ -308,7 +321,26 @@ m_getprop:
     b.hi    7f
     ldp     x29, x30, [sp], #32
     b       m_noprops
-7:  VAL     x0, T_UNDEF
+7:  ldr     x0, [sp, #16]               // a string, number or boolean: what the library gave its kind
+    lsr     x9, x0, #48
+    mov     x2, #(W_PROTOS + 24)
+    mov     w10, #T_STRING
+    cmp     w9, w10
+    b.eq    71f
+    mov     x2, #(W_PROTOS + 40)
+    mov     w10, #T_BOOL
+    cmp     w9, w10
+    b.eq    71f
+    mov     x2, #(W_PROTOS + 32)
+    mov     w10, #T_UNDEF
+    cmp     w9, w10
+    b.hs    72f
+71: ldr     x0, [x19, x2]
+    cbz     x0, 72f
+    ldr     x1, [sp, #24]
+    bl      o_get
+    b       9f
+72: VAL     x0, T_UNDEF
 9:  ldp     x29, x30, [sp], #32
     ret
 // m_setprop: the value x0 gets x2 as its property named x1. Setting an array's length cuts it or fills it out.
@@ -1169,6 +1201,15 @@ m_keylist:
     mov     x1, #1
     str     x1, [sp, #40]
     str     xzr, [sp, #32]
+    ldr     x16, [x19, #W_OWNONLY]      // the library's own objects are not gone through, nor anything inherited when only
+    cbnz    x16, 8f                     // the value's own names are wanted
+    add     x15, x19, #W_PROTOS
+    add     x16, x15, #48
+61: ldr     x17, [x15], #8
+    cmp     x17, x0
+    b.eq    8f
+    cmp     x15, x16
+    b.lo    61b
     TAGIS   x0, T_OBJECT
     b.eq    3b
 8:  ldr     x0, [sp, #16]

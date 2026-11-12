@@ -174,3 +174,20 @@ object per entry of a block with a function is never given back until stage 7.
 **Stage 5 is complete apart from those notes.** Next: shapes (property lookup by shared layout), then stage 6, the library
 (Object, Array, String, Number, Math, JSON first: this is where page scripts start to run; needs native functions callable
 from the language and text of an object by its toString). Ask Gemini for each check program first.
+**Stage 6, first unit (2026-11-12, new conversation): the library's base. `library.js` (Gemini's draft) and `library2.js` pass: 29 of 29 programs, 1400 lines.** 54 of 55 lines on the first run.
+How: `lib.S` (head comment: the calling shape) holds the built-ins written in machine code, numbered in `n_table`; a built-in
+function is a function whose plan has flag 32 and its number at 8 (`m_call` → `m_native`). `prelude.js` (taken in by `.incbin`
+at `c_prelude`, translated before every program) names them through `__n(k)`, a global only the opening lines can name
+(`c_native_in`/`c_native_out`), and writes the rest of the library in the language: every method that calls a function it is
+handed (map, filter, reduce, sort (a stable merge), forEach, ...), and for now also join, slice, concat, indexOf, split, trim,
+parseInt, parseFloat, number `toString(radix)` and an exact `toFixed`. `__n(-1..-6, object)` tells the machine what plain
+objects, arrays, functions, strings, numbers and booleans inherit from (W_PROTOS; `o_make` sets it by kind, `m_getprop` uses it
+for values that are not objects; for..in stops at those objects). In machine code so far (20): Math floor ceil abs sqrt round
+trunc sign min max; push pop isArray; Object.keys hasOwnProperty; charCodeAt, one-unit fromCharCode, substring, upper and lower case.
+`**` with the power one half is the square root now; other fractional powers still give NaN.
+Soft / not made: built-ins cannot call back into the language (why the callback methods are in prelude.js); Math's exp, log,
+sin, cos, tan, atan, atan2, random, and general `pow` (next: needs pair arithmetic for a correctly rounded result); JSON; Date;
+RegExp; Map, Set, Symbol, Promise; `Function.prototype.call/apply/bind`; text of an object by its own `toString`; `new Array(n)`;
+`Object.create/defineProperty/freeze`; hasOwnProperty on an array's items; sort does not move undefined last; case of letters
+past 255; `toString(radix)` of a fraction gives up to 52 digits rather than the shortest; prelude methods are slower than
+machine code would be (join and indexOf first to move into lib.S). Every load translates prelude.js again (about 9 KB).

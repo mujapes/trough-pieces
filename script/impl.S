@@ -18,4 +18,5 @@
     .include "script/compile.S"
     .include "script/machine.S"
     .include "script/objects.S"
+    .include "script/lib.S"
     .include "script/entries.S"
