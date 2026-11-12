@@ -6,6 +6,7 @@
     .global check
     .global render
     .global link
+    .global pictures
     // the layout
     .equ S, 0
     .equ TABLE, 8
@@ -40,7 +41,10 @@
     .equ HREF_AT, 2096
     .equ HREF_LEN, 2104
     .equ LHREF, 2112
-    .equ FRAME, 2848
+    // for "pictures": where the next record goes in the block and where the block ends
+    .equ OUT_AT, 2752
+    .equ OUT_END, 2760
+    .equ FRAME, 2864
 check:
     ldr     w9, [x0]
     cmp     w9, #1
@@ -96,6 +100,9 @@ flush_line:
     sub     x9, x9, x10                 // the line's top on the surface
     ldrsw   x10, [x19, #SIZE]
     add     x28, x9, x10                // where the letters stand
+    ldr     w12, [x19, #PROBE]
+    cmp     w12, #2
+    b.eq    f_down
     ldrsw   x11, [x19, #HEIGHT]
     cmp     x9, x11
     b.ge    f_down
@@ -633,7 +640,12 @@ s_none:
     mov     x22, x21
     b       r_loop
 r_known:
-    IS      t_br
+    IS      t_img
+    b.eq    30f
+    cbnz    x25, r_after
+    bl      picture
+    b       r_after
+30: IS      t_br
     b.eq    1f
     bl      end_word
     ldr     w9, [x19, #LINE_N]
@@ -970,7 +982,101 @@ link:
     tbnz    w0, #31, r_bad
     str     w0, [x19, #SPACE]
     b       r_start
+// pictures: every picture in the page that states its size: where it goes and its address. Numbers: the page's handle, the font's
+// handle, the text size, the screen's width. The page is laid out as render lays it out. -> how many bytes of records were
+// written into the block from byte 64 (see "picture" above for a record), -1 if the numbers are not usable.
+pictures:
+    sub     sp, sp, #FRAME
+    stp     x29, x30, [sp]
+    stp     x19, x20, [sp, #16]
+    stp     x21, x22, [sp, #32]
+    stp     x23, x24, [sp, #48]
+    stp     x25, x26, [sp, #64]
+    stp     x27, x28, [sp, #80]
+    add     x19, sp, #96
+    mov     x27, x1
+    mov     x28, x2
+    str     x0, [x19, #S]
+    str     x4, [x19, #TABLE]
+    cmp     x28, #4
+    b.lt    r_bad
+    ldr     x9, [x0, #16]
+    cmp     x9, #64
+    b.lo    r_bad
+    add     x10, x0, #64
+    add     x9, x0, x9
+    add     x11, x19, #OUT_AT
+    stp     x10, x9, [x11]
+    BLOCK   0, 0
+    mov     x20, x0
+    BLOCK   1, 0
+    cbz     x20, r_bad
+    cbz     x0, r_bad
+    ldr     w9, [x20]
+    cmp     w9, #2
+    b.ne    r_bad
+    ldr     w9, [x0]
+    cmp     w9, #2
+    b.ne    r_bad
+    ldr     x9, [x19, #S]
+    cmp     x20, x9
+    b.eq    r_bad
+    ldr     x21, [x20, #16]
+    cmp     x21, #64
+    b.lo    r_bad
+    sub     x21, x21, #64
+    add     x20, x20, #64
+    ldrsh   w11, [x27, #4]
+    cmp     w11, #6
+    b.lt    r_bad
+    cmp     w11, #200
+    b.gt    r_bad
+    ldrsh   w9, [x27, #2]
+    str     w9, [x19, #FONT]
+    str     w11, [x19, #BASE]
+    str     w11, [x19, #SIZE]
+    str     wzr, [x19, #SCROLL]
+    ldrsh   w9, [x27, #6]
+    cmp     w9, #16
+    b.lt    r_bad
+    str     w9, [x19, #WIDTH]
+    mov     w9, #16384
+    str     w9, [x19, #HEIGHT]
+    mov     w9, #-1
+    str     w9, [x19, #CACHE]
+    str     w9, [x19, #SCRATCH]
+    str     wzr, [x19, #LINK]
+    mov     x9, #8
+    str     x9, [x19, #Y]
+    str     xzr, [x19, #PENDING]
+    str     wzr, [x19, #LINE_N]
+    str     xzr, [x19, #LINE_W]
+    str     wzr, [x19, #LINKS]
+    str     wzr, [x19, #WORD_N]
+    mov     w9, #2
+    str     w9, [x19, #PROBE]
+    add     x17, x19, #HREF_AT
+    stp     xzr, xzr, [x17]
+    add     x17, x19, #HIT_AT
+    stp     xzr, xzr, [x17]
+    add     x0, x19, #SP3
+    mov     w9, #32
+    strh    w9, [x0, #4]
+    mov     w1, #1
+    bl      measure
+    tbnz    w0, #31, r_bad
+    str     w0, [x19, #SPACE]
+    b       r_start
 l_finish:
+    ldr     w9, [x19, #PROBE]
+    cmp     w9, #2
+    b.ne    40f
+    ldr     x9, [x19, #OUT_AT]          // listing pictures: how much was written
+    ldr     x10, [x19, #S]
+    sub     x0, x9, x10
+    sub     x0, x0, #64
+    b       r_out
+40:
     add     x17, x19, #HIT_AT
     ldp     x9, x10, [x17]
     mov     x0, #0
@@ -1001,15 +1107,15 @@ r_out:
     add     sp, sp, #FRAME
     ret
     .ltorg
-// find_href: where the address is written in the opening tag whose name is at x23 (x24 long) and which ends before x26:
-// after the word href (any case, with white space before it), an equals sign, then the address in either kind of quotes or
-// bare. Sets HREF_AT and HREF_LEN (0 if there is none). Uses x9-x14.
-find_href:
-    add     x17, x19, #HREF_AT
-    stp     xzr, xzr, [x17]
+// find_attr: where the value of an attribute is written in the opening tag whose name is at x23 (x24 long) and which ends
+// before x26: after the attribute's name (at x2, lower case, ending in a zero byte; any case in the page; white space before
+// it), an equals sign, then the value in either kind of quotes or bare -> x12 where, x13 how long (0 if there is none).
+// Uses x9-x16.
+find_attr:
+    mov     x12, #0
+    mov     x13, #0
     add     x9, x23, x24
-1:  add     x10, x9, #5
-    cmp     x10, x26
+1:  cmp     x9, x26
     b.hs    9f
     ldrb    w11, [x20, x9]
     add     x9, x9, #1
@@ -1021,57 +1127,171 @@ find_href:
     b.eq    2f
     cmp     w11, #13
     b.ne    1b
-2:  add     x12, x20, x9
-    ldr     w11, [x12]
-    orr     w11, w11, #0x20202020
-    ldr     w13, =0x66657268            // "href"
-    cmp     w11, w13
-    b.ne    1b
-    add     x10, x9, #4
-3:  cmp     x10, x26                    // white space, an equals sign, white space
-    b.hs    9f
+2:  mov     x10, x9                     // does the name follow here?
+    mov     x15, #0
+3:  ldrb    w16, [x2, x15]
+    cbz     w16, 4f
+    cmp     x10, x26
+    b.hs    1b
     ldrb    w11, [x20, x10]
-    cmp     w11, #' '
-    b.ne    4f
+    orr     w11, w11, #0x20
+    cmp     w11, w16
+    b.ne    1b
     add     x10, x10, #1
+    add     x15, x15, #1
     b       3b
-4:  cmp     w11, #'='
-    b.ne    1b
-    add     x10, x10, #1
-5:  cmp     x10, x26
+4:  cmp     x10, x26                    // white space, an equals sign, white space
     b.hs    9f
     ldrb    w11, [x20, x10]
     cmp     w11, #' '
-    b.ne    6f
+    b.ne    5f
     add     x10, x10, #1
-    b       5b
-6:  mov     w14, #0                     // the quote that ends it, or 0 for a bare address
+    b       4b
+5:  cmp     w11, #'='
+    b.ne    1b
+    add     x10, x10, #1
+6:  cmp     x10, x26
+    b.hs    9f
+    ldrb    w11, [x20, x10]
+    cmp     w11, #' '
+    b.ne    7f
+    add     x10, x10, #1
+    b       6b
+7:  mov     w14, #0                     // the quote that ends it, or 0 for a bare value
     cmp     w11, #'"'
-    b.eq    7f
+    b.eq    8f
     cmp     w11, #39
-    b.ne    8f
-7:  mov     w14, w11
+    b.ne    10f
+8:  mov     w14, w11
     add     x10, x10, #1
-8:  mov     x12, x10
-10: cmp     x10, x26
-    b.hs    11f
+10: mov     x12, x10
+11: cmp     x10, x26
+    b.hs    14f
     ldrb    w11, [x20, x10]
     cmp     w11, #'>'
-    b.eq    11f
+    b.eq    14f
     cbz     w14, 12f
     cmp     w11, w14
-    b.eq    11f
+    b.eq    14f
     b       13f
 12: cmp     w11, #' '
-    b.eq    11f
+    b.eq    14f
 13: add     x10, x10, #1
-    b       10b
-11: sub     x13, x10, x12
+    b       11b
+14: sub     x13, x10, x12
     add     x12, x20, x12
-    add     x17, x19, #HREF_AT
-    stp     x12, x13, [x17]
 9:  ret
+// find_href: the address an opening <a> leads to, into HREF_AT and HREF_LEN
+find_href:
+    mov     x17, x30
+    adr     x2, t_href
+    bl      find_attr
+    add     x9, x19, #HREF_AT
+    stp     x12, x13, [x9]
+    ret     x17
+// attr_number: the attribute named at x2 as a whole number -> x0 (0 if absent or not digits). Uses what find_attr uses, x17.
+attr_number:
+    mov     x17, x30
+    bl      find_attr
+    mov     x0, #0
+    mov     x9, #0
+1:  cmp     x9, x13
+    b.hs    2f
+    ldrb    w10, [x12, x9]
+    sub     w10, w10, #'0'
+    cmp     w10, #9
+    b.hi    2f
+    mov     x11, #10
+    madd    x0, x0, x11, x10
+    add     x9, x9, #1
+    ldr     x11, =100000
+    cmp     x0, x11
+    b.lo    1b
+    mov     x0, #0
+2:  ret     x17
+// picture: an <img> tag (name at x23, ending before x26). If it states a width and a height (8 to 4096 each), it gets a line of
+// its own that much room, shrunk in proportion if wider than the page; when pictures are being listed, a record is written:
+// left, top (counted from the top of the page), width, height, the address's length, then the address, filled out to a
+// multiple of four bytes (the first five as 32-bit numbers).
+picture:
+    stp     x29, x30, [sp, #-48]!
+    stp     x27, x28, [sp, #16]
+    adr     x2, t_width
+    bl      attr_number
+    mov     x27, x0
+    adr     x2, t_height
+    bl      attr_number
+    mov     x28, x0
+    sub     x9, x27, #8
+    cmp     x9, #(4096 - 8)
+    b.hi    9f
+    sub     x9, x28, #8
+    cmp     x9, #(4096 - 8)
+    b.hi    9f
+    bl      end_word
+    bl      flush_line
+    ldrsw   x9, [x19, #WIDTH]
+    sub     x9, x9, #16
+    cmp     x9, #8
+    b.lt    9f
+    cmp     x27, x9
+    b.le    1f
+    mul     x28, x28, x9                // too wide: shrunk in proportion
+    udiv    x28, x28, x27
+    mov     x27, x9
+    cmp     x28, #1
+    csinc   x28, x28, xzr, hs
+1:  ldp     x9, x10, [x19, #Y]
+    add     x9, x9, x10
+    stp     x9, xzr, [x19, #Y]
+    str     x9, [sp, #32]
+    ldr     w10, [x19, #PROBE]
+    cmp     w10, #2
+    b.ne    4f
+    adr     x2, t_src
+    bl      find_attr
+    cbz     x13, 4f
+    add     x9, x19, #OUT_AT
+    ldp     x10, x11, [x9]
+    add     x14, x13, #3
+    and     x14, x14, #-4
+    add     x15, x10, #20
+    add     x15, x15, x14
+    cmp     x15, x11
+    b.hi    4f                          // no room for this record: it is left out
+    mov     w16, #8
+    str     w16, [x10]
+    ldr     x16, [sp, #32]
+    str     w16, [x10, #4]
+    str     w27, [x10, #8]
+    str     w28, [x10, #12]
+    str     w13, [x10, #16]
+    add     x10, x10, #20
+    mov     x16, #0
+2:  cmp     x16, x14
+    b.hs    3f
+    mov     w17, #0
+    cmp     x16, x13
+    b.hs    5f
+    ldrb    w17, [x12, x16]
+5:  strb    w17, [x10, x16]
+    add     x16, x16, #1
+    b       2b
+3:  str     x15, [x9]
+4:  ldr     x9, [x19, #Y]               // the room, and a quarter of a line below it
+    add     x9, x9, x28
+    ldrsw   x10, [x19, #SIZE]
+    add     x9, x9, x10, asr #2
+    str     x9, [x19, #Y]
+9:  ldp     x27, x28, [sp, #16]
+    ldp     x29, x30, [sp], #48
+    ret
     .ltorg
+t_href: .asciz "href"
+t_src:  .asciz "src"
+t_width: .asciz "width"
+t_height: .asciz "height"
+t_img:  .asciz "img"
 t_br:   .asciz "br"
 t_a:    .asciz "a"
 t_amp:  .asciz "amp"
