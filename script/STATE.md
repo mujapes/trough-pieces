@@ -242,5 +242,6 @@ values in order, holes packed away after deletions. Arrays have values, keys, en
 Soft / not made: an iterator is drained whole before the loop begins (an endless one never ends; changes made to a Map
 during its loop are not seen); real symbols; WeakMap, WeakSet; a Map's `_h`, `_k`, `_v`, `_d` and its methods show in
 for..in (no hidden properties yet); `[a, b] = v` as an expression gives the array made from v, not v; text of a function.
-`Math.expm1(1)`: node is one unit off, ours is the exact rounding (that one line is skipped in math2.js).
+`Math.expm1(1)`, `Math.log1p(2)`, `Math.hypot(1e-300,1e-300)`: node and qjs are one unit off, ours is the exact rounding (mpmath);
+math2.js therefore prints numbers cut to 14 digits (its `R`), and minus nought in a label is written neg0 (run.py rewrites node's -0).
 Next: asinh, acosh, atanh, fround, clz32, imul; then join, indexOf, slice into lib.S; shapes; RegExp.
