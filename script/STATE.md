@@ -112,7 +112,20 @@ for `var [..] = v` and `[..] = v`; the same in `c_defaults` for parameters and `
 nameless variable (`c_hidden`); the names inside are declared by translating the patterns once with the instructions thrown
 away (c_function label 5), so a function written inside a parameter default is translated twice (harmless, wasteful).
 Not made: object rest `{...r}`, object spread, a rest parameter that is a pattern, patterns in catch.
-Next: classes, getters and setters, then shapes. Ask the Gemini helper for the check program first (it has been right twice).
+Getters and setters, and classes, done (seventh unit): **22 of 22 programs, 1257 lines.**
+Accessors: a property's value may be a T_ACC value pointing at a pair (getter, setter). `i_getp`/`i_gete` hand such a read to
+`m_getter` (an ordinary call whose answer lands in the property's place); `m_setprop` now looks for a setter on the object and
+along its prototypes and hands it back, and `m_setter` calls it (call record flag 2: the answer is dropped). Defined by
+OP_DEFACC (`c_object`, `c_propkey`, `c_peek_acc`). Soft spot: a literal's or class's plain property with the same name as an
+inherited setter is not defined (OP_INITP/INITE go through m_setprop).
+Classes: `c_class`, `c_find_ctor`, `c_super` in `compile.S`; OP_EXTENDS, OP_HOME, OP_SUPER in `objects.S`. A class is a
+function; a class without a constructor gets a plan with flag 16 that `m_call` passes on to the parent (the function's own
+prototype link). `super(...)` calls the parent on the same `this` (the object is made by `new` before, not by the base class);
+`super.name` looks from the home object's prototype (F_HOME, set by OP_HOME; functions are 64 bytes now). Not made: fields,
+private names, static blocks, refusing a class called without `new`, `super` inside an arrow, a class expression's own name,
+getters reached through `super`.
+Next: shapes (property lookup by shared layout instead of search), then stage 5 (errors, try/catch/throw, block scope and the
+dead zone), each with a Gemini-drafted check program first (it has been right five times).
 Help that saves usage: GitHub Actions (`../pieces-repo`, public, pushes with `trough-gh` credentials; `ci/run.sh` now builds
 the engine and runs `checks/run.py` there) and the Gemini helper for drafting check programs
 (`trough-model-helper ask gemini-auto --prompt-file F`; the reply is JSON, the text is in `.text`; `/tmp/gtools/split.py` shows

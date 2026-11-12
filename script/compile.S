@@ -1979,6 +1979,55 @@ c_new:
 8:  NOLV
     ldr     x30, [sp], #16
     ret
+// c_peek_acc: the current word is get or set: does a property's name follow (and not : ( , or }) -> flags: eq if so
+c_peek_acc:
+    str     x30, [sp, #-16]!
+    LEXSAVE
+    bl      next_word
+    mov     w0, #0
+    cbz     w23, 1f
+    mov     w0, #1
+    cmp     w23, #K_PUNCT
+    b.ne    1f
+    cmp     w24, #37
+    cset    w0, eq
+1:  LEXBACK
+    ldr     x30, [sp], #16
+    cmp     w0, #1
+    ret
+// c_propkey: a property's name where one is being defined (a word, a string, a number, or [worked out]) -> instructions
+// that leave it on the stack; steps past it
+c_propkey:
+    str     x30, [sp, #-16]!
+    cmp     w23, #K_PUNCT
+    b.ne    1f
+    cmp     w24, #37
+    b.ne    c_unexpected
+    bl      next_word
+    bl      c_assign
+    ISP     38, c_unexpected
+    b       8f
+1:  cmp     w23, #K_NUMBER
+    b.ne    2f
+    fmov    x0, d8
+    bl      c_const
+    b       8f
+2:  cmp     w23, #K_STRING
+    b.ne    3f
+    bl      c_string
+    bl      c_strconst
+    b       8f
+3:  cmp     w23, #K_NAME
+    b.eq    4f
+    cmp     w23, #K_KEYWORD
+    b.ne    c_unexpected
+4:  bl      c_wordconst
+    mov     w1, w0
+    mov     w0, #OP_CONST
+    bl      c_op16
+8:  bl      next_word
+    ldr     x30, [sp], #16
+    ret
 // c_object: { name: value, "text": value, 3: value, [key]: value, name, name(a) { } } -> the object. The } stays the current word.
 // Kept: 8 the name's constant, 16 and 24 the name's word, 32 its kind, 40 and 48 the word after it.
 c_object:
@@ -2001,7 +2050,23 @@ c_object:
     b       7f
 2:  stp     x25, x26, [sp, #16]
     str     w23, [sp, #32]
-    cmp     w23, #K_NAME
+    cmp     w23, #K_KEYWORD             // get name() { } and set name(v) { }
+    b.ne    20f
+    sub     w9, w24, #38
+    cmp     w9, #1
+    b.hi    20f
+    str     w9, [sp, #36]
+    bl      c_peek_acc
+    b.ne    20f
+    bl      next_word
+    bl      c_propkey
+    mov     w0, #4
+    bl      c_function
+    OP      OP_DEFACC
+    ldr     w0, [sp, #36]
+    bl      c_byte
+    b       7f
+20: cmp     w23, #K_NAME
     b.eq    3f
     cmp     w23, #K_KEYWORD
     b.eq    3f
@@ -2519,6 +2584,220 @@ c_pattern:
 70: ldr     w9, [sp, #8]
     cbz     w9, c_ref
     b       c_declref
+// c_super: super(a, b) calls the parent class on this same object; super.name is the property as the parent's side has it,
+// and super.name(a) calls it with `this` unchanged. (Reached from c_primary, whose frame it leaves through.)
+c_super:
+    bl      next_word
+    OP      OP_THIS
+    ISP     35, 2f
+    mov     w0, #OP_SUPER
+    mov     w1, #0xffff
+    bl      c_op16
+1:  bl      next_word
+    bl      c_args
+    tbnz    w0, #31, 11f
+    str     w0, [sp, #8]
+    OP      OP_CALLM
+    ldr     w0, [sp, #8]
+    bl      c_byte
+    b       8f
+11: OP      OP_APPLY
+    mov     w0, #1
+    bl      c_byte
+    b       8f
+2:  EXPECT  56
+    cmp     w23, #K_NAME
+    b.eq    3f
+    cmp     w23, #K_KEYWORD
+    b.ne    c_unexpected
+3:  bl      c_wordconst
+    mov     w1, w0
+    mov     w0, #OP_SUPER
+    bl      c_op16
+    bl      next_word
+    ISP     35, 4f
+    b       1b
+4:  OP      OP_SWAP
+    OP      OP_POP
+8:  NOLV
+    ldr     x30, [sp], #16
+    ret
+c_w_constructor: .ascii "constructor"
+c_w_prototype:   .ascii "prototype"
+c_w_proto_end:
+    .balign 4
+// c_find_ctor: the current word is the { of a class's body: is there a constructor in it -> flags: eq if so, the reader
+// left at the ( after its name (the caller keeps and puts back the reader's place)
+c_find_ctor:
+    stp     x30, xzr, [sp, #-16]!
+1:  cbz     w23, 7f
+    cmp     w23, #K_PUNCT
+    b.ne    3f
+    sub     w9, w24, #33
+    cmp     w9, #5
+    b.hi    6f
+    ldr     w10, [sp, #8]
+    tbz     w24, #0, 2f
+    add     w10, w10, #1
+    str     w10, [sp, #8]
+    b       6f
+2:  sub     w10, w10, #1
+    str     w10, [sp, #8]
+    cbz     w10, 7f
+    b       6f
+3:  cmp     w23, #K_NAME
+    b.ne    6f
+    ldr     w10, [sp, #8]
+    cmp     w10, #1
+    b.ne    6f
+    adr     x0, c_w_constructor
+    mov     x1, #(c_w_prototype - c_w_constructor)
+    bl      c_is
+    b.ne    6f
+    bl      next_word
+    ISP     35, 1b
+    mov     w0, #1
+    b       8f
+6:  bl      next_word
+    b       1b
+7:  mov     w0, #0
+8:  ldr     x30, [sp], #16
+    cmp     w0, #1
+    ret
+// c_class: a class, from the word `class` to past its closing }: the class (a function) is left on the stack, and with w0 1
+// also stored in the variable of its name. The constructor is found first, wherever it is written (without one: a plan with
+// flag 16, which the machine passes on to the parent); then each method is put on the prototype, or on the class if static.
+// Kept: 8 a declaration?, 16 the variable, 20 static?, 24 getter or setter (0, 1; -1 neither), 28 extends?
+// (Not made: fields, private names, static blocks; a class called without new is not refused.)
+c_class:
+    stp     x30, x0, [sp, #-48]!
+    DEEPER
+    bl      next_word
+    mov     w9, #-1
+    str     w9, [sp, #16]
+    str     wzr, [sp, #28]
+    cmp     w23, #K_NAME
+    b.ne    1f
+    ldr     w9, [sp, #8]
+    cbz     w9, 0f
+    bl      c_declref
+    str     w0, [sp, #16]
+0:  bl      next_word
+1:  ISK     12, 2f
+    bl      next_word
+    bl      c_postfix
+    mov     w9, #1
+    str     w9, [sp, #28]
+2:  ISP     33, c_unexpected
+    LEXSAVE
+    bl      c_find_ctor
+    b.ne    3f
+    mov     w0, #4
+    bl      c_function
+    LEXBACK
+    b       4f
+3:  LEXBACK
+    mov     x0, #40
+    bl      w_alloc
+    cbz     x0, c_full
+    add     x9, x19, x0
+    mov     x10, #2
+    str     x10, [x9]
+    stp     xzr, xzr, [x9, #8]
+    mov     x10, #16
+    str     x10, [x9, #24]
+    VAL     x10, T_UNDEF
+    str     x10, [x9, #32]
+    mov     x16, #(T_OBJECT << 48)
+    orr     x0, x0, x16
+    bl      c_addconst
+    mov     w1, w0
+    mov     w0, #OP_CLOSURE
+    bl      c_op16
+4:  ldr     w9, [sp, #28]
+    cbz     w9, 5f
+    OP      OP_EXTENDS
+5:  OP      OP_DUP
+    adr     x0, c_w_prototype
+    mov     x1, #(c_w_proto_end - c_w_prototype)
+    bl      w_string
+    cbz     x0, c_full
+    bl      c_keyconst
+    mov     w1, w0
+    mov     w0, #OP_GETP
+    bl      c_op16
+    bl      next_word
+6:  cmp     w23, #K_PUNCT
+    b.ne    61f
+    cmp     w24, #34
+    b.eq    9f
+    cmp     w24, #39
+    b.ne    61f
+    bl      next_word
+    b       6b
+61: cbz     w23, c_unexpected
+    mov     w9, #-1
+    stp     wzr, w9, [sp, #20]
+    ISK     34, 62f
+    bl      c_peek_acc
+    b.ne    62f
+    mov     w9, #1
+    str     w9, [sp, #20]
+    bl      next_word
+62: cmp     w23, #K_KEYWORD
+    b.ne    63f
+    sub     w9, w24, #38
+    cmp     w9, #1
+    b.hi    63f
+    str     w9, [sp, #32]
+    bl      c_peek_acc
+    b.ne    63f
+    ldr     w9, [sp, #32]
+    str     w9, [sp, #24]
+    bl      next_word
+63: ldr     w9, [sp, #20]
+    cbnz    w9, 64f
+    ldr     w9, [sp, #24]
+    cmn     w9, #1
+    b.ne    65f
+    cmp     w23, #K_NAME
+    b.ne    65f
+    adr     x0, c_w_constructor
+    mov     x1, #(c_w_prototype - c_w_constructor)
+    bl      c_is
+    b.ne    65f
+    bl      next_word                   // the constructor: translated already
+    bl      c_skip_pattern
+    bl      c_skip_pattern
+    b       6b
+64: OP      OP_SWAP
+65: bl      c_propkey
+    ISP     35, c_notyet
+    mov     w0, #4
+    bl      c_function
+    OP      OP_HOME
+    ldr     w9, [sp, #24]
+    cmn     w9, #1
+    b.ne    66f
+    OP      OP_INITE
+    b       67f
+66: OP      OP_DEFACC
+    ldr     w0, [sp, #24]
+    bl      c_byte
+67: ldr     w9, [sp, #20]
+    cbz     w9, 6b
+    OP      OP_SWAP
+    b       6b
+9:  OP      OP_POP
+    ldr     w0, [sp, #16]
+    cmn     w0, #1
+    b.eq    91f
+    bl      c_store
+91: bl      next_word
+    NOLV
+    SHALLOWER
+    ldr     x30, [sp], #48
+    ret
 // c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
 c_primary:
     stp     x30, xzr, [sp, #-16]!
@@ -2547,6 +2826,13 @@ c_primary:
     mov     w0, #OP_THIS
     cmp     w24, #24
     b.eq    20f
+    cmp     w24, #3
+    b.ne    21f
+    mov     w0, #0
+    bl      c_class
+    b       9f
+21: cmp     w24, #22
+    b.eq    c_super
     sub     w9, w24, #33                // let, static, async, await, of, get, set may be plain names
     cmp     w9, #6
     b.ls    40f
@@ -2773,7 +3059,13 @@ s_word:
     b.eq    s_continue
     cmp     w24, #21
     b.eq    s_return
-    cmp     w24, #15
+    cmp     w24, #3
+    b.ne    1f
+    mov     w0, #1
+    bl      c_class
+    OP      OP_POP
+    b       s_done
+1:  cmp     w24, #15
     b.ne    s_expr
     bl      next_word
     mov     w0, #1

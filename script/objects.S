@@ -12,6 +12,7 @@
     .equ F_PLAN, 32
     .equ F_SCOPE, 40
     .equ F_THIS, 48
+    .equ F_HOME, 56                     // a method's home: the object it was written in (0 if none)
     .equ A_ITEMS, 32
     .equ A_LEN, 40
     .equ A_CAP, 44
@@ -342,13 +343,36 @@ m_setprop:
     bl      a_set
     cbz     x0, 8f
     b       9f
-4:  ldp     x0, x1, [sp, #16]
-    ldr     x2, [sp, #32]
+4:  ldp     x0, x1, [sp, #16]           // its own property is stored to; without one, a setter along the prototypes is
+    and     x0, x0, #0xffffffffffff     // looked for before a new property is made. A setter is handed back in x0.
+    add     x0, x19, x0
+    str     x0, [sp, #40]
+    bl      o_find
+    cbz     x2, 42f
+    ldr     x3, [x2]
+    TAGIS   x3, T_ACC
+    b.eq    45f
+    ldr     x3, [sp, #32]
+    str     x3, [x2]
+    b       9f
+42: ldr     x0, [x0, #O_PROTO]
+    TAGIS   x0, T_OBJECT
+    b.ne    44f
     and     x0, x0, #0xffffffffffff
     add     x0, x19, x0
+    bl      o_find
+    cbz     x2, 42b
+    ldr     x3, [x2]
+    TAGIS   x3, T_ACC
+    b.eq    45f
+44: ldr     x0, [sp, #40]
+    ldr     x1, [sp, #24]
+    ldr     x2, [sp, #32]
     bl      o_put
     cbz     x0, 8f
     b       9f
+45: mov     x0, x3
+    b       91f
 5:  mov     w10, #T_UNDEF
     sub     w9, w9, w10
     cmp     w9, #1
@@ -357,7 +381,8 @@ m_setprop:
     b       m_noprops
 8:  ldp     x29, x30, [sp], #48
     b       m_full
-9:  ldp     x29, x30, [sp], #48
+9:  mov     x0, #0
+91: ldp     x29, x30, [sp], #48
     ret
 // m_index: is the key x1 a whole number that can be an item's number -> w3 1 and x2 the number, or w3 0. Uses x16, x17, d0, d1.
 m_index:
@@ -418,13 +443,144 @@ i_getp:                                 // + 16 bits: the name (a constant). obj
     ldr     x1, [x23, x1, lsl #3]
     ldr     x0, [x22, #-8]
     bl      m_getprop
+    TAGIS   x0, T_ACC
+    b.eq    1f
     str     x0, [x22, #-8]
+    NEXT
+1:  ldr     x11, [x22, #-8]
+    sub     x12, x22, #8
+// m_getter: the property read was a getter and setter (x0): the getter is called with x11 as `this`, its answer to go to x12
+// (the stack ends there meanwhile)
+m_getter:
+    and     x0, x0, #0xffffffffffff
+    ldr     x2, [x19, x0]
+    TAGIS   x2, T_OBJECT
+    b.eq    1f
+    VAL     x0, T_UNDEF
+    str     x0, [x12], #8
+    mov     x22, x12
+    NEXT
+1:  add     x22, x12, #8
+    PUSH    x2
+    mov     x1, x22
+    mov     x0, #0
+    mov     x13, #0
+    b       m_call
+// m_setter: the property stored to has a setter (in x0's pair): on the stack the object and the value; the setter is called
+// with the value, its answer dropped, and the value is what stays
+m_setter:
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    ldr     x2, [x0, #8]
+    ldp     x11, x3, [x22, #-16]
+    str     x3, [x22, #-16]
+    TAGIS   x2, T_OBJECT
+    b.eq    1f
+    sub     x22, x22, #8
+    NEXT
+1:  str     x2, [x22, #-8]
+    sub     x12, x22, #8
+    PUSH    x3
+    sub     x1, x22, #8
+    mov     x0, #1
+    mov     x13, #2
+    b       m_call
+i_extends:                              // parent, class -> class: the class inherits from the parent, its prototype from the parent's
+    ldp     x0, x1, [x22, #-16]
+    TAGIS   x0, T_OBJECT
+    b.ne    m_notfn
+    and     x2, x1, #0xffffffffffff
+    add     x2, x19, x2
+    str     x0, [x2, #O_PROTO]
+    bl      m_fnproto
+    cbz     x0, m_full
+    str     x0, [sp, #-16]!
+    ldr     x0, [x22, #-8]
+    bl      m_fnproto
+    ldr     x3, [sp], #16
+    cbz     x0, m_full
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    str     x3, [x0, #O_PROTO]
+    ldr     x1, [x22, #-8]
+    sub     x22, x22, #8
+    str     x1, [x22, #-8]
+    NEXT
+i_home:
+    ldr     x0, [x22, #-8]
+    ldr     x1, [x22, #-24]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    str     x1, [x0, #F_HOME]
+    NEXT
+i_super:
+    U16     w5
+    ldr     x0, [x20, #48]
+    and     x1, x0, #0xffffffffffff
+    add     x1, x19, x1
+    mov     w6, #0xffff
+    cmp     w5, w6
+    b.ne    1f
+    ldr     x0, [x1, #O_PROTO]
+    b       8f
+1:  ldr     x0, [x1, #F_HOME]
+    TAGIS   x0, T_OBJECT
+    b.ne    7f
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    ldr     x0, [x0, #O_PROTO]
+    TAGIS   x0, T_OBJECT
+    b.ne    7f
+    ldr     x1, [x23, x5, lsl #3]
+    bl      m_getprop
+    TAGIS   x0, T_ACC
+    b.ne    8f
+7:  VAL     x0, T_UNDEF
+8:  PUSH    x0
+    NEXT
+i_defacc:                               // + 8 bits: 0 a getter, 1 a setter. object, key, function -> object
+    ldr     x0, [x22, #-16]
+    bl      v_text
+    cbz     x0, m_full
+    str     x0, [x22, #-16]
+    mov     x1, x0
+    ldr     x0, [x22, #-24]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    bl      o_find
+    cbz     x2, 1f
+    ldr     x3, [x2]
+    TAGIS   x3, T_ACC
+    b.eq    2f
+1:  mov     x0, #16
+    bl      w_alloc
+    cbz     x0, m_full
+    add     x9, x19, x0
+    VAL     x10, T_UNDEF
+    stp     x10, x10, [x9]
+    mov     x16, #(T_ACC << 48)
+    orr     x2, x0, x16
+    str     x2, [sp, #-16]!
+    ldr     x0, [x22, #-24]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    ldr     x1, [x22, #-16]
+    bl      o_put
+    ldr     x3, [sp], #16
+    cbz     x0, m_full
+2:  and     x3, x3, #0xffffffffffff
+    add     x3, x19, x3
+    ldrb    w9, [x21], #1
+    ldr     x4, [x22, #-8]
+    str     x4, [x3, x9, lsl #3]
+    sub     x22, x22, #16
     NEXT
 i_setp:                                 // object, value -> value
     U16     w1
     ldr     x1, [x23, x1, lsl #3]
     ldp     x0, x2, [x22, #-16]
     bl      m_setprop
+    cbnz    x0, m_setter
     ldr     x0, [x22, #-8]
     sub     x22, x22, #8
     str     x0, [x22, #-8]
@@ -482,6 +638,17 @@ i_getek:
     mov     x1, x0
     ldr     x0, [x22, #-16]
     bl      m_getprop
+    TAGIS   x0, T_ACC
+    b.ne    8f
+    ldrb    w9, [x21, #-1]
+    cmp     w9, #OP_GETEK
+    b.eq    6f
+    sub     x22, x22, #8
+    ldr     x11, [x22, #-8]
+    b       7f
+6:  ldr     x11, [x22, #-16]
+7:  sub     x12, x22, #8
+    b       m_getter
 8:  ldrb    w9, [x21, #-1]
     cmp     w9, #OP_GETEK
     b.eq    9f
@@ -515,6 +682,15 @@ i_inite:
     ldr     x0, [x22, #-24]
     ldr     x2, [x22, #-8]
     bl      m_setprop
+    cbz     x0, 8f
+    ldrb    w9, [x21, #-1]
+    cmp     w9, #OP_INITE
+    b.eq    8f
+    ldr     x9, [x22, #-24]
+    ldr     x3, [x22, #-8]
+    sub     x22, x22, #8
+    stp     x9, x3, [x22, #-16]
+    b       m_setter
 8:  ldr     x0, [x22, #-8]
     sub     x22, x22, #16
     ldrb    w9, [x21, #-1]

@@ -79,7 +79,11 @@
     .equ OP_SPREAD, 75                  // array, array or string -> array with each of its items added
     .equ OP_APPLY, 76                   // + 8 bits: which call (0 plain, 1 on an object, 2 new, 3 print); the array on top is its arguments
     .equ OP_TAIL, 77                    // + 16 bits: from which item. array or string -> a new array of the items from there on
-    .equ OP_COUNT, 78
+    .equ OP_DEFACC, 78                  // + 8 bits: 0 a getter, 1 a setter. object, key, function -> object
+    .equ OP_EXTENDS, 79                 // parent, class -> class, its chains linked to the parent's
+    .equ OP_HOME, 80                    // object, key, function: the function remembers the object as its home (for super)
+    .equ OP_SUPER, 81                   // + 16 bits: a name: that property, looked for from the home's prototype on; 0xffff: the parent class
+    .equ OP_COUNT, 82
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -907,7 +911,7 @@ i_closure:
     U16     w0
     ldr     x1, [x23, x0, lsl #3]
     mov     x4, x1
-    mov     x0, #56
+    mov     x0, #64
     mov     x1, #1
     bl      o_make
     cbz     x0, m_full
@@ -949,7 +953,25 @@ m_call:                                 // w0 arguments from x1 on, the function
     ldr     w5, [x4, #16]
     ldr     w6, [x4, #20]
     ldr     x9, [x4, #24]
-    tbz     x9, #1, 0f
+    tbz     x9, #4, 88f                 // a class written without a constructor: the call goes on to the parent class,
+    ldr     x3, [x2, #O_PROTO]          // or, with none, is over at once
+    lsr     x4, x3, #48
+    mov     w16, #T_OBJECT
+    cmp     w4, w16
+    b.ne    89f
+    and     x4, x3, #0xffffffffffff
+    ldr     x4, [x19, x4]
+    cmp     x4, #1
+    b.ne    89f
+    str     x3, [x1, #-8]
+    b       m_call
+89: VAL     x0, T_UNDEF
+    cmp     x13, #1
+    csel    x0, x11, x0, eq
+    str     x0, [x12]
+    add     x22, x12, #8
+    NEXT
+88: tbz     x9, #1, 0f
     ldr     x11, [x2, #F_THIS]          // an arrow: the `this` it was made under
 0:  tbz     x9, #3, 30f                 // it uses `arguments`: all of them, as an array, kept for its variable
     stp     x1, x11, [sp, #-32]!
@@ -1049,8 +1071,10 @@ m_call:                                 // w0 arguments from x1 on, the function
     NEXT
 i_ret:
     ldr     x0, [x22, #-8]
-    ldr     x13, [x20, #56]
+    ldr     x13, [x20, #56]             // 1: called by new; 2: a setter, whose answer is dropped
     cbz     x13, 1f
+    cmp     x13, #2
+    b.eq    1f
     TAGIS   x0, T_OBJECT
     b.eq    1f
     ldr     x0, [x20, #40]
@@ -1061,8 +1085,10 @@ i_ret:
     add     x27, x19, x10
     add     x20, x19, x11
     add     x22, x19, x12
+    cmp     x13, #2
+    b.eq    2f
     str     x0, [x22], #8
-    ldr     x10, [x19, #W_CODE]
+2:  ldr     x10, [x19, #W_CODE]
     add     x21, x19, x10
     add     x21, x21, x9
     NEXT
@@ -1083,5 +1109,5 @@ m_table:
     .word   i_swap - m_table, i_rot - m_table, i_pick - m_table, i_dup2 - m_table
     .word   i_in - m_table, i_instof - m_table, i_delp - m_table, i_dele - m_table
     .word   i_keys - m_table, i_iter - m_table, i_fornext - m_table
-    .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table
+    .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
     .ltorg
