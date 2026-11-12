@@ -60,6 +60,9 @@ S.repeat=function(k){var s=''+this,r='';while(k>0){if(k&1)r+=s;k>>=1;if(k)s+=s}r
 S.padStart=function(k,p){var s=''+this,f='';p=p===undefined?' ':''+p;if(!p.length)return s;while(f.length+s.length<k)f+=p;return f.substring(0,k-s.length)+s};
 S.padEnd=function(k,p){var s=''+this,f='';p=p===undefined?' ':''+p;if(!p.length)return s;while(f.length+s.length<k)f+=p;return s+f.substring(0,k-s.length)};
 S.concat=function(){var s=''+this;for(var i=0;i<arguments.length;i++)s+=arguments[i];return s};
+Function.prototype.call=n(28);Function.prototype.apply=n(29);
+Function.prototype.bind=function(t){var f=this,a=[];for(var i=1;i<arguments.length;i++)a.push(arguments[i]);return function(){var b=a.slice();for(var i=0;i<arguments.length;i++)b.push(arguments[i]);return f.apply(t,b)}};
+Object.prototype.toString=function(){return '[object Object]'};
 Object.keys=n(13);Object.prototype.hasOwnProperty=n(14);
 Object.values=function(o){var k=Object.keys(o),r=[];for(var i=0;i<k.length;i++)r.push(o[k[i]]);return r};
 Object.entries=function(o){var k=Object.keys(o),r=[];for(var i=0;i<k.length;i++)r.push([k[i],o[k[i]]]);return r};

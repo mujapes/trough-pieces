@@ -7,6 +7,11 @@
 // can be read: missing ones are undefined), x11 `this`; it answers in x0 and may use x0-x17, d0-d7. It cannot call back
 // into the language. Out of room: b n_full. An error: x0, x1 the text ("Name: message"), b n_fail. Both from any depth.
 m_native:
+    ldr     x9, [x4, #8]
+    cmp     x9, #28
+    b.eq    m_fcall
+    cmp     x9, #29
+    b.eq    m_fapply
     add     x8, x1, #32
     cmp     x8, x26
     b.hi    m_deep
@@ -22,14 +27,118 @@ m_native:
     adr     x10, n_table
     ldrsw   x9, [x10, x9, lsl #2]
     add     x10, x10, x9
-    str     x12, [sp, #-16]!
+    stp     x12, x13, [sp, #-16]!
     mov     x9, sp
     str     x9, [x19, #W_NSP]
     blr     x10
-    ldr     x12, [sp], #16
+    ldp     x12, x13, [sp], #16
+// m_answer: a call's answer x0 goes to its place x12. A call of kind x13 3 or 4 was an object's toString, made by m_toprim
+// for the top value or the one under it: the answer (the usual text if it is itself an object) takes the object's place
+// and the stack is as it was, for the instruction to run again.
+m_answer:
+    cmp     x13, #3
+    b.hs    1f
     str     x0, [x12]
     add     x22, x12, #8
     NEXT
+1:  TAGIS   x0, T_OBJECT
+    b.ne    2f
+    mov     x4, x12
+    mov     x5, x13
+    LIT     s_objtext, s_end
+    cbz     x0, m_full
+    mov     x12, x4
+    mov     x13, x5
+2:  str     x0, [x12]
+    sub     x13, x13, #2
+    add     x22, x12, x13, lsl #3
+    NEXT
+// m_toprim: from an instruction of one byte that met an object where it wants text or a number: x5 the object, x4 1 if it
+// is the top value, 2 if the one under. A plain object with a toString that is a function has it called, and the
+// instruction runs again with the answer in the object's place; any other object becomes its usual text at once.
+m_toprim:
+    sub     x21, x21, #1
+    and     x6, x5, #0xffffffffffff
+    ldr     x6, [x19, x6]
+    cmp     x6, #3
+    b.ne    5f
+    stp     x4, x5, [sp, #-16]!
+    mov     x0, x5
+    ldr     x1, [x19, #W_K_TOSTRING]
+    bl      o_get
+    ldp     x4, x5, [sp], #16
+    TAGIS   x0, T_OBJECT
+    b.ne    5f
+    and     x6, x0, #0xffffffffffff
+    ldr     x6, [x19, x6]
+    cmp     x6, #1
+    b.ne    5f
+    sub     x12, x22, x4, lsl #3
+    mov     x11, x5
+    PUSH    x0
+    mov     x1, x22
+    mov     x0, #0
+    add     x13, x4, #2
+    b       m_call
+5:  str     x4, [sp, #-16]!
+    mov     x0, x5
+    bl      v_text
+    ldr     x4, [sp], #16
+    cbz     x0, m_full
+    sub     x12, x22, x4, lsl #3
+    str     x0, [x12]
+    NEXT
+// 28 call, 29 apply (of a function): not routines but turns of the call itself: `this` is the function to call, the first
+// argument its `this`; the rest (call) or the items of the second, an array (apply), are its arguments.
+m_fcall:
+    str     x11, [x1, #-8]
+    VAL     x11, T_UNDEF
+    cbz     x0, m_call
+    ldr     x11, [x1]
+    sub     x0, x0, #1
+    mov     x8, #0
+1:  cmp     x8, x0
+    b.hs    2f
+    add     x9, x1, x8, lsl #3
+    ldr     x10, [x9, #8]
+    str     x10, [x9]
+    add     x8, x8, #1
+    b       1b
+2:  add     x22, x1, x0, lsl #3
+    b       m_call
+m_fapply:
+    str     x11, [x1, #-8]
+    VAL     x11, T_UNDEF
+    mov     x5, #0
+    cbz     x0, 9f
+    ldr     x11, [x1]
+    cmp     x0, #2
+    b.lo    9f
+    ldr     x6, [x1, #8]
+    TAGIS   x6, T_OBJECT
+    b.ne    9f
+    and     x6, x6, #0xffffffffffff
+    add     x6, x19, x6
+    ldr     x7, [x6]
+    cmp     x7, #4
+    b.ne    9f
+    ldr     w5, [x6, #A_LEN]
+    ldr     x7, [x6, #A_ITEMS]
+    add     x7, x19, x7
+    add     x8, x1, x5, lsl #3
+    add     x8, x8, #64
+    cmp     x8, x26
+    b.hi    m_deep
+    mov     x8, #0
+1:  cmp     x8, x5
+    b.hs    9f
+    ldr     x9, [x7, x8, lsl #3]
+    str     x9, [x1, x8, lsl #3]
+    add     x8, x8, #1
+    b       1b
+9:  add     x22, x1, x5, lsl #3
+    mov     x0, x5
+    b       m_call
 n_full:
     ldr     x9, [x19, #W_NSP]
     add     sp, x9, #16
@@ -126,7 +235,31 @@ n_maker:
     ldr     x1, [sp, #24]
     ldr     x10, [x1, #8]
     str     x10, [x11, x9, lsl #3]
-    b       n_undef
+    cmp     x9, #2
+    b.ne    n_undef
+    ldr     x11, [x19, #W_GLOB]         // functions: the ones declared at the top were made before this was said,
+    add     x11, x19, x11               // and are all among the globals: they inherit now
+    ldr     x12, [x19, #W_GLOB_N]
+3:  cbz     x12, n_undef
+    ldr     x13, [x11, #8]
+    add     x11, x11, #16
+    sub     x12, x12, #1
+    lsr     x14, x13, #48
+    mov     w16, #T_OBJECT
+    cmp     w14, w16
+    b.ne    3b
+    and     x13, x13, #0xffffffffffff
+    add     x13, x19, x13
+    ldr     x14, [x13]
+    cmp     x14, #1
+    b.ne    3b
+    ldr     x14, [x13, #O_PROTO]
+    lsr     x14, x14, #48
+    mov     w16, #T_NULL
+    cmp     w14, w16
+    b.ne    3b
+    str     x10, [x13, #O_PROTO]
+    b       3b
 2:  stp     xzr, xzr, [x11]
     stp     xzr, xzr, [x11, #16]
     stp     xzr, xzr, [x11, #32]
@@ -439,5 +572,6 @@ n_table:
     .word   n_isarray - n_table, n_keys - n_table, n_hasown - n_table, n_charcode - n_table, n_fromcc - n_table
     .word   n_substring - n_table, n_upper - n_table, n_lower - n_table, n_mexp - n_table, n_log - n_table
     .word   n_log2 - n_table, n_log10 - n_table, n_random - n_table, n_sin - n_table, n_cos - n_table, n_tan - n_table
-    .equ    N_COUNT, 28
+    .word   n_undef - n_table, n_undef - n_table
+    .equ    N_COUNT, 30
     .ltorg

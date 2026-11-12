@@ -217,13 +217,16 @@ m_keys:
     str     x0, [x19, #W_K_LENGTH]
     LIT     k_prototype, k_constructor
     str     x0, [x19, #W_K_PROTOTYPE]
-    LIT     k_constructor, k_end
+    LIT     k_constructor, k_tostring
     str     x0, [x19, #W_K_CONSTRUCTOR]
+    LIT     k_tostring, k_end
+    str     x0, [x19, #W_K_TOSTRING]
     ldr     x30, [sp], #16
     ret
 k_length:      .ascii "length"
 k_prototype:   .ascii "prototype"
 k_constructor: .ascii "constructor"
+k_tostring:    .ascii "toString"
 k_end:
 e_noprops: .ascii "TypeError: Cannot read properties of undefined or null"
 e_noprops_end:

@@ -203,3 +203,11 @@ double (1280 bits of 2/pi, `k_2opi`; whole-number multiply, then a pair), then f
 `python3 -I checks/turns.py out/script.asm [n] [seed]` (mpmath, 2000 bits): 8199 values over three seeds, angles up to the
 largest double and ones next to multiples of pi/2: 0 wrong, first run. 28 built-ins in machine code. Next in Math: atan,
 atan2, asin, acos; expm1, log1p, sinh, cosh, tanh, cbrt, hypot. Then call/apply/bind, object text by toString, JSON.
+**Stage 6, fourth unit: `call`, `apply`, `bind`, and an object's text by its own `toString`. `calls.js` passes: 30 of 30
+programs, 1412 lines** (second run; the first found that top-level functions are made before the library registers what
+functions inherit from: `__n(-3, ..)` now goes through the globals and gives them it). How: built-ins 28 and 29 are not
+routines but turns of the call (`m_fcall`, `m_fapply` in lib.S: rearrange the stack, go on into `m_call`); `bind` is in
+prelude.js. `i_add` meeting an object goes to `m_toprim`: a plain object's `toString`, if a function, is called with the
+answer to land in the object's place (call kinds 3 and 4, finished by `m_answer`) and the instruction runs again. Only `+`
+(so also `+=`, templates, `String(x)`, join) does this so far: not `==`, comparison, arithmetic (`valueOf`), property keys,
+or `console.log` of an object. A function nested in a block that ran before registration is not an issue (they are made later).

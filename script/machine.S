@@ -679,7 +679,15 @@ i_add:
     fadd    d0, d1, d0
     sub     x22, x22, #8
     RESULT
-1:  mov     w16, #T_STRING              // text on either side: both become text and are joined
+1:  mov     w16, #T_OBJECT              // an object on either side first becomes text, by its own toString if it has one
+    mov     x4, #1
+    cmp     w3, w16
+    csel    x5, x1, x0, eq
+    b.eq    m_toprim
+    mov     x4, #2
+    cmp     w2, w16
+    b.eq    m_toprim
+    mov     w16, #T_STRING              // text on either side: both become text and are joined
     cmp     w2, w16
     ccmp    w3, w16, #4, ne
     b.eq    2f
@@ -1379,7 +1387,7 @@ i_ret:
     ldr     x13, [x20, #56]             // 1: called by new; 2: a setter, whose answer is dropped
     cbz     x13, 1f
     cmp     x13, #2
-    b.eq    1f
+    b.hs    1f
     TAGIS   x0, T_OBJECT
     b.eq    1f
     ldr     x0, [x20, #40]
@@ -1390,13 +1398,16 @@ i_ret:
     add     x27, x19, x10
     add     x20, x19, x11
     add     x22, x19, x12
-    cmp     x13, #2
-    b.eq    2f
-    str     x0, [x22], #8
-2:  ldr     x10, [x19, #W_CODE]
+    ldr     x10, [x19, #W_CODE]
     add     x21, x19, x10
     add     x21, x21, x9
-    NEXT
+    cmp     x13, #2
+    b.eq    2f
+    b.hi    3f
+    str     x0, [x22], #8
+2:  NEXT
+3:  mov     x12, x22                    // 3, 4: the call was an object's toString, made in the middle of an instruction
+    b       m_answer
 p_space: .byte ' '
 p_line:  .byte 10
     .balign 4
