@@ -78,12 +78,27 @@ static uint8_t *plain_fetch(const char *site, int port, const uint8_t *request, 
 /* Calls an entry that writes text into a block; the block then holds exactly that text. 0 if the entry said no. */
 static uint8_t *made_text(entry5 e, const int16_t *q, int n, size_t room) { uint8_t *b = block(2, room); long long len = e(b, q, n, 0, table); if (len < 0) { free(b); return 0; } resize(b, (size_t)len); return b; }
 static uint8_t *file_block(const char *path) { FILE *f = fopen(path, "rb"); if (!f) { fprintf(stderr, "cannot read %s\n", path); exit(3); } fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET); uint8_t *b = block(2, (size_t)n); if (fread(b + 64, 1, (size_t)n, f) != (size_t)n) exit(3); fclose(f); return b; }
+/* A prompt to a language model: browse <out dir> --ask <key file> <model> <prompt file> [most tokens]
+ * The llm piece writes the request and reads the answer; tls with trust carries it; http takes the reply out of its chunks. */
+static int ask(int argc, char **argv, const uint8_t *roots) {
+    if (argc < 6) { fprintf(stderr, "browse <pieces out dir> --ask <key file> <model> <prompt file> [most tokens]\n"); return 2; }
+    uint8_t *key = file_block(argv[3]), *model = text_block(argv[4], strlen(argv[4])), *prompt = file_block(argv[5]); long long most = argc > 6 ? atoll(argv[6]) : 1024; double started = now_ms();
+    size_t kn = length(key); while (kn && (key[64 + kn - 1] == '\n' || key[64 + kn - 1] == '\r' || key[64 + kn - 1] == ' ')) kn--; resize(key, kn);   /* a key file usually ends in a line break */
+    at(40, key); at(41, model); at(42, prompt); int16_t q[3] = {40, 41, 42}; uint8_t *request = block(2, length(prompt) * 6 + 2048); long long rn = entry("llm", "request")(request, q, 3, most, table);
+    if (rn < 0) { printf("the llm piece would not write that request (key, model name, prompt or token count not acceptable)\n"); return 1; } resize(request, (size_t)rn);
+    char why[400] = ""; uint8_t *reply = secure_fetch("api.anthropic.com", 443, request, roots, why, sizeof why); if (!reply) { printf("api.anthropic.com: %s\n", why); return 1; }
+    at(43, reply); int16_t qr[1] = {43}; long long status = entry("http", "status")(0, qr, 1, 0, table); uint8_t *body = block(2, length(reply) + 64); long long bn = entry("http", "body")(body, qr, 1, 0, table);
+    if (bn < 0) { printf("status %lld; the reply's body could not be read (%zu bytes came)\n", status, length(reply)); return 1; } resize(body, (size_t)bn);
+    at(44, body); int16_t qb[1] = {44}; uint8_t *words = block(2, (size_t)bn + 64); long long wn = entry("llm", "text")(words, qb, 1, 0, table), stopped = entry("llm", "stopped")(0, qb, 1, 0, table);
+    printf("status %lld, %zu bytes back over a verified secure connection in %.0f ms; the llm piece says: %s; %lld bytes of words\n", status, length(reply), now_ms() - started, stopped == 1 ? "finished" : stopped == 2 ? "the server reported an error" : "not finished", wn);
+    if (wn > 0) { fwrite(words + 64, 1, (size_t)wn, stdout); printf("\n"); } else if (stopped != 1) printf("%.*s\n", bn > 300 ? 300 : (int)bn, body + 64);
+    return stopped == 1 ? 0 : 1; }
 int main(int argc, char **argv) {
-    if (argc < 4) { fprintf(stderr, "browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]\n"); return 2; }
+    if (argc < 4) { fprintf(stderr, "browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]\n   or: browse <pieces out dir> --ask <key file> <model> <prompt file> [most tokens]\n"); return 2; }
     dir = argv[1]; int size_px = argc > 4 ? atoi(argv[4]) : 26, scroll = argc > 5 ? atoi(argv[5]) : 0; uint32_t W = argc > 6 ? (uint32_t)atoi(argv[6]) : 720, H = argc > 7 ? (uint32_t)atoi(argv[7]) : 1280; double started = now_ms();
     char path[600]; snprintf(path, sizeof path, "%s/../slots.txt", dir); FILE *f = fopen(path, "r"); if (!f) { fprintf(stderr, "no slots.txt\n"); return 3; }
     char line[256]; while (fgets(line, sizeof line, f)) { int slot; char name[64], en[64]; if (line[0] == '#' || sscanf(line, "%d %63s %63s", &slot, name, en) != 3) continue; if (slot >= 0 && slot < 256) table[slot] = piece_entry(get(name), en); } fclose(f);
-    snprintf(path, sizeof path, "%s/android-roots.der", dir); uint8_t *roots = file_block(path); snprintf(path, sizeof path, "%s/font.fixture", dir); uint8_t *font = file_block(path);
+    snprintf(path, sizeof path, "%s/android-roots.der", dir); uint8_t *roots = file_block(path); if (argc > 2 && !strcmp(argv[2], "--ask")) return ask(argc, argv, roots); snprintf(path, sizeof path, "%s/font.fixture", dir); uint8_t *font = file_block(path);
     entry5 resolve = entry("url", "resolve"), part = entry("url", "part"), port_of = entry("url", "port"), request_of = entry("http", "request"), status_of = entry("http", "status"), header = entry("http", "header"), packed_of = entry("http", "packed"), body_of = entry("http", "body"), unpack = entry("inflate", "unpack");
     uint8_t *address = text_block(argv[2], strlen(argv[2])), *reply = 0; char why[400] = ""; const char *secure = ""; long long status = -1;
     for (int hop = 0; hop < 6; hop++) {
