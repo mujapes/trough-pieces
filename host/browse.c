@@ -119,22 +119,38 @@ static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, s
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+typedef struct { uint32_t x, y, w, h; char src[1024]; int state; uint8_t *ready; } pic;   /* state: 0 to fetch, 1 ready, 2 could not be shown */
+/* One picture of the page: fetched, decoded by our own piece for its kind, and scaled by the image piece to the room the page gave it. */
+static int get_picture(pic *p, const char *page_address, const uint8_t *roots) {
+    char why[200] = ""; uint8_t *base = text_block(page_address, strlen(page_address)), *ref = text_block(p->src, strlen(p->src)); at(30, base); at(31, ref); int16_t qn[2] = {30, 31}; uint8_t *where = made_text(entry("url", "resolve"), qn, 2, 8192); if (!where) return 0;
+    char address[2048]; if (length(where) >= sizeof address) return 0; memcpy(address, where + 64, length(where)); address[length(where)] = 0;
+    uint8_t *body = fetch_body(address, roots, why, sizeof why); if (!body) return 0; size_t bn = length(body); const uint8_t *d = body + 64;
+    const char *kind = bn > 8 && !memcmp(d, "\x89PNG\r\n\x1a\n", 8) ? "png" : bn > 2 && d[0] == 0xff && d[1] == 0xd8 ? "jpeg" : bn > 4 && !memcmp(d, "GIF8", 4) ? "gif" : 0; if (!kind) { free(body); return 0; }
+    at(36, body); int16_t qp[3] = {36, 38, 0}; long long wh = entry(kind, "size")(0, qp, 1, 0, table); if (wh < 0) { free(body); return 0; } uint32_t iw = (uint32_t)(wh >> 16), ih = (uint32_t)(wh & 65535); if ((uint64_t)iw * ih > 6000000) { free(body); return 0; }
+    uint8_t *whole = surface(1, iw, ih, 4), *scratch = block(5, 64 + 24ull * iw * ih + 8ull * ih + 70000 + 20480); at(37, whole); at(38, scratch);
+    long long ok = entry(kind, "decode")(whole, qp, !strcmp(kind, "gif") ? 3 : 2, 0, table); free(scratch); free(body); if (ok < 0) { free(whole); return 0; }
+    p->ready = surface(1, p->w, p->h, 4); entry("paint", "clear")(p->ready, 0, 0, 0xffffffffll, table); int16_t qi[5] = {37, 0, 0, (int16_t)p->w, (int16_t)p->h}; entry("image", iw > p->w ? "smooth" : iw < p->w ? "stretch" : "blit")(p->ready, qi, iw == p->w && ih == p->h ? 3 : 5, 0, table); free(whole); return 1; }
 static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     if (argc < 7) { fprintf(stderr, "browse <pieces out dir> --serve <picture file> <events file> <width> <height> [address]\n"); return 2; }
     uint32_t W = (uint32_t)atoi(argv[5]), H = (uint32_t)atoi(argv[6]); if (W < 16 || H < 16 || W > 4096 || H > 4096) return 2; size_t bytes = 64 + 4ull * W * H;
     int fd = open(argv[3], O_RDWR | O_CREAT, 0600); if (fd < 0 || ftruncate(fd, (off_t)bytes)) { fprintf(stderr, "cannot make the picture file\n"); return 1; }
     uint8_t *screen = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (screen == MAP_FAILED) return 1; uint64_t z = bytes, counter = 0; uint32_t head[4] = {1, W, H, 4 * W}; memset(screen, 0, 64); memcpy(screen, head, 16); memcpy(screen + 16, &z, 8);
     FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
-    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24 }; static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
+    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; static pic pics[PICS]; int pic_n = 0; static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
     for (;;) {
         if (fresh) { fresh = 0; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
+            for (int i = 0; i < pic_n; i++) { free(pics[i].ready); pics[i].ready = 0; } pic_n = 0;
+            if (body) { at(34, body); at(35, font); uint8_t *list = block(2, 65536); int16_t qq[4] = {34, 35, (int16_t)size_px, (int16_t)W}; long long ln = entry("page", "pictures")(list, qq, 4, 0, table);
+                for (long long o = 0; o + 20 <= ln && pic_n < PICS; ) { uint32_t f[5]; memcpy(f, list + 64 + o, 20); if (f[4] < sizeof pics[0].src && f[2] && f[3]) { pic *p = &pics[pic_n++]; p->x = f[0]; p->y = f[1]; p->w = f[2]; p->h = f[3]; size_t k = 0; for (uint32_t i = 0; i < f[4]; i++) { char c = (char)list[64 + o + 20 + i]; p->src[k++] = c; if (c == '&' && i + 4 < f[4] && !memcmp(list + 64 + o + 21 + i, "amp;", 4)) i += 4; } p->src[k] = 0; p->state = 0; p->ready = 0; } o += 20 + ((f[4] + 3) & ~3u); }
+                free(list); printf("%d pictures to fetch\n", pic_n); fflush(stdout); }
             if (!body) { char sorry[600]; int n = snprintf(sorry, sizeof sorry, "<h2>This page could not be opened</h2><p>%s</p><p>%s</p>", address, why); body = text_block(sorry, (size_t)n); } }
         if (dirty) { dirty = 0; int drawn = 0; double t = now_ms(); at(34, body); at(35, font); memcpy(&counter, screen + 24, 8); { /* the page shows from row (scroll - BAR) of its own height; each strip of TILE rows is drawn by the pieces once and kept */
               long long first = scroll - BAR; size_t rowbytes = 4 * (size_t)W;
               for (uint32_t y = 0; y < H; ) { long long row = first + y; uint32_t run;
                   if (row < 0) { run = (uint32_t)(-row) < H - y ? (uint32_t)(-row) : H - y; memset(screen + 64 + y * rowbytes, 255, run * rowbytes); y += run; continue; }
                   long long which = row / TILE; int found = -1, oldest = 0; for (int i = 0; i < KEPT; i++) { if (strip_at[i] == which) found = i; if (strip_used[i] < strip_used[oldest]) oldest = i; }
-                  if (found < 0) { found = oldest; if (!strip[found]) strip[found] = surface(1, W, TILE, 4); strip_at[found] = which; clear(strip[found], 0, 0, 0xffffffffll, table); int16_t q[4] = {34, 35, (int16_t)size_px, (int16_t)(which * TILE > 32000 ? 32000 : which * TILE)}; tall = render(strip[found], q, 4, 0, table); drawn++; }
+                  if (found < 0) { found = oldest; if (!strip[found]) strip[found] = surface(1, W, TILE, 4); strip_at[found] = which; clear(strip[found], 0, 0, 0xffffffffll, table); int16_t q[4] = {34, 35, (int16_t)size_px, (int16_t)(which * TILE > 32000 ? 32000 : which * TILE)}; tall = render(strip[found], q, 4, 0, table); drawn++;
+                      for (int i = 0; i < pic_n; i++) if (pics[i].state == 1 && (long long)pics[i].y < (which + 1) * TILE && (long long)pics[i].y + pics[i].h > which * TILE) { at(39, pics[i].ready); int16_t qb[3] = {39, (int16_t)pics[i].x, (int16_t)((long long)pics[i].y - which * TILE)}; entry("image", "blit")(strip[found], qb, 3, 0, table); } }
                   strip_used[found] = ++tick; uint32_t in = (uint32_t)(row - which * TILE); run = TILE - in < H - y ? TILE - in : H - y; memcpy(screen + 64 + y * rowbytes, strip[found] + 64 + in * rowbytes, run * rowbytes); y += run; } }
             { /* the bar across the top, drawn by the paint and font pieces: a back arrow when there is somewhere to go back to, and the address */
               int16_t r[4] = {0, 0, (int16_t)W, BAR}; rect(screen, r, 4, 0xffe8ecf0ll, table); int16_t l[4] = {0, BAR - 1, (int16_t)W, 1}; rect(screen, l, 4, 0xffc0c8d0ll, table);
@@ -152,9 +168,13 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
                             if (next && length(next) < sizeof address) { if (depth == 16) { memmove(before[0], before[1], 15 * sizeof before[0]); depth = 15; } snprintf(before[depth++], sizeof before[0], "%s", address); memcpy(address, next + 64, length(next)); address[length(next)] = 0; fresh = 1; printf("tap at %d %d: link to %s\n", down_x, down_y, address); } else printf("tap at %d %d: a link the address piece cannot follow\n", down_x, down_y); }
                         else printf("tap at %d %d: no link there\n", down_x, down_y); fflush(stdout); } down = 0; }
                 else if (line[0] == 'o' && line[1] == ' ') { if (depth == 16) { memmove(before[0], before[1], 15 * sizeof before[0]); depth = 15; } snprintf(before[depth++], sizeof before[0], "%s", address); snprintf(address, sizeof address, "%s", line + 2); fresh = 1; }
+                else if (line[0] == 'g' && sscanf(line + 1, "%d", &y) == 1) { long long limit = tall + BAR > (long long)H ? tall + BAR - H : 0; scroll = y < 0 ? 0 : y > limit ? limit : y; dirty = 1; }   /* go to that row of the page */
                 else if (line[0] == 'q') return 0; } }
         else if (st.st_size < read_to) read_to = 0;
-        if (!dirty && !fresh) usleep(4000); } }
+        if (!dirty && !fresh) { int todo = -1; for (int i = 0; i < pic_n && todo < 0; i++) if (pics[i].state == 0) todo = i;
+            if (todo >= 0) { double t = now_ms(); pic *p = &pics[todo]; p->state = get_picture(p, address, roots) ? 1 : 2; printf("picture %d of %d (%u x %u at row %u) %s in %.0f ms: %.80s\n", todo + 1, pic_n, p->w, p->h, p->y, p->state == 1 ? "ready" : "could not be shown", now_ms() - t, p->src); fflush(stdout);
+                if (p->state == 1) { for (int i = 0; i < KEPT; i++) if (strip_at[i] >= 0 && (long long)p->y < (strip_at[i] + 1) * TILE && (long long)p->y + p->h > strip_at[i] * TILE) strip_at[i] = -1; dirty = 1; } }
+            else usleep(4000); } } }
 int main(int argc, char **argv) {
     if (argc < 4) { fprintf(stderr, "browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]\n   or: browse <pieces out dir> --ask <key file> <model> <prompt file> [most tokens]\n"); return 2; }
     dir = argv[1]; int size_px = argc > 4 ? atoi(argv[4]) : 26, scroll = argc > 5 ? atoi(argv[5]) : 0; uint32_t W = argc > 6 ? (uint32_t)atoi(argv[6]) : 720, H = argc > 7 ? (uint32_t)atoi(argv[7]) : 1280; double started = now_ms();
