@@ -373,7 +373,7 @@ The library (stage 6): what the language has built in. Two halves. The routines 
 - 325 `n_substring` 17 substring: the units from one place up to another (either order; each held within the string). Wide only if it must be.
 - 390 `n_upper` 18 toUpperCase, 19 toLowerCase: English and western European letters, so far (not ÿ, ß, µ, nor anything past 255)
 
-## math.S (314 lines)
+## math.S (547 lines)
 The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exactly. The answer is the pair rounded once, so it is the correctly rounded one except where the true value lies within about 2^-90 of halfway between two doubles (not proved absent; none met in the checks). dd_mul, dd_add, dd_div: the pair A (d0, d1) with the pair B (d2, d3) -> A. Use d16-d20 and nothing else.
 - 6 `dd_mul` The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exac
 - 59 `q_exp` q_exp: e to the power of the pair (d0, d1) -> d0. The power is cut to r = it - k ln 2, r / 512 goes through nine terms of the series 1 + r(1 + r/2(1 + r/3(...))), the sum is squared nine times and scaled by 2^k in two steps, the second a fused one so that the 
@@ -382,6 +382,9 @@ The curved functions of Math (stage 6), and powers that are not whole. Worked in
 - 231 `m_powfrac` m_powfrac: from the power instruction: d1 to the power d0, which is not a whole number (or is not a number)
 - 268 `n_mexp` 20 exp, 21 log, 22 log2, 23 log10
 - 298 `n_random` 24 random: a number from 0 up to but not 1 (xorshift; the same run of numbers in every world until the host gives a seed)
+- 328 `q_ser` q_ser: the series 1 - t/(a b)(1 - t/(c d)(1 - ...)) of fifteen terms, t the pair (d23, d24): with x13 0 the cosine's (divisors 1 2, 3 4, ...), with x13 1 the sine's over its angle (2 3, 4 5, ...) -> the pair (d0, d1). Uses x9, x10, x12.
+- 359 `q_sincos` q_sincos: for the number d0 (finite, not zero), taken without its sign: x11 the quarter turn its angle falls nearest (only the low two bits mean anything), and of what is left over, r (within pi/4 either way), the sine as the pair (d25, d26) and the cosine as 
+- 492 `n_sin` 25 sin, 26 cos, 27 tan
 
 ## entries.S (232 lines)
 The entries. x0 block, x1 numbers (16-bit), x2 how many, x3 argument, x4 call table.

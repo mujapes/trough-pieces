@@ -198,3 +198,8 @@ seeds, 0 wrong, first run (run it with -I: `checks/numbers.py` shadows a standar
 run overflows the world's printed text). Against node the fixed corner cases agree, except `1e308**1.0001` where ours is the
 exact answer and node is one unit off. 25 built-ins in machine code now. Next in Math: sin, cos, tan (cut the angle with a
 long 2/pi, then the series in pairs), atan, atan2, asin, acos, and expm1, log1p, sinh, cosh, tanh, cbrt, hypot.
+**Stage 6, third unit: sin, cos, tan in machine code (`math.S`: `q_sincos`, `q_ser`).** The angle is cut exactly for every
+double (1280 bits of 2/pi, `k_2opi`; whole-number multiply, then a pair), then fifteen terms of each series in pairs.
+`python3 -I checks/turns.py out/script.asm [n] [seed]` (mpmath, 2000 bits): 8199 values over three seeds, angles up to the
+largest double and ones next to multiples of pi/2: 0 wrong, first run. 28 built-ins in machine code. Next in Math: atan,
+atan2, asin, acos; expm1, log1p, sinh, cosh, tanh, cbrt, hypot. Then call/apply/bind, object text by toString, JSON.

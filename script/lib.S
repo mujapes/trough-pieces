@@ -438,6 +438,6 @@ n_table:
     .word   n_trunc - n_table, n_sign - n_table, n_min - n_table, n_max - n_table, n_push - n_table, n_pop - n_table
     .word   n_isarray - n_table, n_keys - n_table, n_hasown - n_table, n_charcode - n_table, n_fromcc - n_table
     .word   n_substring - n_table, n_upper - n_table, n_lower - n_table, n_mexp - n_table, n_log - n_table
-    .word   n_log2 - n_table, n_log10 - n_table, n_random - n_table
-    .equ    N_COUNT, 25
+    .word   n_log2 - n_table, n_log10 - n_table, n_random - n_table, n_sin - n_table, n_cos - n_table, n_tan - n_table
+    .equ    N_COUNT, 28
     .ltorg
