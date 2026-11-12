@@ -46,3 +46,14 @@ Through the call table: paint clear (socket 3), font draw (8), font measure (9),
   `href` (any case; in double quotes, single quotes or bare), as written: making it absolute is the url piece's job.
   Checked against the picture: every link-coloured dot of a drawn test page answers with its own address and every
   plain-text dot with none (three links, three ways of writing the address, wrapped lines, scrolled).
+
+## Pictures (added 2026-11-12)
+An `<img>` that states a width and a height (8 to 4096 each) gets a line of its own with that much room, shrunk in
+proportion if wider than the page less its margins, and a quarter of a line below it. The piece draws nothing
+there. Pictures with no stated size, or smaller than 8 either way, take no room and are not listed.
+- **pictures**(block, numbers: page handle, font handle, text size, screen width) → writes one record for each such
+  picture into the block from byte 64 and returns how many bytes were written (-1 if the numbers are not usable; a
+  record that does not fit is left out). A record: five 32-bit numbers (left, top counted from the top of the page,
+  width, height, the address's length), then the address as written after `src`, filled out with zeros to a
+  multiple of four bytes. Fetching, decoding and drawing the picture into that room is the host's and the image
+  piece's work.

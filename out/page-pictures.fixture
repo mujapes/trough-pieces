@@ -1,0 +1,1 @@
+<html><body><p>Before the first picture.</p><img src="/a/one.png" width="100" height="50"><p>Between.</p><IMG HEIGHT=300 WIDTH=900 SRC='https://x.example/big.jpg' alt="x"><p>After.</p><img src="tiny.gif" width=1 height=1><img src="nosize.png"><p>End.</p></body></html>

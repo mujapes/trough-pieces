@@ -5,11 +5,14 @@ hold 2 file font.fixture
 hold 3 block 3 1048576
 hold 4 mask 256 256
 hold 5 file page-links.fixture
+hold 6 file page-pictures.fixture
 entry check 0 0
 entry render 0 0
 entry link 0 0
-numbers render 2 6 pick:0,0,0,5,5,0,0,1 pick:2,2,2,2,2,2,2,1 range:4:40 range:-30:160 pick:3,3,1 pick:4,4,1
+entry pictures 0 0
+numbers render 2 6 pick:0,0,6,5,5,6,0,1 pick:2,2,2,2,2,2,2,1 range:4:40 range:-30:160 pick:3,3,1 pick:4,4,1
 numbers link 8 8 pick:5,5,5,5,5,5,0,1 pick:2,2,2,2,2,2,2,1 pick:10,10,12,12,14,8,20,5 range:-10:60 range:0:160 range:0:120 pick:160,160,160,160,120,200,160,8 pick:120,120,120,120,120,120,120,8
+numbers pictures 4 4 pick:6,6,6,6,6,5,0,1 pick:2,2,2,2,2,2,2,1 pick:10,12,14,16,20,8,30,5 pick:160,160,120,200,60,24,160,8
 needs 3
 needs 8
 needs 9
