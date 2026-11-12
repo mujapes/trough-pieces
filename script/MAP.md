@@ -9,15 +9,15 @@ The world: everything a running program has, in one block the host owns (kind 6)
 - 127 `w_string` w_string: a string value holding the x1 bytes at x0 -> x0 the value, or 0 if the world is full. A string in the heap is its length (8 bytes), then its bytes. Uses x9-x13.
 - 146 `w_out` w_out: the x1 bytes at x0 join what the program has printed (what does not fit is dropped). Uses x9-x12.
 
-## lex.S (932 lines)
+## lex.S (935 lines)
 script, written by hand (ARM64): Trough's own JavaScript engine. The meaning and the plan are script/intent.md. This file: the words (stage 1). Entries: x0 block, x1 numbers (16-bit), x2 how many, x3 argument, x4 call table. Calls nothing. While words are being read: x20 the text, x21 how long, x22 where we are, w23 the word's kind, w24 its id (which keyword or punctuation), x25 where it starts, x26 how long it is, w27 whether a line ended before it, w28 whether a slash here would begin a pattern, d8 a number's value. Kinds: 0 the end, 1 name, 2 keyword, 3 number, 4 string, 5 template, 6 punctuation, 7 pattern, 8 a number meant as a big
 - 19 `CH` CH: the byte at x22 + \ahead -> \reg, or 0 past the end
 - 29 `NAMEPART` is_name_part: can the byte w0 be inside a name -> flags: eq if so. (Letters, digits, $ and _; and any byte of a character beyond ASCII, which is taken as a letter for now.) Uses w9.
 - 46 `next_word` next_word: reads the next word at x22 into w23-w27 and d8; moves x22 past it. Uses x0-x17.
 - 48 `w_space` what is between words: spaces, line ends, comments
-- 264 `w_quoted` a string: to the same quote, a backslash taking what follows with it
-- 293 `w_template` a template: to the closing backtick; ${ ... } inside may hold anything, strings and
-- 498 `n_exact` n_exact: the decimal number in the text from x25 to x22, with w12 the power written after its e, as the nearest double (ties to the even one) -> d8. The digits become one long whole number in 32-bit limbs on the stack (the first 800 that count; whether anythin
+- 267 `w_quoted` a string: to the same quote, a backslash taking what follows with it
+- 296 `w_template` a template: to the closing backtick; ${ ... } inside may hold anything, strings and
+- 501 `n_exact` n_exact: the decimal number in the text from x25 to x22, with w12 the power written after its e, as the nearest double (ties to the even one) -> d8. The digits become one long whole number in 32-bit limbs on the stack (the first 800 that count; whether anythin
 
 ## values.S (345 lines)
 Values and their conversions, as the language defines them. x19 is the world. These routines use x0-x17 and d0-d3 only. ISNUM: is the value in \reg a number -> flags: lo if so. Uses x17.
@@ -53,7 +53,7 @@ A number as text, exactly as the language says: the shortest digits that read ba
 - 339 `n_exp` very large or very small: one digit, a point, the rest, e, the power
 - 397 `n_high` n_high: does r + up reach s (pass it, when the range's ends do not round to the number) -> flags: hs if so
 
-## compile.S (4259 lines)
+## compile.S (4305 lines)
 The translator: the program's words become instructions for the machine, in one pass, nothing kept as a tree. Expressions by precedence climbing; jumps are written with room for their distance and filled in when the place is known. While it works: x19 the world, x20-x28 and d8 the word reader's (the current word is always read already), x29 this translator's own frame, set once by c_compile and never moved: an error anywhere drops the stack back to it. Stage 2: names are all globals (no block scope yet); functions, objects, arrays and templates are refused as not yet made.
 - 30 `ISP` ISP, ISK: is the current word this punctuation / this keyword; goes to \no if not
 - 36 `ISK` macro id, no
@@ -153,31 +153,32 @@ The translator: the program's words become instructions for the machine, in one 
 - 3167 `c_w_proto_end` 
 - 3171 `c_find_ctor` c_find_ctor: the current word is the { of a class's body: is there a constructor in it -> flags: eq if so, the reader left at the ( after its name (the caller keeps and puts back the reader's place)
 - 3212 `c_class` c_class: a class, from the word `class` to past its closing }: the class (a function) is left on the stack, and with w0 1 also stored in the variable of its name. The constructor is found first, wherever it is written (without one: a plan with flag 16, which t
-- 3342 `c_primary` c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
-- 3493 `c_var` Statements. Each leaves the machine's stack as it found it. c_var: var, let or const (the current word) and what it declares, up to but not past the end of the statement
-- 3547 `c_semi` c_semi: the end of a statement: a ; or, where the language lets it be left out, a line end, a } or the end of the text
-- 3558 `LOOP_IN` macro
-- 3571 `LOOP_OUT` macro
-- 3577 `c_stmt` c_stmt: one statement. Its frame: 8, 16, 24, 56 for places in the instructions; 32-55 a loop's record, which goes on at 64 (how many places the loop keeps on the machine's stack), 68 (1: it is a switch), 72 and 80 (its label).
-- 3580 `s_again` 
-- 3607 `s_forw` a for statement is read inside a block of its own, for the let of its head
-- 3624 `s_word` 
-- 3665 `s_expr` 
-- 3685 `s_var` 
-- 3689 `s_if` 
-- 3712 `s_while` 
-- 3737 `s_do` 
-- 3762 `s_for` 
-- 3832 `s_each` for (name in value), for (name of value): 24 the variable, 56 which (1 in, 2 of)
-- 3925 `s_return` 
-- 3945 `s_break` 
-- 3948 `s_continue` 
-- 3997 `s_switch` switch (v) { case a: .. default: .. }: v stays on the stack; each case is JMP past its test (for the body above falling through), the test (DUP, a, SEQ, JF to the next test), then its body. When no test passes: to the default if there is one. 8 the open jump t
-- 4057 `s_done` 
-- 4062 `s_throw` 
-- 4072 `s_try` try { A } catch (e) { B } finally { C } is laid out as: TRY c; A; ENDTRY; JMP n; c: store e; TRY a; B; ENDTRY; JMP n; a: GOSUB f; THROW; n: UNDEF; GOSUB f; POP; JMP end; f: C; RETSUB; end. So C is written once and is reached with two places on the stack (somet
-- 4171 `c_try_exits` c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this function it leaves is ended and its finally run; inside a finally, the two places it was reached with are dropped.
-- 4243 `c_unscope_to` (inside c_try_exits) OP_UNSCOPE for each block's scope between where we are and the record x0
+- 3343 `c_rxlit` c_rxlit: a pattern literal /source/flags is the call RegExp("source", "flags"), made anew each time it is reached. (The global RegExp is the prelude's; the source's backslashes go as they are written.)
+- 3385 `c_primary` c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
+- 3539 `c_var` Statements. Each leaves the machine's stack as it found it. c_var: var, let or const (the current word) and what it declares, up to but not past the end of the statement
+- 3593 `c_semi` c_semi: the end of a statement: a ; or, where the language lets it be left out, a line end, a } or the end of the text
+- 3604 `LOOP_IN` macro
+- 3617 `LOOP_OUT` macro
+- 3623 `c_stmt` c_stmt: one statement. Its frame: 8, 16, 24, 56 for places in the instructions; 32-55 a loop's record, which goes on at 64 (how many places the loop keeps on the machine's stack), 68 (1: it is a switch), 72 and 80 (its label).
+- 3626 `s_again` 
+- 3653 `s_forw` a for statement is read inside a block of its own, for the let of its head
+- 3670 `s_word` 
+- 3711 `s_expr` 
+- 3731 `s_var` 
+- 3735 `s_if` 
+- 3758 `s_while` 
+- 3783 `s_do` 
+- 3808 `s_for` 
+- 3878 `s_each` for (name in value), for (name of value): 24 the variable, 56 which (1 in, 2 of)
+- 3971 `s_return` 
+- 3991 `s_break` 
+- 3994 `s_continue` 
+- 4043 `s_switch` switch (v) { case a: .. default: .. }: v stays on the stack; each case is JMP past its test (for the body above falling through), the test (DUP, a, SEQ, JF to the next test), then its body. When no test passes: to the default if there is one. 8 the open jump t
+- 4103 `s_done` 
+- 4108 `s_throw` 
+- 4118 `s_try` try { A } catch (e) { B } finally { C } is laid out as: TRY c; A; ENDTRY; JMP n; c: store e; TRY a; B; ENDTRY; JMP n; a: GOSUB f; THROW; n: UNDEF; GOSUB f; POP; JMP end; f: C; RETSUB; end. So C is written once and is reached with two places on the stack (somet
+- 4217 `c_try_exits` c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this function it leaves is ended and its finally run; inside a finally, the two places it was reached with are dropped.
+- 4289 `c_unscope_to` (inside c_try_exits) OP_UNSCOPE for each block's scope between where we are and the record x0
 
 ## machine.S (1434 lines)
 The machine: runs the instructions the translator wrote. A stack machine: values go on a stack in the world; each instruction is one byte, some followed by a small number (low byte first). While it runs: x19 the world, x21 the next instruction, x22 the stack's top (the next free place), x23 the constants, x24 the globals, x25 steps left, x26 the stack's end.

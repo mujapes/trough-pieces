@@ -276,3 +276,13 @@ Not made: pattern literals `/x/g` in the translator (next); String match, matchA
 the u and v flags, `\p{..}`, pairs of units as one character; ignoring case past western European letters;
 `[^]`/`[]` agree with node. A Gemini list of 150 patterns was asked for into /tmp/gout2.json (not back when this was
 written: `patterns.py out/script.asm FILE` runs any such list). 51 routines in machine code.
+**Stage 6, eleventh unit: pattern literals and the text functions that take patterns. 35 of 35 programs (`regexp2.js`, 27 lines,
+agreed on the first complete run).** `c_rxlit` (compile.S): `/source/flags` is written as the call `RegExp("source", "flags")`
+through the global RegExp (a program that replaces that global changes its literals: soft). The reader already cut patterns out
+(kind 7); one repair there: after `++` and `--` the slash's meaning stays as it was (`a++ / 2` divides). In prelude.js, inside
+RegExp's closure: match, matchAll (an array's values, made whole first), search, replace and replaceAll (text or pattern;
+`$$ $& $` $' $1..$99`, or a function), split by a pattern (captures spliced in, a limit). Not made: `$<name>`; Symbol.replace
+and its kin; a literal directly after `}` or `)` is read by the reader's simple rule. Gemini's first list never came (its reply
+was an error); asked again for a 120-line usage program into /tmp/gout3.json (strip any fences, run with run.py, keep it as
+`regexp3.js` if the references agree with each other).
+Next: Date; Promise and timers (need the host); shapes; the overnight differential fuzz job.

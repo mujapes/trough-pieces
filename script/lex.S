@@ -241,6 +241,9 @@ w_punct:
     mov     x26, x3
     mov     w23, #K_PUNCT
     mov     w24, w2
+    sub     w5, w2, #20                 // ++ and -- leave it as it was (after a value they follow it, and a slash divides)
+    cmp     w5, #1
+    b.ls    6f
     mov     w28, #1                     // after punctuation a slash begins a pattern, except after ) and ]
     cmp     w2, #36
     b.eq    5f

@@ -133,4 +133,23 @@ R.exec=function(s){s=''+s;var g=this.global||this.sticky,i=g?this.lastIndex:0;if
 var r=[],k;for(k=0;k<c.length;k+=2)r.push(c[k]<0?undefined:s.substring(c[k],c[k+1]));r.index=c[0];r.input=s;if(g)this.lastIndex=c[1];return r};
 R.test=function(s){return this.exec(s)!==null};
 R.toString=function(){return '/'+this.source+'/'+this.flags};
+var S=String.prototype,osplit=S.split;
+function all(r,s){var a=[],m;while((m=r.exec(s))!==null){a.push(m);if(m[0]==='')r.lastIndex++}return a}
+function expand(t,m,s){var o='',i=0,n=t.length,c,d,e,k,p=m.index;while(i<n){c=t.charAt(i++);if(c!=='$'||i>=n){o+=c;continue}d=t.charAt(i);
+if(d==='$'){o+='$';i++}else if(d==='&'){o+=m[0];i++}else if(d==='`'){o+=s.substring(0,p);i++}else if(d==="'"){o+=s.substring(p+m[0].length);i++}
+else if(d>='0'&&d<='9'){k=+d;e=t.charAt(i+1);if(e!==''&&e>='0'&&e<='9'&&k*10+(+e)>0&&k*10+(+e)<m.length){k=k*10+(+e);i+=2}else if(k>0&&k<m.length)i++;else{o+='$';continue}if(m[k]!==undefined)o+=m[k]}
+else o+='$'}return o}
+function rep(s,m,f){if(typeof f==='function'){var a=m.slice(0);a.push(m.index,s);return ''+f.apply(undefined,a)}return expand(f,m,s)}
+S.match=function(r){var s=''+this;if(!(r instanceof RegExp))r=new RegExp(r);if(!r.global)return r.exec(s);r.lastIndex=0;var a=all(r,s),i;if(!a.length)return null;for(i=0;i<a.length;i++)a[i]=a[i][0];return a};
+S.matchAll=function(r){var s=''+this,l=0;if(r instanceof RegExp){if(!r.global)throw new TypeError('String.prototype.matchAll called with a non-global RegExp argument');l=r.lastIndex;r=new RegExp(r)}else r=new RegExp(r,'g');r.lastIndex=l;return all(r,s).values()};
+S.search=function(r){if(!(r instanceof RegExp))r=new RegExp(r);var c=X(r._p,''+this,0,0);return c===null?-1:c[0]};
+S.replace=function(r,f){var s=''+this,o='',p=0,a,i,m;if(typeof f!=='function')f=''+f;
+if(r instanceof RegExp){if(r.global){r.lastIndex=0;a=all(r,s)}else{m=r.exec(s);a=m?[m]:[]}}else{r=''+r;i=s.indexOf(r);a=[];if(i>=0){m=[r];m.index=i;a.push(m)}}
+for(i=0;i<a.length;i++){m=a[i];o+=s.substring(p,m.index)+rep(s,m,f);p=m.index+m[0].length}return o+s.substring(p)};
+S.replaceAll=function(r,f){var s=''+this;if(r instanceof RegExp){if(!r.global)throw new TypeError('replaceAll must be called with a global RegExp');return s.replace(r,f)}
+r=''+r;if(typeof f!=='function')f=''+f;var o='',p=0,q=0,i,m,k=r.length;while((i=s.indexOf(r,q))>=0){m=[r];m.index=i;o+=s.substring(p,i)+rep(s,m,f);p=i+k;q=p+(k?0:1);if(q>s.length)break}return o+s.substring(p)};
+S.split=function(d,n){if(!(d instanceof RegExp))return n===undefined?osplit.call(this,d):osplit.call(this,d).slice(0,n>>>0);
+var s=''+this,r=[],l=s.length,p=0,q=0,c,k;n=n===undefined?4294967295:n>>>0;if(!n)return r;if(!l){if(X(d._p,s,0,1)===null)r.push(s);return r}
+while(q<l){c=X(d._p,s,q,1);if(c===null||c[1]===p){q++;continue}r.push(s.substring(p,q));if(r.length===n)return r;
+for(k=2;k<c.length;k+=2){r.push(c[k]<0?undefined:s.substring(c[k],c[k+1]));if(r.length===n)return r}p=q=c[1]}r.push(s.substring(p));return r};
 })(__n);

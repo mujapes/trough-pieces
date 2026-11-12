@@ -3338,6 +3338,49 @@ c_class:
     SHALLOWER
     ldr     x30, [sp], #48
     ret
+// c_rxlit: a pattern literal /source/flags is the call RegExp("source", "flags"), made anew each time it is reached.
+// (The global RegExp is the prelude's; the source's backslashes go as they are written.)
+c_rxlit:
+    stp     x30, x25, [sp, #-32]!
+    str     x26, [sp, #16]
+    adr     x9, 7f
+    sub     x25, x9, x20
+    mov     x26, #6
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    ldr     x25, [sp, #8]
+    ldr     x26, [sp, #16]
+    add     x9, x25, x26                // back from the end to the closing slash (flags hold none)
+1:  sub     x9, x9, #1
+    ldrb    w10, [x20, x9]
+    cmp     w10, #'/'
+    b.ne    1b
+    str     x9, [sp, #24]
+    add     x0, x20, x25
+    add     x0, x0, #1
+    sub     x1, x9, x25
+    sub     x1, x1, #1
+    bl      w_text
+    cbz     x0, c_full
+    bl      c_strconst
+    ldr     x9, [sp, #24]
+    add     x0, x20, x9
+    add     x0, x0, #1
+    add     x1, x25, x26
+    sub     x1, x1, x9
+    sub     x1, x1, #1
+    bl      w_text
+    cbz     x0, c_full
+    bl      c_strconst
+    OP      OP_CALL
+    mov     w0, #2
+    bl      c_byte
+    ldr     x30, [sp], #32
+    ret
+7:  .ascii  "RegExp"
+    .balign 4
 // c_primary: a number, a string, a name, a word that is a value, or an expression in brackets
 c_primary:
     stp     x30, xzr, [sp, #-16]!
@@ -3413,7 +3456,10 @@ c_primary:
     b       8f
 46:
     cmp     w23, #K_PATTERN
-    b.eq    c_notyet
+    b.ne    47f
+    bl      c_rxlit
+    b       8f
+47:
     cmp     w23, #K_BIGINT
     b.eq    c_notyet
     b       c_unexpected
