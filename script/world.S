@@ -40,6 +40,7 @@
     .equ T_BOOL, 0xfffb
     .equ T_STRING, 0xfffc
     .equ T_OBJECT, 0xfffd
+    .equ T_HOLE, 0xffff                 // only ever a global's value: nothing has declared it or stored to it yet
     .equ T_ACC, 0xfffe                  // only ever a property's value: where its getter and setter are (two values)
 // VAL: a tagged value with no payload -> \reg
     .macro  VAL reg, tag

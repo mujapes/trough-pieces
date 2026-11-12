@@ -89,7 +89,8 @@
     .equ OP_THROW, 85                   // the top value is thrown
     .equ OP_GOSUB, 86                   // + 32 bits: goes there, leaving on the stack where to come back to (a finally)
     .equ OP_RETSUB, 87                  // comes back
-    .equ OP_COUNT, 88
+    .equ OP_GETGQ, 88                   // + 16 bits: a global read that does not mind the name never having been declared (typeof)
+    .equ OP_COUNT, 89
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -299,11 +300,29 @@ m_fail:
     b.eq    2f
     add     x9, x9, #1
     b       1b
-2:  str     x9, [sp, #-32]!             // 0 where the colon is, 8 the prototype then the message, 16 the object
-    mov     x0, x23
-    mov     x1, x9
+2:  str     x9, [sp, #-16]!
+    add     x9, x9, #2
+    add     x0, x23, x9
+    sub     x1, x24, x9
     bl      w_string
-    cbz     x0, 6f
+    ldr     x1, [sp], #16
+    cbz     x0, 7f
+    str     x0, [sp, #-16]!
+    mov     x0, x23
+    bl      w_string
+    ldr     x1, [sp], #16
+    cbnz    x0, m_raise
+7:  mov     x0, x23
+    mov     x1, x24
+    bl      w_string
+    cbnz    x0, 8f
+    adr     x0, e_full
+    mov     x1, #(e_wrong - e_full)
+    b       m_fatal
+// m_raise: an error of the class named x0 with the message x1 (string values) is thrown: an object whose prototype is that
+// class's (the class is looked up among the globals; the message alone is thrown if it is not there)
+m_raise:
+    stp     x0, x1, [sp, #-32]!         // 0 the name then the prototype, 8 the message, 16 the object
     mov     x1, x0
     ldr     x10, [x19, #W_GLOB]
     add     x10, x19, x10
@@ -326,22 +345,15 @@ m_fail:
     b.ne    6f
     bl      m_fnproto
     cbz     x0, 6f
-    str     x0, [sp, #8]
+    str     x0, [sp]
     mov     x0, #32
     mov     x1, #3
     bl      o_make
     cbz     x0, 6f
     str     x0, [sp, #16]
-    ldr     x9, [sp, #8]
+    ldr     x9, [sp]
     add     x10, x19, x0
     str     x9, [x10, #O_PROTO]
-    ldr     x9, [sp]
-    add     x9, x9, #2
-    add     x0, x23, x9
-    sub     x1, x24, x9
-    bl      w_string
-    cbz     x0, 6f
-    str     x0, [sp, #8]
     LIT     k_message, k_colon
     cbz     x0, 6f
     mov     x1, x0
@@ -355,14 +367,8 @@ m_fail:
     orr     x0, x0, x16
     add     sp, sp, #32
     b       8f
-6:  add     sp, sp, #32
-7:  mov     x0, x23
-    mov     x1, x24
-    bl      w_string
-    cbnz    x0, 8f
-    adr     x0, e_full
-    mov     x1, #(e_wrong - e_full)
-    b       m_fatal
+6:  ldr     x0, [sp, #8]
+    add     sp, sp, #32
 8:  ldr     x23, [x19, #W_CONST]
     add     x23, x19, x23
     ldr     x24, [x19, #W_GLOB]
@@ -531,7 +537,38 @@ i_getg:
     U16     w0
     add     x1, x24, x0, lsl #4
     ldr     x0, [x1, #8]
+    lsr     x9, x0, #48
+    mov     w10, #T_HOLE
+    cmp     w9, w10
+    b.eq    1f
     PUSH    x0
+    NEXT
+1:  ldr     x23, [x1]                   // a name nothing ever declared or stored to
+    LIT     e_notdef, e_notdef_end
+    cbz     x0, m_full
+    mov     x1, x0
+    mov     x0, x23
+    bl      v_join
+    cbz     x0, m_full
+    mov     x23, x0
+    LIT     e_referr, e_notdef
+    cbz     x0, m_full
+    mov     x1, x23
+    b       m_raise
+e_referr: .ascii "ReferenceError"
+e_notdef: .ascii " is not defined"
+e_notdef_end:
+    .balign 4
+i_getgq:                                // the same read under typeof, where such a name is just undefined
+    U16     w0
+    add     x1, x24, x0, lsl #4
+    ldr     x0, [x1, #8]
+    lsr     x9, x0, #48
+    mov     w10, #T_HOLE
+    cmp     w9, w10
+    b.ne    1f
+    VAL     x0, T_UNDEF
+1:  PUSH    x0
     NEXT
 i_setg:
     U16     w0
@@ -1318,5 +1355,5 @@ m_table:
     .word   i_in - m_table, i_instof - m_table, i_delp - m_table, i_dele - m_table
     .word   i_keys - m_table, i_iter - m_table, i_fornext - m_table
     .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
-    .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table
+    .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table, i_getgq - m_table
     .ltorg

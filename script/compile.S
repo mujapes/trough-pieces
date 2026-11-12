@@ -421,7 +421,7 @@ c_global:
     add     x1, x19, x1
     ldr     x2, [x19, #W_GLOB_N]
     add     x5, x1, x2, lsl #4
-    VAL     x6, T_UNDEF
+    VAL     x6, T_HOLE
     stp     x0, x6, [x5]
     add     x9, x2, #1
     str     x9, [x19, #W_GLOB_N]
@@ -623,7 +623,17 @@ c_declref:
     mov     w1, #OP_GETL
     b       2f
 1:  bl      c_global
-    mov     w1, #OP_GETG
+    ldr     x9, [x19, #W_GLOB]          // declared: it holds undefined from the start
+    add     x9, x19, x9
+    add     x9, x9, x0, lsl #4
+    ldr     x10, [x9, #8]
+    lsr     x11, x10, #48
+    mov     w1, #T_HOLE
+    cmp     w11, w1
+    b.ne    3f
+    VAL     x10, T_UNDEF
+    str     x10, [x9, #8]
+3:  mov     w1, #OP_GETG
 2:  orr     w0, w1, w0, lsl #8
     ldr     x30, [sp], #16
     ret
@@ -1830,6 +1840,19 @@ c_unary:
 1:  str     w0, [sp, #8]
     bl      next_word
     bl      c_unary
+    ldr     w9, [sp, #8]                // typeof of a bare global name must not mind its never having been declared
+    cmp     w9, #OP_TYPEOF
+    b.ne    2f
+    ldr     x9, [x29, #F_LV]
+    cmn     x9, #1
+    b.eq    2f
+    ldr     x10, [x29, #F_CODE]
+    ldrb    w11, [x10, x9]
+    cmp     w11, #OP_GETG
+    b.ne    2f
+    mov     w11, #OP_GETGQ
+    strb    w11, [x10, x9]
+2:
     ldr     w0, [sp, #8]
     bl      c_byte
     b       9f
@@ -3415,8 +3438,18 @@ s_try:
     ISP     35, 2f
     bl      next_word
     cmp     w23, #K_NAME
-    b.ne    c_notyet
-    bl      c_declref
+    b.eq    1f
+    cmp     w23, #K_PUNCT               // catch ({a, b}) or catch ([a, b]): the pattern takes the thrown value apart
+    b.ne    c_unexpected
+    cmp     w24, #33
+    mov     w9, #37
+    ccmp    w24, w9, #4, ne
+    b.ne    c_unexpected
+    mov     w0, #1
+    bl      c_pattern
+    EXPECT  36
+    b       2f
+1:  bl      c_declref
     str     w0, [sp, #48 + 56]
     bl      next_word
     EXPECT  36

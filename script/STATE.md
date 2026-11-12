@@ -141,8 +141,12 @@ return, break or continue that leaves a try ends it and runs its finally (`c_try
 `s_break`). The machine's own errors (`m_fail`, text "Name: message") are thrown as objects of the class of that name when a
 try is open. The error classes (Error, TypeError, RangeError, ReferenceError, SyntaxError, EvalError, URIError) are a prelude
 written in the language (`c_prelude` in `compile.S`), translated before the program's text on every `load`.
-Not made: a pattern in `catch (..)`, the catch variable is the function's (no block scope), `Error("m")` without `new`, `stack`,
-`cause`, text of an object by its `toString` (so `"" + e` is [object Object]), an undeclared name still reads undefined
-(ReferenceError and the dead zone come with block scope: next), messages do not match node's wording, uncaught errors show as
+Later the same unit: a pattern in `catch ({a})`, and a global name nothing declared or stored to raises ReferenceError when read (its
+place holds T_HOLE; `c_declref` turns that to undefined at translation; `typeof name` reads with OP_GETGQ, 88). `m_raise` (name,
+message as string values) is the one way the machine throws its own errors. Gemini's `gerrors.js` passes too: **24 of 24**.
+Not made: the catch variable is the function's (no block scope), `Error("m")` without `new`, `stack`,
+`cause`, text of an object by its `toString` (so `"" + e` is [object Object]), the dead zone of let and const (comes with block scope: next), messages do not match node's wording, uncaught errors show as
 "Uncaught Name: message" in W_ERR without line numbers. `switch` and labelled loops are still missing (stage 2 gaps).
-Next: block scope for let/const/class with the dead zone and ReferenceError for undeclared names; `switch`; then shapes.
+Next: block scope for let/const/class with the dead zone, a fresh loop variable for each turn of a `for (let ..)`, assigning to a
+const as TypeError, functions declared in blocks, `switch`, labelled break and continue: Gemini's check program for all of these is
+kept at `~/.trough/gem/stage5/scope.js` (8 lines on node; copy it into `checks/programs/` and make it pass). Then shapes.
