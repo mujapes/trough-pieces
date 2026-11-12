@@ -263,3 +263,16 @@ holes); a full world now stops with "RangeError: the world is full" (its text is
 **Order changed (my judgement, said to the user):** RegExp comes before shapes. Shapes only make lookups faster; page
 scripts cannot run at all without RegExp, Date, Promise and timers. Next: RegExp (read intent.md's stage list first; ask
 Gemini for the check program with tight instructions: no "-0" in labels, no exact digits of curved functions).
+**Stage 6, tenth unit: regular expressions, first half: `regex.S` (new, about 1000 lines): the translator and the matcher
+in machine code; built-ins 52 (pattern, flags -> program) and 53 (program, text, from, sticky -> the groups' places or
+null). `RegExp` with exec, test, lastIndex, toString in prelude.js.** `python3 -I checks/patterns.py out/script.asm
+[cases.json]` against node: 77 of 77 (66 of 68 on the first run; the two were captures forgetting at each turn of a
+repeat, RX_CLEAR, and `\N` past the pattern's groups being an old octal code). 34 of 34 programs still.
+How: the file's head lists the 21 instructions. A backtracking matcher; its places to come back to live in one block
+of the world (W_RXSTACK, doubled when full, reused); a limit of 64M steps. Repeats by count copy the thing; a repeat
+with no end of something that could match nothing has RX_MARK / RX_CHKADV. Looking ahead runs the matcher inside itself.
+Not made: pattern literals `/x/g` in the translator (next); String match, matchAll, replace, split, search with a RegExp
+(next, in prelude.js); looking behind (refused with a SyntaxError); named groups (taken, names not kept; `\k<n>` not);
+the u and v flags, `\p{..}`, pairs of units as one character; ignoring case past western European letters;
+`[^]`/`[]` agree with node. A Gemini list of 150 patterns was asked for into /tmp/gout2.json (not back when this was
+written: `patterns.py out/script.asm FILE` runs any such list). 51 routines in machine code.

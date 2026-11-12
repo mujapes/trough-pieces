@@ -852,6 +852,6 @@ n_table:
     .word   n_atan - n_table, n_atan2 - n_table, n_asin - n_table, n_acos - n_table, n_expm1 - n_table, n_log1p - n_table
     .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table, n_ident - n_table
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
-    .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table
-    .equ    N_COUNT, 52
+    .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
+    .equ    N_COUNT, 54
     .ltorg
