@@ -83,7 +83,13 @@
     .equ OP_EXTENDS, 79                 // parent, class -> class, its chains linked to the parent's
     .equ OP_HOME, 80                    // object, key, function: the function remembers the object as its home (for super)
     .equ OP_SUPER, 81                   // + 16 bits: a name: that property, looked for from the home's prototype on; 0xffff: the parent class
-    .equ OP_COUNT, 82
+    .equ OP_TRY, 82                     // + 32 bits: where a throw lands. Five places go on the stack: that, the call's record, variables and scope, the try before
+    .equ OP_ENDTRY, 83                  // the newest try is over: its record goes (and anything above it)
+    .equ OP_ENDTRYK, 84                 // the same, keeping the top value
+    .equ OP_THROW, 85                   // the top value is thrown
+    .equ OP_GOSUB, 86                   // + 32 bits: goes there, leaving on the stack where to come back to (a finally)
+    .equ OP_RETSUB, 87                  // comes back
+    .equ OP_COUNT, 88
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -278,7 +284,209 @@ m_notfn:
 m_wrong:
     adr     x0, e_wrong
     mov     x1, #(e_wrong_end - e_wrong)
+// m_fail: the machine's own error, given as "Name: message" (x0, x1 bytes). Inside a try it is thrown as an object of that
+// class (looked up among the globals by name; the text itself if there is none); otherwise the program stops with it.
 m_fail:
+    ldr     x9, [x19, #W_HANDLER]
+    cbz     x9, m_fatal
+    mov     x23, x0
+    mov     x24, x1
+    mov     x9, #0
+1:  cmp     x9, x24
+    b.hs    7f
+    ldrb    w10, [x23, x9]
+    cmp     w10, #':'
+    b.eq    2f
+    add     x9, x9, #1
+    b       1b
+2:  str     x9, [sp, #-32]!             // 0 where the colon is, 8 the prototype then the message, 16 the object
+    mov     x0, x23
+    mov     x1, x9
+    bl      w_string
+    cbz     x0, 6f
+    mov     x1, x0
+    ldr     x10, [x19, #W_GLOB]
+    add     x10, x19, x10
+    ldr     x11, [x19, #W_GLOB_N]
+3:  cbz     x11, 6f
+    ldr     x2, [x10]
+    bl      o_keyeq
+    b.eq    4f
+    add     x10, x10, #16
+    sub     x11, x11, #1
+    b       3b
+4:  ldr     x0, [x10, #8]
+    lsr     x9, x0, #48
+    mov     w16, #T_OBJECT
+    cmp     w9, w16
+    b.ne    6f
+    and     x9, x0, #0xffffffffffff
+    ldr     x9, [x19, x9]
+    cmp     x9, #1
+    b.ne    6f
+    bl      m_fnproto
+    cbz     x0, 6f
+    str     x0, [sp, #8]
+    mov     x0, #32
+    mov     x1, #3
+    bl      o_make
+    cbz     x0, 6f
+    str     x0, [sp, #16]
+    ldr     x9, [sp, #8]
+    add     x10, x19, x0
+    str     x9, [x10, #O_PROTO]
+    ldr     x9, [sp]
+    add     x9, x9, #2
+    add     x0, x23, x9
+    sub     x1, x24, x9
+    bl      w_string
+    cbz     x0, 6f
+    str     x0, [sp, #8]
+    LIT     k_message, k_colon
+    cbz     x0, 6f
+    mov     x1, x0
+    ldr     x2, [sp, #8]
+    ldr     x0, [sp, #16]
+    add     x0, x19, x0
+    bl      o_put
+    cbz     x0, 6f
+    ldr     x0, [sp, #16]
+    mov     x16, #(T_OBJECT << 48)
+    orr     x0, x0, x16
+    add     sp, sp, #32
+    b       8f
+6:  add     sp, sp, #32
+7:  mov     x0, x23
+    mov     x1, x24
+    bl      w_string
+    cbnz    x0, 8f
+    adr     x0, e_full
+    mov     x1, #(e_wrong - e_full)
+    b       m_fatal
+8:  ldr     x23, [x19, #W_CONST]
+    add     x23, x19, x23
+    ldr     x24, [x19, #W_GLOB]
+    add     x24, x19, x24
+// m_throw: the value x0 is thrown: the newest try's record says where to go on and what the machine was like there
+m_throw:
+    ldr     x9, [x19, #W_HANDLER]
+    cbz     x9, m_uncaught
+    add     x9, x19, x9
+    ldp     x10, x11, [x9, #-40]
+    ldp     x12, x28, [x9, #-24]
+    ldr     x13, [x9, #-8]
+    str     x13, [x19, #W_HANDLER]
+    sub     x22, x9, #40
+    add     x20, x19, x11
+    add     x27, x19, x12
+    ldr     x9, [x19, #W_CODE]
+    add     x21, x19, x9
+    add     x21, x21, x10
+    str     x0, [x22], #8
+    NEXT
+// nothing caught it: the program stops; the error's text is "Uncaught " and the value (an error object as Name: message)
+m_uncaught:
+    mov     x23, x0
+    TAGIS   x0, T_OBJECT
+    b.ne    2f
+    LIT     k_name, k_message
+    cbz     x0, 2f
+    mov     x1, x0
+    mov     x0, x23
+    bl      o_get
+    TAGIS   x0, T_STRING
+    b.ne    2f
+    mov     x24, x0
+    LIT     k_colon, k_uncaught
+    cbz     x0, 2f
+    mov     x1, x0
+    mov     x0, x24
+    bl      v_join
+    cbz     x0, 2f
+    mov     x24, x0
+    LIT     k_message, k_colon
+    cbz     x0, 2f
+    mov     x1, x0
+    mov     x0, x23
+    bl      o_get
+    bl      v_text
+    cbz     x0, 2f
+    mov     x1, x0
+    mov     x0, x24
+    bl      v_join
+    b       3f
+2:  mov     x0, x23
+    bl      v_text
+3:  mov     x24, x0
+    LIT     k_uncaught, k_uncaught_end
+    mov     x1, x24
+    cbz     x0, 4f
+    cbz     x1, 4f
+    bl      v_join
+4:  str     x0, [x19, #W_ERR]
+    mov     w9, #3
+    str     w9, [x19, #W_STATE]
+    mov     x0, #-1
+    b       m_leave
+k_name:     .ascii "name"
+k_message:  .ascii "message"
+k_colon:    .ascii ": "
+k_uncaught: .ascii "Uncaught "
+k_uncaught_end:
+    .balign 4
+i_try:
+    ldrsw   x0, [x21], #4
+    add     x0, x21, x0
+    ldr     x9, [x19, #W_CODE]
+    add     x9, x19, x9
+    sub     x0, x0, x9
+    add     x9, x22, #40
+    cmp     x9, x26
+    b.hi    m_deep
+    sub     x10, x20, x19
+    stp     x0, x10, [x22]
+    sub     x10, x27, x19
+    stp     x10, x28, [x22, #16]
+    ldr     x10, [x19, #W_HANDLER]
+    str     x10, [x22, #32]
+    mov     x22, x9
+    sub     x9, x9, x19
+    str     x9, [x19, #W_HANDLER]
+    NEXT
+i_endtry:
+    ldr     x9, [x19, #W_HANDLER]
+    add     x9, x19, x9
+    ldr     x10, [x9, #-8]
+    str     x10, [x19, #W_HANDLER]
+    sub     x22, x9, #40
+    NEXT
+i_endtryk:
+    ldr     x0, [x22, #-8]
+    ldr     x9, [x19, #W_HANDLER]
+    add     x9, x19, x9
+    ldr     x10, [x9, #-8]
+    str     x10, [x19, #W_HANDLER]
+    sub     x22, x9, #40
+    str     x0, [x22], #8
+    NEXT
+i_throw:
+    POP     x0
+    b       m_throw
+i_gosub:
+    ldrsw   x0, [x21], #4
+    ldr     x9, [x19, #W_CODE]
+    add     x9, x19, x9
+    sub     x9, x21, x9
+    add     x21, x21, x0
+    PUSH    x9
+    NEXT
+i_retsub:
+    POP     x9
+    ldr     x10, [x19, #W_CODE]
+    add     x21, x19, x10
+    add     x21, x21, x9
+    NEXT
+m_fatal:
     bl      w_string
     str     x0, [x19, #W_ERR]
     mov     w9, #3
@@ -1110,4 +1318,5 @@ m_table:
     .word   i_in - m_table, i_instof - m_table, i_delp - m_table, i_dele - m_table
     .word   i_keys - m_table, i_iter - m_table, i_fornext - m_table
     .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
+    .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table
     .ltorg

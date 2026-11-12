@@ -33,6 +33,7 @@
     .equ W_K_LENGTH, 280                // names the machine itself knows, as string values (made when first run)
     .equ W_K_PROTOTYPE, 288
     .equ W_K_CONSTRUCTOR, 296
+    .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below
     .equ T_UNDEF, 0xfff9
     .equ T_NULL, 0xfffa

@@ -11,6 +11,7 @@
     .equ F_DEPTH, 56                    // how deep the nesting is
     .equ F_FUNC, 64                     // the function being translated: its record (on the stack), or 0 at the top level
     .equ F_NTOP, 72                     // names of variables, 16 bytes each (where in the text, how long), kept during
+    .equ F_TRY, 96                      // the innermost try's record (on the stack: outer record, 1 while its finally is still to come, the chain of jumps to its finally, the loop and the function it is in), or 0
     .equ F_PTOP, 80                     // translation in the machine's idle stack; from its other end, declared functions waiting
     .equ C_DEEPEST, 400
     // a function's record
@@ -61,8 +62,11 @@
 
 // c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
 c_compile:
-    stp     x29, x30, [sp, #-96]!
+    stp     x29, x30, [sp, #-128]!
     mov     x29, sp
+    stp     x20, x21, [x29, #104]
+    str     xzr, [x29, #F_TRY]
+    str     xzr, [x19, #W_HANDLER]
     str     xzr, [x29, #F_LOOP]
     str     xzr, [x29, #88]
     ldr     x9, [x19, #W_CODE]
@@ -80,6 +84,15 @@ c_compile:
     stp     x9, x10, [x29, #F_NTOP]
     mov     w0, #OP_JMP                 // first to the end, where the declared functions are made; then back here
     bl      c_jump
+    adr     x20, c_prelude              // first the few lines of the language that make the error classes
+    mov     x21, #(c_prelude_end - c_prelude)
+    mov     x22, #0
+    mov     w28, #1
+    bl      next_word
+3:  cbz     w23, 4f
+    bl      c_stmt
+    b       3b
+4:  ldp     x20, x21, [x29, #104]
     mov     x22, #0
     mov     w28, #1
     bl      next_word
@@ -106,8 +119,19 @@ c_compile:
     str     w9, [x19, #W_STATE]
     mov     x0, #1
 c_out:
-    ldp     x29, x30, [sp], #96
+    ldp     x29, x30, [sp], #128
     ret
+c_prelude:
+    .ascii "class Error{constructor(m){if(m!==undefined)this.message=\"\"+m}toString(){return this.message===\"\"?this.name:this.name+\": \"+this.message}}"
+    .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";"
+    .ascii "class TypeError extends Error{}TypeError.prototype.name=\"TypeError\";"
+    .ascii "class RangeError extends Error{}RangeError.prototype.name=\"RangeError\";"
+    .ascii "class ReferenceError extends Error{}ReferenceError.prototype.name=\"ReferenceError\";"
+    .ascii "class SyntaxError extends Error{}SyntaxError.prototype.name=\"SyntaxError\";"
+    .ascii "class EvalError extends Error{}EvalError.prototype.name=\"EvalError\";"
+    .ascii "class URIError extends Error{}URIError.prototype.name=\"URIError\";"
+c_prelude_end:
+    .balign 4
 // the ways it goes wrong: the message, with the line and column of the word it stopped at
 c_unexpected:
     adr     x0, c_m_unexpected
@@ -3059,6 +3083,10 @@ s_word:
     b.eq    s_continue
     cmp     w24, #21
     b.eq    s_return
+    cmp     w24, #26
+    b.eq    s_try
+    cmp     w24, #25
+    b.eq    s_throw
     cmp     w24, #3
     b.ne    1f
     mov     w0, #1
@@ -3317,7 +3345,9 @@ s_return:
 1:  OP      OP_UNDEF
     b       3f
 2:  bl      c_expr
-3:  OP      OP_RET
+3:  mov     w0, #1
+    bl      c_try_exits
+    OP      OP_RET
     bl      c_semi
     b       s_done
 s_break:
@@ -3327,6 +3357,11 @@ s_continue:
     mov     x10, #16
 1:  ldr     x1, [x29, #F_LOOP]
     cbz     x1, c_noloop
+    str     x10, [sp, #8]
+    mov     w0, #0
+    bl      c_try_exits
+    ldr     x10, [sp, #8]
+    ldr     x1, [x29, #F_LOOP]
     add     x1, x1, x10
     mov     w0, #OP_JMP
     bl      c_chain
@@ -3338,5 +3373,143 @@ s_continue:
 s_done:
     SHALLOWER
     ldr     x30, [sp], #64
+    ret
+s_throw:
+    bl      next_word
+    bl      c_expr
+    OP      OP_THROW
+    bl      c_semi
+    b       s_done
+// try { A } catch (e) { B } finally { C } is laid out as: TRY c; A; ENDTRY; JMP n; c: store e; TRY a; B; ENDTRY; JMP n;
+// a: GOSUB f; THROW; n: UNDEF; GOSUB f; POP; JMP end; f: C; RETSUB; end. So C is written once and is reached with two places
+// on the stack (something pending, where to go back to). Without a catch, c is a. The record (48 bytes under this frame):
+// 0 the try around, 8 state, 16 the jumps to f, 24 the loop and 32 the function it is in, 40 whether a catch was seen.
+s_try:
+    bl      next_word
+    ISP     33, c_unexpected
+    sub     sp, sp, #48
+    ldr     x9, [x29, #F_TRY]
+    mov     x10, #1
+    stp     x9, x10, [sp]
+    ldr     x9, [x29, #F_LOOP]
+    stp     xzr, x9, [sp, #16]
+    ldr     x9, [x29, #F_FUNC]
+    stp     x9, xzr, [sp, #32]
+    mov     x9, sp
+    str     x9, [x29, #F_TRY]
+    str     xzr, [sp, #48 + 24]
+    mov     w0, #OP_TRY
+    bl      c_jump
+    str     x0, [sp, #48 + 8]
+    bl      c_stmt
+    OP      OP_ENDTRY
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #48 + 16]
+    ldr     x0, [sp, #48 + 8]
+    bl      c_patch
+    ISK     2, 4f
+    mov     x9, #1
+    str     x9, [sp, #40]
+    bl      next_word
+    ISP     35, 2f
+    bl      next_word
+    cmp     w23, #K_NAME
+    b.ne    c_notyet
+    bl      c_declref
+    str     w0, [sp, #48 + 56]
+    bl      next_word
+    EXPECT  36
+    ldr     w0, [sp, #48 + 56]
+    bl      c_store
+2:  OP      OP_POP
+    ISP     33, c_unexpected
+    mov     w0, #OP_TRY
+    bl      c_jump
+    str     x0, [sp, #48 + 8]
+    bl      c_stmt
+    OP      OP_ENDTRY
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #48 + 24]
+    ldr     x0, [sp, #48 + 8]
+    bl      c_patch
+4:  mov     w0, #OP_GOSUB
+    add     x1, sp, #16
+    bl      c_chain
+    OP      OP_THROW
+    ldr     x0, [sp, #48 + 16]
+    bl      c_patch
+    ldr     x0, [sp, #48 + 24]
+    cbz     x0, 5f
+    bl      c_patch
+5:  OP      OP_UNDEF
+    mov     w0, #OP_GOSUB
+    add     x1, sp, #16
+    bl      c_chain
+    OP      OP_POP
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #48 + 8]
+    ldr     x0, [sp, #16]
+    ldr     x1, [x29, #F_LEN]
+    bl      c_resolve
+    str     xzr, [sp, #8]
+    ISK     13, 6f
+    bl      next_word
+    ISP     33, c_unexpected
+    bl      c_stmt
+    b       7f
+6:  ldr     x9, [sp, #40]
+    cbz     x9, c_unexpected
+7:  OP      OP_RETSUB
+    ldr     x0, [sp, #48 + 8]
+    bl      c_patch
+    ldr     x9, [sp]
+    str     x9, [x29, #F_TRY]
+    add     sp, sp, #48
+    b       s_done
+// c_try_exits: a return (w0 1, its value on the stack) or a break or continue (w0 0) is about to leave: each try of this
+// function it leaves (for a break: those begun inside the loop) is ended and its finally run; inside a finally, the two
+// places it was reached with are dropped instead.
+c_try_exits:
+    stp     x30, x0, [sp, #-32]!
+    ldr     x9, [x29, #F_TRY]
+1:  str     x9, [sp, #16]
+    cbz     x9, 9f
+    ldr     x10, [x9, #32]
+    ldr     x11, [x29, #F_FUNC]
+    cmp     x10, x11
+    b.ne    9f
+    ldr     x12, [sp, #8]
+    cbnz    x12, 2f
+    ldr     x10, [x9, #24]
+    ldr     x11, [x29, #F_LOOP]
+    cmp     x10, x11
+    b.ne    9f
+2:  ldr     x10, [x9, #8]
+    cbz     x10, 5f
+    cbnz    x12, 3f
+    OP      OP_ENDTRY
+    OP      OP_UNDEF
+    mov     w0, #OP_GOSUB
+    ldr     x1, [sp, #16]
+    add     x1, x1, #16
+    bl      c_chain
+    OP      OP_POP
+    b       8f
+3:  OP      OP_ENDTRYK
+    mov     w0, #OP_GOSUB
+    ldr     x1, [sp, #16]
+    add     x1, x1, #16
+    bl      c_chain
+    b       8f
+5:  cbnz    x12, 8f
+    OP      OP_POP
+    OP      OP_POP
+8:  ldr     x9, [sp, #16]
+    ldr     x9, [x9]
+    b       1b
+9:  ldr     x30, [sp], #32
     ret
     .ltorg

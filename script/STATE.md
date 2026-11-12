@@ -133,3 +133,16 @@ how to split it). A random program generator for overnight differential fuzzing 
 CI note: the runner's qjs is older and differs from node on literals.js and numbers.js; `run.py` now counts a program wrong only
 when ours differs from node, and prints a note when only qjs differs. The generator request to `gemini-auto` failed once (likely
 its 180 second limit); asked again of `gemini-subscription-flash` with the same prompt (`/tmp/gem/p2.txt`).
+**Stage 5, first part, done (eighth unit, 2026-11-12 night): `errors.js` passes on its first complete run: 23 of 23 programs, 1286 lines.**
+`throw`, `try`/`catch`/`finally` (`s_try`, `s_throw`, `c_try_exits` at the end of `compile.S`; the layout is in the comment
+above `s_try`: the finally is written once and reached by OP_GOSUB with two places on the stack). Machine: OP_TRY..OP_RETSUB
+(82-87) and `m_throw`, `m_uncaught` in `machine.S`; a try's record is five places on the stack, W_HANDLER the newest. A
+return, break or continue that leaves a try ends it and runs its finally (`c_try_exits`, called from `s_return` and
+`s_break`). The machine's own errors (`m_fail`, text "Name: message") are thrown as objects of the class of that name when a
+try is open. The error classes (Error, TypeError, RangeError, ReferenceError, SyntaxError, EvalError, URIError) are a prelude
+written in the language (`c_prelude` in `compile.S`), translated before the program's text on every `load`.
+Not made: a pattern in `catch (..)`, the catch variable is the function's (no block scope), `Error("m")` without `new`, `stack`,
+`cause`, text of an object by its `toString` (so `"" + e` is [object Object]), an undeclared name still reads undefined
+(ReferenceError and the dead zone come with block scope: next), messages do not match node's wording, uncaught errors show as
+"Uncaught Name: message" in W_ERR without line numbers. `switch` and labelled loops are still missing (stage 2 gaps).
+Next: block scope for let/const/class with the dead zone and ReferenceError for undeclared names; `switch`; then shapes.
