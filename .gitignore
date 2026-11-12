@@ -9,3 +9,4 @@ out/vectors
 out/certfuzz
 out/check.txt
 __pycache__/
+out/render

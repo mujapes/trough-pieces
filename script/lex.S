@@ -376,6 +376,7 @@ w_number:
 4:  cbz     w4, w_bad
     b       n_done
 n_decimal:
+    mov     w12, #0                     // the power of ten that is written out after an e, if any
     mov     x1, #0                      // the digits as a whole number (the first 19), and the power of ten to apply
     mov     w2, #0
     mov     w3, #0                      // digits taken
@@ -442,10 +443,23 @@ n_decimal:
     b       7b
 8:  cmp     w6, #0
     cneg    w10, w10, ne
+    mov     w12, w10
     add     w2, w2, w10
 9:  ucvtf   d8, x1                      // the digits times ten to that power. Exact when the power is within 22 either way and
-    cbz     x1, n_done                  // the digits fit 53 bits; nearly exact otherwise (long arithmetic is to come)
-    adr     x5, t_pow10
+    cbz     x1, n_done                  // the digits fit 53 bits; anything else is worked out in long arithmetic (n_exact)
+    cmp     w3, #19
+    b.hs    12f
+    lsr     x5, x1, #53
+    cbnz    x5, 12f
+    cmp     w2, #22
+    b.gt    12f
+    cmn     w2, #22
+    b.ge    13f
+12: mov     x11, x30
+    bl      n_exact
+    mov     x30, x11
+    b       n_done
+13: adr     x5, t_pow10
 10: cmp     w2, #0
     b.eq    n_done
     b.lt    11f
@@ -475,6 +489,211 @@ n_done:
     b       w_bad_one
 2:  sub     x26, x22, x25
     ret
+// n_exact: the decimal number in the text from x25 to x22, with w12 the power written after its e, as the nearest double
+// (ties to the even one) -> d8. The digits become one long whole number in 32-bit limbs on the stack (the first 800 that
+// count; whether anything follows them is all that can matter). A power above zero multiplies it by ten that many times.
+// A power below zero: it is moved up 4 bits for each ten plus 64 and divided by ten that many times, keeping whether
+// anything was ever left over; floor division done in steps is the same as done at once. Then the top 53 bits are taken
+// (fewer below the ordinary range) and rounded by the next bit and the left-overs. Uses x0-x10, x12-x17; not x11.
+n_exact:
+    sub     sp, sp, #1136
+    mov     x13, sp
+    mov     x14, #0                     // limbs in use
+    mov     x15, #0                     // anything left over?
+    mov     w16, w12                    // the power of ten
+    mov     w3, #0
+    mov     w4, #0
+    mov     x17, x25
+1:  cmp     x17, x22
+    b.hs    5f
+    ldrb    w0, [x20, x17]
+    add     x17, x17, #1
+    cmp     w0, #'_'
+    b.eq    1b
+    cmp     w0, #'.'
+    b.ne    2f
+    mov     w4, #1
+    b       1b
+2:  sub     w5, w0, #'0'
+    cmp     w5, #9
+    b.hi    5f
+    cmp     w3, #800
+    b.hs    3f
+    sub     w16, w16, w4
+    cbnz    w3, 21f
+    cbz     w5, 1b
+21: add     w3, w3, #1
+    mov     x6, #0
+    mov     x7, x5
+    mov     x8, #10
+22: cmp     x6, x14
+    b.hs    23f
+    ldr     w9, [x13, x6, lsl #2]
+    madd    x7, x9, x8, x7
+    str     w7, [x13, x6, lsl #2]
+    lsr     x7, x7, #32
+    add     x6, x6, #1
+    b       22b
+23: cbz     x7, 1b
+    str     w7, [x13, x14, lsl #2]
+    add     x14, x14, #1
+    b       1b
+3:  orr     x15, x15, x5
+    eor     w6, w4, #1
+    add     w16, w16, w6
+    b       1b
+5:  cbz     x14, n_ex_zero
+    cmp     w16, #0
+    b.lt    6f
+    cmp     w16, #310
+    b.gt    n_ex_inf
+    mov     w3, w16
+    mov     x8, #10
+51: cbz     w3, 52f
+    mov     x6, #0
+    mov     x7, #0
+53: ldr     w9, [x13, x6, lsl #2]
+    madd    x7, x9, x8, x7
+    str     w7, [x13, x6, lsl #2]
+    lsr     x7, x7, #32
+    add     x6, x6, #1
+    cmp     x6, x14
+    b.lo    53b
+    cbz     x7, 54f
+    str     w7, [x13, x14, lsl #2]
+    add     x14, x14, #1
+54: sub     w3, w3, #1
+    b       51b
+52: mov     w16, #0
+    b       7f
+6:  neg     w16, w16                    // how many times to divide by ten
+    cmp     w16, #1140
+    b.hi    n_ex_zero
+7:  lsl     w12, w16, #2
+    add     w12, w12, #64               // how many bits it is moved up
+    and     w1, w12, #31
+    lsr     w2, w12, #5
+    cbz     w1, 72f
+    mov     x6, #0
+    mov     x7, #0
+71: ldr     w9, [x13, x6, lsl #2]
+    lsl     x9, x9, x1
+    orr     x9, x9, x7
+    str     w9, [x13, x6, lsl #2]
+    lsr     x7, x9, #32
+    add     x6, x6, #1
+    cmp     x6, x14
+    b.lo    71b
+    cbz     x7, 72f
+    str     w7, [x13, x14, lsl #2]
+    add     x14, x14, #1
+72: mov     x6, x14
+73: sub     x6, x6, #1
+    ldr     w9, [x13, x6, lsl #2]
+    add     x7, x6, x2
+    str     w9, [x13, x7, lsl #2]
+    cbnz    x6, 73b
+    mov     x6, #0
+74: str     wzr, [x13, x6, lsl #2]
+    add     x6, x6, #1
+    cmp     x6, x2
+    b.lo    74b
+    add     x14, x14, x2
+    mov     x8, #10
+8:  cbz     w16, 9f
+    mov     x6, x14
+    mov     x7, #0
+81: sub     x6, x6, #1
+    ldr     w9, [x13, x6, lsl #2]
+    orr     x9, x9, x7, lsl #32
+    udiv    x10, x9, x8
+    msub    x7, x10, x8, x9
+    str     w10, [x13, x6, lsl #2]
+    cbnz    x6, 81b
+    orr     x15, x15, x7
+    sub     x6, x14, #1
+    ldr     w9, [x13, x6, lsl #2]
+    cbnz    w9, 82f
+    mov     x14, x6
+82: sub     w16, w16, #1
+    b       8b
+9:  sub     x6, x14, #1                 // how many bits long it is
+    ldr     w9, [x13, x6, lsl #2]
+    clz     w10, w9
+    mov     w7, #32
+    sub     w10, w7, w10
+    add     w10, w10, w6, lsl #5
+    sub     w0, w10, #53                // how many low bits are dropped: all but 53, or more below the ordinary range
+    sub     w1, w12, #1074
+    cmp     w0, w1
+    csel    w0, w1, w0, lt
+    lsr     w2, w0, #5
+    and     w3, w0, #31
+    mov     x4, #0
+    cmp     x2, x14
+    b.hs    91f
+    ldr     w4, [x13, x2, lsl #2]
+91: add     x5, x2, #1
+    cmp     x5, x14
+    b.hs    92f
+    ldr     w6, [x13, x5, lsl #2]
+    orr     x4, x4, x6, lsl #32
+92: lsr     x4, x4, x3
+    cbz     w3, 93f
+    add     x5, x2, #2
+    cmp     x5, x14
+    b.hs    93f
+    ldr     w6, [x13, x5, lsl #2]
+    mov     w7, #64
+    sub     w7, w7, w3
+    lsl     x6, x6, x7
+    orr     x4, x4, x6
+93: sub     w0, w0, #1                  // the bit just below, and whether anything lies below that
+    lsr     w2, w0, #5
+    and     w3, w0, #31
+    mov     x5, #0
+    cmp     x2, x14
+    csel    x7, x14, x2, hi
+    b.hs    95f
+    ldr     w6, [x13, x2, lsl #2]
+    lsr     x5, x6, x3
+    and     x5, x5, #1
+    mov     x9, #1
+    lsl     x9, x9, x3
+    sub     x9, x9, #1
+    and     x6, x6, x9
+    orr     x15, x15, x6
+95: mov     x6, #0
+96: cmp     x6, x7
+    b.hs    97f
+    ldr     w9, [x13, x6, lsl #2]
+    orr     x15, x15, x9
+    add     x6, x6, #1
+    b       96b
+97: cbz     x5, 98f
+    and     x9, x4, #1
+    orr     x9, x9, x15
+    cbz     x9, 98f
+    add     x4, x4, #1
+98: add     w0, w0, #1
+    sub     w0, w0, w12
+    add     w0, w0, #1074               // the exponent field less one; the top digit adds the one (or not, below the range)
+    add     x4, x4, x0, lsl #52
+    lsr     x9, x4, #52
+    cmp     x9, #0x7ff
+    b.hs    n_ex_inf
+    fmov    d8, x4
+    b       n_ex_out
+n_ex_inf:
+    ldr     x4, =0x7ff0000000000000
+    fmov    d8, x4
+    b       n_ex_out
+n_ex_zero:
+    fmov    d8, xzr
+n_ex_out:
+    add     sp, sp, #1136
+    ret
+    .ltorg
     .balign 8
 t_pow10:
     .quad   0x3ff0000000000000

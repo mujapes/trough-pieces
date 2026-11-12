@@ -10,5 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: gcc --version | head -1 && grep -m1 Features /proc/cpuinfo | tr ' ' '\n' | grep -E '^(aes|pmull|sha2|asimd)$' | tr '\n' ' '
+      - name: Reference engines for the script checks
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq quickjs && node --version && which qjs
       - name: Rebuild every piece and replay its recorded checks
         run: ./ci/run.sh

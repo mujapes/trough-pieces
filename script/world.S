@@ -1,7 +1,7 @@
 // The world: everything a running program has, in one block the host owns (kind 6). Nothing in it is an address: every
 // reference is a distance from the block's start, so a world can be moved, saved, or handed to a new build of this piece.
 // x19 is the world's start wherever this file's routines are used.
-    // the head (256 bytes). Places and counts are 64-bit.
+    // the head (512 bytes). Places and counts are 64-bit.
     .equ W_MAGIC, 64                    // "TRJS" and the layout's version
     .equ W_CODE, 72                     // the instructions: where, how many bytes are written, room
     .equ W_CODE_LEN, 80
@@ -27,6 +27,12 @@
     .equ W_ERR_COL, 236
     .equ W_SRC, 240                     // the program's text, kept in the world: where, how long
     .equ W_SRC_LEN, 248
+    .equ W_FP, 256                      // the machine inside a call: the call's record on the stack (0: not in one),
+    .equ W_LOCALS, 264                  // where the running function's variables are,
+    .equ W_ENV, 272                     // and the scope its inner functions will remember
+    .equ W_K_LENGTH, 280                // names the machine itself knows, as string values (made when first run)
+    .equ W_K_PROTOTYPE, 288
+    .equ W_K_CONSTRUCTOR, 296
     // values: a number is itself; anything else has these top 16 bits and a payload below
     .equ T_UNDEF, 0xfff9
     .equ T_NULL, 0xfffa
@@ -49,7 +55,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #24
+    mov     x12, #56
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -57,7 +63,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #256
+    mov     x11, #512
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]

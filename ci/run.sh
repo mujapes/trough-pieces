@@ -26,4 +26,7 @@ while read -r name src entries; do
 done < ci/pieces.txt
 echo "--- damaged certificates (each against an unreadable page)"
 for c in leaf wiki root middle; do ./out/certfuzz out/cert.ref "out/cert-$c.fixture" "${FUZZ_ROUNDS:-3000000}" || { echo "FUZZ FAILED $c"; fail=1; }; done
+echo "--- script: our own JavaScript engine against node and qjs, program by program"
+gcc -O2 -o out/render loader/render.c loader/piece.c
+if ./build.sh script/impl.S out/script.asm begin tokens numtext load run text error; then python3 script/checks/run.py out/script.asm | tail -15 || fail=1; else echo "BUILD FAILED script"; fail=1; fi
 exit $fail

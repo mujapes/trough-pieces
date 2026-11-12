@@ -5,11 +5,17 @@
     .global begin
     .global tokens
     .global numtext
+    .global load
+    .global run
+    .global text
+    .global error
     .include "script/world.S"
     .include "script/lex.S"
     .include "script/tokens.S"
     .include "script/values.S"
+    .include "script/strings.S"
     .include "script/num.S"
     .include "script/compile.S"
     .include "script/machine.S"
+    .include "script/objects.S"
     .include "script/entries.S"

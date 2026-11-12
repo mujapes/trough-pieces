@@ -16,6 +16,7 @@
     and     \ptr, \reg, #0xffffffffffff
     add     \ptr, x19, \ptr
     ldr     \len, [\ptr], #8
+    and     \len, \len, #0xffffffff
     .endm
 // LIT: a string value for fixed text between two labels -> x0 (0 if the world is full)
     .macro  LIT from, to
@@ -74,6 +75,10 @@ v_number:
 // v_text_number: the string value x0 read as a number, by the language's rules for text: spaces at either end do not count,
 // nothing at all is zero, a base prefix is allowed, Infinity is a word; anything else that is not wholly a number is not one.
 v_text_number:
+    and     x1, x0, #0xffffffffffff
+    ldr     x1, [x19, x1]
+    lsr     x1, x1, #32                 // (text with characters past 255 is never a number here)
+    cbnz    x1, t_nan
     STRV    x0, x1, x2
     add     x2, x1, x2                  // x1 where we are, x2 the end
 1:  cmp     x1, x2                      // spaces before
@@ -258,22 +263,12 @@ t_nan:
     .ltorg
 // v_same_text: are the two string values x0 and x1 the same text -> w0 1 or 0
 v_same_text:
-    STRV    x0, x2, x3
-    STRV    x1, x4, x5
-    mov     w0, #0
-    cmp     x3, x5
-    b.ne    2f
-    mov     x6, #0
-1:  cmp     x6, x3
-    b.hs    3f
-    ldrb    w7, [x2, x6]
-    ldrb    w8, [x4, x6]
-    add     x6, x6, #1
-    cmp     w7, w8
-    b.eq    1b
-2:  ret
-3:  mov     w0, #1
-    ret
+    mov     x9, x30
+    mov     x2, x1
+    mov     x1, x0
+    bl      o_keyeq
+    cset    w0, eq
+    ret     x9
 // v_strict: are the values x0 and x1 the same without any conversion (===) -> w0 1 or 0
 v_strict:
     ISNUM   x0
