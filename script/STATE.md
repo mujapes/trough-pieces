@@ -245,3 +245,8 @@ for..in (no hidden properties yet); `[a, b] = v` as an expression gives the arra
 `Math.expm1(1)`, `Math.log1p(2)`, `Math.hypot(1e-300,1e-300)`: node and qjs are one unit off, ours is the exact rounding (mpmath);
 math2.js therefore prints numbers cut to 14 digits (its `R`), and minus nought in a label is written neg0 (run.py rewrites node's -0).
 Next: asinh, acosh, atanh, fround, clz32, imul; then join, indexOf, slice into lib.S; shapes; RegExp.
+**Stage 6, eighth unit: asinh, acosh, atanh, fround, clz32, imul in machine code (built-ins 43 to 48; 42 is `n_ident`).
+Math is complete.** `q_log1pp` (the logarithm of 1 + a pair) carries log1p and the three inverse hyperbolic ones.
+`checks/arcs.py` 150 3: 8858 values, 0 wrong, first run that built; `Math.asinh(1e300)` and `acosh(1e300)`: node is a unit
+off, ours exact. 46 routines in machine code. Trap met: `n_nan` is num.S's text "NaN", not a routine (mine is `n_notnum`).
+Next: join, indexOf, slice into lib.S; shapes; RegExp.

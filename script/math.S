@@ -867,13 +867,12 @@ n_expm1:
     bl      dd_add
     fadd    d0, d0, d1
     b       n_num
-// 36 log1p: u = 1 + x as the machine rounds it and c what that lost, exactly; the answer is ln u + d - d^2/2, d = c / u
-n_log1p:
-    NIN
-    ARGNUM  0
-    fcmp    d0, #0.0
-    b.vs    n_num
-    b.eq    n_num
+// q_log1pp: the logarithm of 1 + w, w the pair (d0, d1) above -1 and finite -> the pair. u = 1 + w as the machine rounds
+// it and c what that lost (exactly, with w's second half); the answer is ln u + d - d^2/2, d = c / u.
+// Uses what q_log does, and d29-d31.
+q_log1pp:
+    str     x30, [sp, #-16]!
+    fmov    d31, d1
     fmov    d16, #1.0
     fadd    d29, d0, d16
     fsub    d17, d29, d16
@@ -882,14 +881,14 @@ n_log1p:
     fsub    d17, d0, d17
     fadd    d30, d18, d17
     fmov    d0, d29
-    bl      q_logs
-    fsub    d16, d0, d0
-    fcmp    d16, #0.0
-    b.ne    n_num
+    bl      q_log
     fmov    d27, d0
     fmov    d28, d1
     fmov    d0, d30
     movi    d1, #0
+    fmov    d2, d31
+    movi    d3, #0
+    bl      dd_add
     fmov    d2, d29
     movi    d3, #0
     bl      dd_div
@@ -899,7 +898,174 @@ n_log1p:
     fmov    d2, d27
     fmov    d3, d28
     bl      dd_add
+    ldr     x30, [sp], #16
+    ret
+// 36 log1p
+n_log1p:
+    NIN
+    ARGNUM  0
+    fcmp    d0, #0.0
+    b.vs    n_num
+    b.eq    n_num
+    fmov    d16, #-1.0
+    fcmp    d0, d16
+    b.lt    n_notnum
+    b.eq    1f
+    mov     x9, #0x7ff0000000000000
+    fmov    d16, x9
+    fcmp    d0, d16
+    b.eq    n_num
+    movi    d1, #0
+    bl      q_log1pp
     fadd    d0, d0, d1
+    b       n_num
+1:  mov     x0, #0xfff0000000000000
+    NOUT
+n_notnum:
+    mov     x0, #0x7ff8000000000000
+    NOUT
+// 43 asinh, 44 acosh, 45 atanh, all by q_log1pp: asinh a = log1p(a + a^2 / (1 + root(a^2 + 1))); acosh x =
+// log1p(t + root(t (x + 1))), t = x - 1; atanh a = log1p(2a / (1 - a)) / 2. Past 2^60 the first two are ln a + ln 2.
+n_asinh:
+    mov     x2, #0
+    b       1f
+n_acosh:
+    mov     x2, #1
+    b       1f
+n_atanh:
+    mov     x2, #2
+1:  NIN
+    str     x2, [sp, #40]
+    ARGNUM  0
+    ldr     x2, [sp, #40]
+    fcmp    d0, d0
+    b.vs    n_num
+    fmov    x14, d0
+    fabs    d7, d0
+    mov     x9, #0x7ff0000000000000
+    fmov    d5, x9
+    cmp     x2, #1
+    b.eq    4f
+    b.hi    6f
+    fcmp    d7, #0.0
+    b.eq    n_num
+    fcmp    d7, d5
+    b.eq    n_num
+    mov     x9, #0x43b0000000000000
+    fmov    d16, x9
+    fcmp    d7, d16
+    b.hi    3f
+    fmul    d0, d7, d7
+    fnmsub  d1, d7, d7, d0
+    fmov    d21, d0
+    fmov    d22, d1
+    fmov    d2, #1.0
+    movi    d3, #0
+    bl      dd_add
+    bl      dd_sqrt
+    fmov    d2, #1.0
+    movi    d3, #0
+    bl      dd_add
+    fmov    d2, d0
+    fmov    d3, d1
+    fmov    d0, d21
+    fmov    d1, d22
+    bl      dd_div
+    fmov    d2, d7
+    movi    d3, #0
+    bl      dd_add
+    bl      q_log1pp
+    b       8f
+3:  fmov    d0, d7
+    bl      q_log
+    adr     x9, k_ln2
+    ldp     d2, d3, [x9, #8]
+    bl      dd_add
+    b       8f
+4:  fmov    d16, #1.0
+    fcmp    d0, d16
+    b.lt    n_notnum
+    b.ne    41f
+    movi    d0, #0
+    b       n_num
+41: fcmp    d0, d5
+    b.eq    n_num
+    mov     x9, #0x43b0000000000000
+    fmov    d16, x9
+    fcmp    d7, d16
+    b.hi    3b
+    fmov    d0, d7
+    movi    d1, #0
+    fmov    d2, #-1.0
+    movi    d3, #0
+    bl      dd_add
+    fmov    d21, d0
+    fmov    d22, d1
+    fmov    d0, d7
+    movi    d1, #0
+    fmov    d2, #1.0
+    movi    d3, #0
+    bl      dd_add
+    fmov    d2, d21
+    fmov    d3, d22
+    bl      dd_mul
+    bl      dd_sqrt
+    fmov    d2, d21
+    fmov    d3, d22
+    bl      dd_add
+    bl      q_log1pp
+    b       8f
+6:  fmov    d16, #1.0
+    fcmp    d7, d16
+    b.hi    n_notnum
+    b.ne    61f
+    fmov    d0, d5
+    movi    d1, #0
+    b       8f
+61: fcmp    d7, #0.0
+    b.eq    n_num
+    fmov    d0, #1.0
+    movi    d1, #0
+    fneg    d2, d7
+    movi    d3, #0
+    bl      dd_add
+    fmov    d2, d0
+    fmov    d3, d1
+    fadd    d0, d7, d7
+    movi    d1, #0
+    bl      dd_div
+    bl      q_log1pp
+    fmov    d16, #0.5
+    fmul    d0, d0, d16
+    fmul    d1, d1, d16
+8:  fadd    d0, d0, d1
+    tbz     x14, #63, n_num
+    fneg    d0, d0
+    b       n_num
+// 46 fround, 47 clz32, 48 imul
+n_fround:
+    NIN
+    ARGNUM  0
+    fcvt    s0, d0
+    fcvt    d0, s0
+    b       n_num
+n_clz32:
+    NIN
+    ARGNUM  0
+    bl      v_int32
+    clz     w0, w0
+    ucvtf   d0, w0
+    b       n_num
+n_imul:
+    NIN
+    ARGNUM  0
+    bl      v_int32
+    str     x0, [sp, #40]
+    ARGNUM  1
+    bl      v_int32
+    ldr     x9, [sp, #40]
+    mul     w0, w0, w9
+    scvtf   d0, w0
     b       n_num
 // 37 sinh, 38 cosh, 39 tanh. Below a half, sinh and tanh go by the sine's and cosine's series with the square's sign
 // turned; otherwise by E = e^|x| as a pair: (E - 1/E) / 2, (E + 1/E) / 2, and the first over the second. Past 40 the 1/E

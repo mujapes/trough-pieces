@@ -23,12 +23,17 @@ for i in range(n):
         add('log1p',[x],mpmath.log(1+M(x)))
     for y,x in ((random.uniform(-3,3),random.uniform(-3,3)),(big(-500,500),big(-500,500)),(big(-1070,1023),big(-1070,1023))):
         add('atan2',[y,x],mpmath.atan2(M(y),M(x))); add('hypot',[y,x],mpmath.sqrt(M(y)**2+M(x)**2))
+    for x in (random.uniform(-3,3),big(-60,60),big(-1070,1023)):
+        add('asinh',[x],mpmath.asinh(M(x))); add('acosh',[abs(x)+1],mpmath.acosh(M(abs(x)+1)))
+    for x in (random.uniform(-1,1),big(-60,-1),big(-1070,-1),random.choice([1,-1])*(1-math.ldexp(random.random(),-random.randint(1,52)))):
+        add('atanh',[x],mpmath.atanh(M(x)))
+    x=1+abs(big(-52,2)); add('acosh',[x],mpmath.acosh(M(x)))
     v=[big(-30,30) for k in range(random.randint(3,5))]; add('hypot',v,mpmath.sqrt(sum(M(a)**2 for a in v)))
 add('cbrt',[27.0],3); add('cbrt',[-8.0],-2); add('hypot',[3.0,4.0],5); add('hypot',[1e308,1e308],M(1e308)*mpmath.sqrt(2)); add('hypot',[5e-324,5e-324],M(5e-324)*mpmath.sqrt(2))
 add('sinh',[710.0],mpmath.sinh(710)); add('cosh',[-710.4],mpmath.cosh(M(-710.4))); add('expm1',[709.7],mpmath.expm1(M(709.7)))
 fixed=['Math.atan(1/0)','Math.atan(-1/0)','1/Math.atan(-0)','1/Math.asin(-0)','1/Math.acos(1)','Math.acos(-1)','Math.asin(1)','Math.asin(-1)','Math.asin(1.0000001)','Math.acos(0/0)',
  '1/Math.expm1(-0)','Math.expm1(-1/0)','Math.expm1(1/0)','Math.expm1(710)','1/Math.log1p(-0)','Math.log1p(-1)','Math.log1p(-1.1)','Math.log1p(1/0)','1/Math.sinh(-0)','Math.sinh(-1/0)','Math.sinh(711)','Math.cosh(-0)','Math.cosh(-1/0)','Math.cosh(800)',
- '1/Math.tanh(-0)','Math.tanh(1/0)','Math.tanh(-1/0)','Math.tanh(50)','1/Math.cbrt(-0)','Math.cbrt(-1/0)','Math.cbrt(0/0)','Math.hypot()','Math.hypot(-3)','Math.hypot(0/0,1/0)','Math.hypot(0/0,1)','1/Math.hypot(-0,0)','Math.hypot(1e308,1e308,1e308,1e308)','Math.hypot("3","4")']
+ '1/Math.tanh(-0)','Math.tanh(1/0)','Math.tanh(-1/0)','Math.tanh(50)','1/Math.cbrt(-0)','Math.cbrt(-1/0)','Math.cbrt(0/0)','Math.hypot()','Math.hypot(-3)','Math.hypot(0/0,1/0)','Math.hypot(0/0,1)','1/Math.hypot(-0,0)','Math.hypot(1e308,1e308,1e308,1e308)','Math.hypot("3","4")','1/Math.asinh(-0)','Math.asinh(-1/0)','Math.acosh(1)','1/Math.acosh(1)','Math.acosh(0.5)','Math.acosh(1/0)','Math.atanh(1)','Math.atanh(-1)','Math.atanh(1.5)','1/Math.atanh(-0)','Math.fround(5.5)','Math.fround(5.05)','Math.fround(1e40)','Math.fround(-1e-50)','Math.clz32(1)','Math.clz32(0)','Math.clz32(-1)','Math.clz32(0.5)','Math.clz32(1e10)','Math.imul(2,4)','Math.imul(-5,12)','Math.imul(0xffffffff,5)','Math.imul(0xfffffffe,5)','Math.imul(123456789,987654321)','Math.imul(2)','Math.log1p(1e300)']
 for y in ('0','-0','1','-1','1/0','-1/0','0/0'):
     for x in ('0','-0','1','-1','1/0','-1/0','0/0'): fixed.append('1/Math.atan2(%s,%s)'%(y,x)); fixed.append('Math.atan2(%s,%s)'%(y,x))
 bad=0; tot=0
