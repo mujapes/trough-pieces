@@ -29,3 +29,4 @@ tls impl.S migrate begin feed send reset
 trust impl.S chain signed_handshake
 url impl.S resolve part port
 voice-policy impl.S skip_ahead duck_volume filler_wait points_wait join_wait
+llm impl.S request text stopped

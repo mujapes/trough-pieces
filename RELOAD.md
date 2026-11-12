@@ -44,3 +44,13 @@ on a build that kills the app (the trial).
 4. Several pieces changing together (a caller and what it calls): today each swaps alone, so an interface change
    needs a build that accepts both. Wanted: a sealed set.
 5. Sockets are global. A second table for a candidate would let it run beside the live one before taking over.
+
+## Direction: a code stream (user, 2026-11-12)
+With no compiler between the description and the bytes, reload can be a stream instead of files: one append-only
+region (a growing file the app keeps mapped, or a pipe) into which sealed machine code is written as it is made,
+and which the app follows continuously, taking each record within milliseconds, not at a once-a-second look.
+Each record: piece name, entry list, code, seal. Two rules of the phone shape it: memory is never writable and
+runnable at once (new code goes into fresh pages, which are then made runnable); and running code is never
+patched in place (new code is appended and the socket is flipped; callers in flight finish in the old code).
+The trial and roll-back above apply to each record unchanged. The assembler that turns written instructions into
+bytes is the last tool outside the system; it can become a piece.

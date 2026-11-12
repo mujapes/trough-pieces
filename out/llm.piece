@@ -1,0 +1,20 @@
+state 16064
+target mask 160 100
+hold 0 file llm-key.fixture
+hold 3 file llm-model.fixture
+hold 4 file llm-prompt1.fixture
+hold 5 file llm-prompt2.fixture
+hold 6 file llm-stream.fixture
+hold 7 file llm-streamcut.fixture
+hold 8 file llm-streamerror.fixture
+hold 9 file llm-badkey.fixture
+hold 10 file llm-bigprompt.fixture
+hold 11 file llm-delkey.fixture
+hold 12 file llm-streammid.fixture
+hold 13 file llm-streampair.fixture
+entry request 0 70000
+entry text 0 0
+entry stopped 0 0
+numbers request 3 3 pick:0,0,0,11,9,0,0,1 pick:3,3,3,3,3,3,4,1 pick:4,5,4,5,4,10,5,1
+numbers text 1 1 range:0:14
+numbers stopped 1 1 range:0:14

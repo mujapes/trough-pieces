@@ -41,3 +41,6 @@
 33 url port
 34 aesgcm seal
 35 aesgcm open
+36 llm request
+37 llm text
+38 llm stopped
