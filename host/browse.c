@@ -93,12 +93,59 @@ static int ask(int argc, char **argv, const uint8_t *roots) {
     printf("status %lld, %zu bytes back over a verified secure connection in %.0f ms; the llm piece says: %s; %lld bytes of words\n", status, length(reply), now_ms() - started, stopped == 1 ? "finished" : stopped == 2 ? "the server reported an error" : "not finished", wn);
     if (wn > 0) { fwrite(words + 64, 1, (size_t)wn, stdout); printf("\n"); } else if (stopped != 1) printf("%.*s\n", bn > 300 ? 300 : (int)bn, body + 64);
     return stopped == 1 ? 0 : 1; }
+/* Gets what an address leads to: the reply's body, unpacked, as a block (0 with the reason in why). Follows redirects. */
+static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, size_t room_why) {
+    entry5 resolve = entry("url", "resolve"), part = entry("url", "part"), port_of = entry("url", "port"), request_of = entry("http", "request"), status_of = entry("http", "status"), header = entry("http", "header"), packed_of = entry("http", "packed"), body_of = entry("http", "body"), unpack = entry("inflate", "unpack");
+    uint8_t *address = text_block(where, strlen(where)), *reply = 0;
+    for (int hop = 0; hop < 6 && !reply; hop++) {
+        at(30, address); at(31, address); int16_t q2[2] = {30, 31}; uint8_t *normal = made_text(resolve, q2, 2, length(address) + 64); if (!normal) { snprintf(why, room_why, "not an address we can follow"); return 0; } address = normal; at(30, address);
+        int16_t qs[2] = {30, 1}, qc[2] = {30, 0}, q1[1] = {30}; uint8_t *site = made_text(part, qs, 2, 300), *scheme = made_text(part, qc, 2, 16), *request = made_text(request_of, q1, 1, 8192); long long port = port_of(0, q1, 1, 0, table);
+        if (!site || !scheme || !request || port <= 0) { snprintf(why, room_why, "not an address we can follow"); return 0; }
+        char host[300]; size_t hn = length(site); memcpy(host, site + 64, hn); host[hn] = 0; if (host[0] == '[' && hn > 1) { memmove(host, host + 1, hn - 2); host[hn - 2] = 0; }
+        int https = length(scheme) == 5 && !memcmp(scheme + 64, "https", 5);
+        reply = https ? secure_fetch(host, (int)port, request, roots, why, room_why) : plain_fetch(host, (int)port, request, why, room_why); if (!reply) return 0;
+        at(32, reply); int16_t qr[1] = {32}; long long status = status_of(0, qr, 1, 0, table);
+        if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) { int16_t ql[9] = {32, 'l', 'o', 'c', 'a', 't', 'i', 'o', 'n'}; uint8_t *to = made_text(header, ql, 9, 4096); if (!to) { snprintf(why, room_why, "a redirect to nowhere"); return 0; }
+            at(31, to); int16_t qn[2] = {30, 31}; uint8_t *next = made_text(resolve, qn, 2, 8192); if (!next) { snprintf(why, room_why, "a redirect we cannot follow"); return 0; } address = next; reply = 0; } }
+    if (!reply) { snprintf(why, room_why, "too many redirects"); return 0; }
+    size_t got = length(reply), room = (got * 4 > 200000 ? got * 4 : 200000) * 6; int16_t qr[1] = {32}; long long packed = packed_of(0, qr, 1, 0, table); uint8_t *body = block(2, room); long long bn = body_of(body, qr, 1, 0, table);
+    if (bn < 0) { snprintf(why, room_why, "the reply's body could not be read"); return 0; } resize(body, (size_t)bn);
+    if (packed == 1) { at(33, body); int16_t qb[1] = {33}; uint8_t *plain = block(2, room); long long un = unpack(plain, qb, 1, 0, table); if (un < 0) { snprintf(why, room_why, "the packed body could not be unpacked"); return 0; } resize(plain, (size_t)un); body = plain; }
+    return body; }
+/* The live screen: browse <out dir> --serve <picture file> <events file> <width> <height> [address]
+ * The picture file is a surface as the pieces know it (64-byte head, then the dots) that the app maps and shows; bytes 24-31 of
+ * the head are a counter this host raises after every redraw. The events file gets one line per event from the app:
+ * "d x y" finger down, "m x y" moved, "u" lifted, "o address" open that address. A drag scrolls. */
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
+    if (argc < 7) { fprintf(stderr, "browse <pieces out dir> --serve <picture file> <events file> <width> <height> [address]\n"); return 2; }
+    uint32_t W = (uint32_t)atoi(argv[5]), H = (uint32_t)atoi(argv[6]); if (W < 16 || H < 16 || W > 4096 || H > 4096) return 2; size_t bytes = 64 + 4ull * W * H;
+    int fd = open(argv[3], O_RDWR | O_CREAT, 0600); if (fd < 0 || ftruncate(fd, (off_t)bytes)) { fprintf(stderr, "cannot make the picture file\n"); return 1; }
+    uint8_t *screen = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (screen == MAP_FAILED) return 1; uint64_t z = bytes, counter = 0; uint32_t head[4] = {1, W, H, 4 * W}; memset(screen, 0, 64); memcpy(screen, head, 16); memcpy(screen + 16, &z, 8);
+    FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
+    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
+    for (;;) {
+        if (fresh) { fresh = 0; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
+            if (!body) { char sorry[600]; int n = snprintf(sorry, sizeof sorry, "<h2>This page could not be opened</h2><p>%s</p><p>%s</p>", address, why); body = text_block(sorry, (size_t)n); } }
+        if (dirty) { dirty = 0; double t = now_ms(); at(34, body); at(35, font); memcpy(&counter, screen + 24, 8); clear(screen, 0, 0, 0xffffffffll, table); int16_t q[4] = {34, 35, (int16_t)size_px, (int16_t)(scroll > 32000 ? 32000 : scroll)}; tall = render(screen, q, 4, 0, table);
+            counter++; memcpy(screen + 24, &counter, 8); printf("drawn at %lld of %lld in %.1f ms\n", scroll, tall, now_ms() - t); fflush(stdout); }
+        struct stat st; if (fstat(fileno(ev), &st) == 0 && st.st_size > read_to) { fseek(ev, read_to, SEEK_SET); char line[2100];
+            while (fgets(line, sizeof line, ev)) { size_t n = strlen(line); if (!n || line[n - 1] != '\n') break; read_to += (long)n; line[n - 1] = 0; int x, y;
+                if (line[0] == 'd' && sscanf(line + 1, "%d %d", &x, &y) == 2) { down = 1; last_y = y; }
+                else if (line[0] == 'm' && down && sscanf(line + 1, "%d %d", &x, &y) == 2) { long long limit = tall > (long long)H ? tall - H : 0, to = scroll - (y - last_y); if (to < 0) to = 0; if (to > limit) to = limit; last_y = y; if (to != scroll) { scroll = to; dirty = 1; } }
+                else if (line[0] == 'u') down = 0;
+                else if (line[0] == 'o' && line[1] == ' ') { snprintf(address, sizeof address, "%s", line + 2); fresh = 1; }
+                else if (line[0] == 'q') return 0; } }
+        else if (st.st_size < read_to) read_to = 0;
+        if (!dirty && !fresh) usleep(4000); } }
 int main(int argc, char **argv) {
     if (argc < 4) { fprintf(stderr, "browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]\n   or: browse <pieces out dir> --ask <key file> <model> <prompt file> [most tokens]\n"); return 2; }
     dir = argv[1]; int size_px = argc > 4 ? atoi(argv[4]) : 26, scroll = argc > 5 ? atoi(argv[5]) : 0; uint32_t W = argc > 6 ? (uint32_t)atoi(argv[6]) : 720, H = argc > 7 ? (uint32_t)atoi(argv[7]) : 1280; double started = now_ms();
     char path[600]; snprintf(path, sizeof path, "%s/../slots.txt", dir); FILE *f = fopen(path, "r"); if (!f) { fprintf(stderr, "no slots.txt\n"); return 3; }
     char line[256]; while (fgets(line, sizeof line, f)) { int slot; char name[64], en[64]; if (line[0] == '#' || sscanf(line, "%d %63s %63s", &slot, name, en) != 3) continue; if (slot >= 0 && slot < 256) table[slot] = piece_entry(get(name), en); } fclose(f);
-    snprintf(path, sizeof path, "%s/android-roots.der", dir); uint8_t *roots = file_block(path); if (argc > 2 && !strcmp(argv[2], "--ask")) return ask(argc, argv, roots); snprintf(path, sizeof path, "%s/font.fixture", dir); uint8_t *font = file_block(path);
+    snprintf(path, sizeof path, "%s/android-roots.der", dir); uint8_t *roots = file_block(path); if (argc > 2 && !strcmp(argv[2], "--ask")) return ask(argc, argv, roots); if (argc > 2 && !strcmp(argv[2], "--serve")) { snprintf(path, sizeof path, "%s/font.fixture", dir); return serve(argc, argv, roots, file_block(path)); } snprintf(path, sizeof path, "%s/font.fixture", dir); uint8_t *font = file_block(path);
     entry5 resolve = entry("url", "resolve"), part = entry("url", "part"), port_of = entry("url", "port"), request_of = entry("http", "request"), status_of = entry("http", "status"), header = entry("http", "header"), packed_of = entry("http", "packed"), body_of = entry("http", "body"), unpack = entry("inflate", "unpack");
     uint8_t *address = text_block(argv[2], strlen(argv[2])), *reply = 0; char why[400] = ""; const char *secure = ""; long long status = -1;
     for (int hop = 0; hop < 6; hop++) {
