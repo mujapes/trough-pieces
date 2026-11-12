@@ -36,3 +36,13 @@ Through the call table: paint clear (socket 3), font draw (8), font measure (9),
 ## Conventions
 - Every read of the page is checked against the block's size. No state; nothing is written except through
   the pieces it calls.
+
+## link (added 2026-11-12)
+- **link**(block, numbers: page handle, font handle, text size, scroll, x, y, screen width, screen height) → which
+  address the text at the point leads to: written into the block from byte 64, its length returned; 0 if the point is
+  not on link text; -1 if the numbers are not usable (fewer than 8, a bad handle, size outside 6 to 200, width or
+  height below 16) or the address does not fit. The page is laid out exactly as `render` lays it out, measuring
+  where it would draw, so the answer always agrees with the picture. The address is what the opening tag gives after
+  `href` (any case; in double quotes, single quotes or bare), as written: making it absolute is the url piece's job.
+  Checked against the picture: every link-coloured dot of a drawn test page answers with its own address and every
+  plain-text dot with none (three links, three ways of writing the address, wrapped lines, scrolled).

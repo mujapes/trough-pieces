@@ -15,7 +15,7 @@ image impl.S check blit scale smooth stretch
 inflate impl.S size unpack
 jpeg impl.S check size decode
 listen-step impl.S migrate step
-page impl.S check render
+page impl.S check render link
 paint impl.S check clear fill_rect
 peak impl.S peak
 png impl.S check size decode

@@ -125,7 +125,7 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     int fd = open(argv[3], O_RDWR | O_CREAT, 0600); if (fd < 0 || ftruncate(fd, (off_t)bytes)) { fprintf(stderr, "cannot make the picture file\n"); return 1; }
     uint8_t *screen = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (screen == MAP_FAILED) return 1; uint64_t z = bytes, counter = 0; uint32_t head[4] = {1, W, H, 4 * W}; memset(screen, 0, 64); memcpy(screen, head, 16); memcpy(screen + 16, &z, 8);
     FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
-    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
+    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
     for (;;) {
         if (fresh) { fresh = 0; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
             if (!body) { char sorry[600]; int n = snprintf(sorry, sizeof sorry, "<h2>This page could not be opened</h2><p>%s</p><p>%s</p>", address, why); body = text_block(sorry, (size_t)n); } }
@@ -133,9 +133,13 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
             counter++; memcpy(screen + 24, &counter, 8); printf("drawn at %lld of %lld in %.1f ms\n", scroll, tall, now_ms() - t); fflush(stdout); }
         struct stat st; if (fstat(fileno(ev), &st) == 0 && st.st_size > read_to) { fseek(ev, read_to, SEEK_SET); char line[2100];
             while (fgets(line, sizeof line, ev)) { size_t n = strlen(line); if (!n || line[n - 1] != '\n') break; read_to += (long)n; line[n - 1] = 0; int x, y;
-                if (line[0] == 'd' && sscanf(line + 1, "%d %d", &x, &y) == 2) { down = 1; last_y = y; }
-                else if (line[0] == 'm' && down && sscanf(line + 1, "%d %d", &x, &y) == 2) { long long limit = tall > (long long)H ? tall - H : 0, to = scroll - (y - last_y); if (to < 0) to = 0; if (to > limit) to = limit; last_y = y; if (to != scroll) { scroll = to; dirty = 1; } }
-                else if (line[0] == 'u') down = 0;
+                if (line[0] == 'd' && sscanf(line + 1, "%d %d", &x, &y) == 2) { down = 1; last_y = y; down_x = x; down_y = y; moved = 0; }
+                else if (line[0] == 'm' && down && sscanf(line + 1, "%d %d", &x, &y) == 2) { moved += abs(y - last_y) + abs(x - down_x) / 4; long long limit = tall > (long long)H ? tall - H : 0, to = scroll - (y - last_y); if (to < 0) to = 0; if (to > limit) to = limit; last_y = y; if (to != scroll) { scroll = to; dirty = 1; } }
+                else if (line[0] == 'u') { if (down && moved < 12) {   /* a tap: is there a link under it? The page piece says; the url piece works out where it leads */
+                        at(34, body); at(35, font); int16_t ql[8] = {34, 35, (int16_t)size_px, (int16_t)(scroll > 32000 ? 32000 : scroll), (int16_t)down_x, (int16_t)down_y, (int16_t)W, (int16_t)H}; uint8_t *href = block(2, 4096); long long hn = entry("page", "link")(href, ql, 8, 0, table);
+                        if (hn > 0) { resize(href, (size_t)hn); uint8_t *base = text_block(address, strlen(address)); at(30, base); at(31, href); int16_t qn[2] = {30, 31}; uint8_t *next = made_text(entry("url", "resolve"), qn, 2, 8192);
+                            if (next && length(next) < sizeof address) { memcpy(address, next + 64, length(next)); address[length(next)] = 0; fresh = 1; printf("tap at %d %d: link to %s\n", down_x, down_y, address); } else printf("tap at %d %d: a link the address piece cannot follow\n", down_x, down_y); }
+                        else printf("tap at %d %d: no link there\n", down_x, down_y); fflush(stdout); } down = 0; }
                 else if (line[0] == 'o' && line[1] == ' ') { snprintf(address, sizeof address, "%s", line + 2); fresh = 1; }
                 else if (line[0] == 'q') return 0; } }
         else if (st.st_size < read_to) read_to = 0;
