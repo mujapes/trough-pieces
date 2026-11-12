@@ -429,7 +429,34 @@ m_index:
     ucvtf   d1, x2
     fcmp    d0, d1
     cset    w3, eq
-9:  ret
+    ret
+9:  mov     w16, #T_STRING              // text that is a whole number as it would be printed ("7", not "07"), to nine digits
+    cmp     w17, w16
+    b.ne    8f
+    and     x16, x1, #0xffffffffffff
+    add     x16, x19, x16
+    ldr     x17, [x16], #8
+    sub     x2, x17, #1
+    cmp     x2, #9
+    b.hs    8f
+    mov     x2, #0
+    ldrb    w3, [x16]
+    cmp     w3, #'0'
+    b.ne    1f
+    cmp     x17, #1
+    b.ne    8f
+1:  ldrb    w3, [x16], #1
+    sub     w3, w3, #'0'
+    cmp     w3, #10
+    b.hs    8f
+    add     x2, x2, x2, lsl #2
+    add     x2, x3, x2, lsl #1
+    subs    x17, x17, #1
+    b.ne    1b
+    mov     w3, #1
+    ret
+8:  mov     w3, #0
+    ret
 // m_this: the `this` of the running call -> x0 (undefined outside any call)
 m_this:
     VAL     x0, T_UNDEF

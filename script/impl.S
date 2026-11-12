@@ -20,4 +20,5 @@
     .include "script/objects.S"
     .include "script/lib.S"
     .include "script/math.S"
+    .include "script/json.S"
     .include "script/entries.S"

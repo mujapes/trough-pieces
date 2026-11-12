@@ -1,0 +1,15 @@
+var t='{"a":1,"b":[true,false,null,-0.5,1e3,12345678901234567890,0],"c":{"d":"x\\ny\\u00e9\\u20ac\\"q\\\\","e":{}},"f":[],"g":-0,"h":1.5E-7,"i":123456789012345}';
+var o=JSON.parse(t);
+console.log(o.a,o.b.length,o.b[0],o.b[2],o.b[3],o.b[4],o.b[5],o.c.d,o.c.d.length,typeof o.c.e,o.f.length,1/o.g,o.h,o.i);
+console.log(JSON.stringify(o));
+console.log(JSON.stringify(o,null,2));
+console.log(JSON.stringify({s:'a"b\\c\n\t\u0001',u:undefined,f:function(){},n:NaN,i:1/0,d:[undefined,function(){}],z:null}));
+console.log(JSON.stringify('x'),JSON.stringify(5),JSON.stringify(null),JSON.stringify(undefined),JSON.stringify([]),JSON.stringify({}),JSON.stringify(true));
+console.log(JSON.stringify({a:{toJSON:function(){return 'T'}},b:[1,[2,[3]]]},null,'--'));
+console.log(JSON.stringify([1,2,3],function(k,v){return typeof v==='number'?v*2:v}));
+console.log(JSON.stringify(JSON.parse(' [ 1 , { "k" : [ ] } , "s" ] ')),JSON.parse('"\\ud83d\\ude00"').length,JSON.parse('7'),JSON.parse(' "q" '),JSON.parse('null'));
+console.log(JSON.stringify(JSON.parse('{"a":[1,2,{"b":3}]}',function(k,v){return typeof v==='number'?v+1:v})));
+var bad=['','{','[1,]','{"a"}','{a:1}','01','1.','.5','"\\x"','"a','tru','[1 2]','{"a":1,}','nul','1e','-','"\t"','[1]x','\'a\''];
+var r='';for(var i=0;i<bad.length;i++){try{JSON.parse(bad[i]);r+='ok '}catch(e){r+=e.name==='SyntaxError'?'S ':'? '}}console.log(r);
+var deep='';for(i=0;i<200;i++)deep+='[';for(i=0;i<200;i++)deep+=']';console.log(JSON.stringify(JSON.parse(deep)).length);
+class P{constructor(){this.x=1;this.y='z'}m(){}}console.log(JSON.stringify(new P()),JSON.stringify({k:new P()}));

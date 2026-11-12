@@ -5,6 +5,7 @@ function Number(x){return arguments.length?+x:0}function Boolean(x){return !!x}
 __n(-1,Object.prototype);__n(-2,Array.prototype);__n(-3,Function.prototype);__n(-4,String.prototype);__n(-5,Number.prototype);__n(-6,Boolean.prototype);
 var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),exp:__n(20),log:__n(21),log2:__n(22),log10:__n(23),random:__n(24),sin:__n(25),cos:__n(26),tan:__n(27),pow:function(a,b){return a**b},
 PI:3.141592653589793,E:2.718281828459045,LN2:0.6931471805599453,LN10:2.302585092994046,LOG2E:1.4426950408889634,LOG10E:0.4342944819032518,SQRT2:1.4142135623730951,SQRT1_2:0.7071067811865476};
+var JSON={};
 function isNaN(x){x=+x;return x!==x}function isFinite(x){x=+x;return x-x===0}
 function parseInt(s,r){s=(''+s).trim();var i=0,g=1,l=s.length,c=s.charCodeAt(0);if(c===45){g=-1;i=1}else if(c===43)i=1;r=r|0;
 if((r===0||r===16)&&s.charCodeAt(i)===48&&(s.charCodeAt(i+1)|32)===120){i+=2;r=16}if(r===0)r=10;var v=0,k=i;
@@ -63,7 +64,19 @@ S.concat=function(){var s=''+this;for(var i=0;i<arguments.length;i++)s+=argument
 Function.prototype.call=n(28);Function.prototype.apply=n(29);
 Function.prototype.bind=function(t){var f=this,a=[];for(var i=1;i<arguments.length;i++)a.push(arguments[i]);return function(){var b=a.slice();for(var i=0;i<arguments.length;i++)b.push(arguments[i]);return f.apply(t,b)}};
 Object.prototype.toString=function(){return '[object Object]'};
-Object.keys=n(13);Object.prototype.hasOwnProperty=n(14);
+Object.keys=n(13);
+function quote(s){var r='"',i=0,l=s.length,a=0,c;while(i<l){c=s.charCodeAt(i);if(c<32||c===34||c===92){r+=s.substring(a,i);a=i+1;
+r+=c===34?'\\"':c===92?'\\\\':c===10?'\\n':c===13?'\\r':c===9?'\\t':c===8?'\\b':c===12?'\\f':'\\u00'+(c<16?'0':'')+c.toString(16)}i++}return r+s.substring(a,l)+'"'}
+function str(k,h,rep,ind,gap){var v=h[k];if(v!==null&&v!==undefined&&typeof v.toJSON==='function')v=v.toJSON(k);if(rep)v=rep.call(h,k,v);
+var t=typeof v;if(t==='string')return quote(v);if(t==='number')return v-v===0?''+v:'null';if(t==='boolean')return ''+v;if(v===null)return 'null';if(t!=='object')return;
+var m=ind+gap,p=[],i,s;if(Array.isArray(v)){for(i=0;i<v.length;i++){s=str(i,v,rep,m,gap);p.push(s===undefined?'null':s)}
+return p.length?(gap?'[\n'+m+p.join(',\n'+m)+'\n'+ind+']':'['+p.join(',')+']'):'[]'}
+var ks=Object.keys(v);for(i=0;i<ks.length;i++){s=str(ks[i],v,rep,m,gap);if(s!==undefined)p.push(quote(ks[i])+(gap?': ':':')+s)}
+return p.length?(gap?'{\n'+m+p.join(',\n'+m)+'\n'+ind+'}':'{'+p.join(',')+'}'):'{}'}
+function walk(h,k,r){var v=h[k];if(v!==null&&typeof v==='object'){var ks=Object.keys(v);for(var i=0;i<ks.length;i++){var x=walk(v,ks[i],r);if(x===undefined)delete v[ks[i]];else v[ks[i]]=x}}return r.call(h,k,v)}
+JSON.parse=(function(p){return function(s,r){var v=p(s);return typeof r==='function'?walk({'':v},'',r):v}})(n(30));
+JSON.stringify=function(v,rep,sp){var gap='';if(typeof sp==='number'){if(sp>10)sp=10;while(gap.length<sp)gap+=' '}else if(typeof sp==='string')gap=sp.substring(0,10);
+if(typeof rep!=='function')rep=null;return str('',{'':v},rep,'',gap)};Object.prototype.hasOwnProperty=n(14);
 Object.values=function(o){var k=Object.keys(o),r=[];for(var i=0;i<k.length;i++)r.push(o[k[i]]);return r};
 Object.entries=function(o){var k=Object.keys(o),r=[];for(var i=0;i<k.length;i++)r.push([k[i],o[k[i]]]);return r};
 Object.assign=function(t){for(var i=1;i<arguments.length;i++){var s=arguments[i];if(s!==undefined&&s!==null){var k=Object.keys(s);for(var j=0;j<k.length;j++)t[k[j]]=s[k[j]]}}return t};

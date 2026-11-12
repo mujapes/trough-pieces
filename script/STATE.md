@@ -214,3 +214,10 @@ or `console.log` of an object. A function nested in a block that ran before regi
 Recorded, not made: outside strict mode the language wraps a number, string or boolean given as `this` in an object
 (`typeof this` is "object") and makes a missing `this` the global object; ours passes the value as it is, as strict mode does.
 The line in calls.js that showed it was changed to `this+1`.
+**Stage 6, fifth unit: JSON. `json.js` passes: 31 of 31 programs, 1455 lines** (second run). `JSON.parse` is machine code
+(`json.S`, built-in 30: reads the text where it lies, x23/x24 the place and end; strings are read twice, count then fill;
+whole numbers to fifteen digits directly, others through `v_text_number`; nesting to what 128 KB of stack allows;
+SyntaxError otherwise). `JSON.stringify` (indent, replacer function, toJSON) and the reviver are in prelude.js. The first run
+found a real fault outside JSON: `a["0"]` on an array did not reach item 0; `m_index` now takes text that is a whole number
+as printed (to nine digits). Not made: a replacer given as a list of names; escaping lone halves of a pair in stringify.
+31 built-in numbers in `n_table` (29 routines in machine code, 2 are call and apply).
