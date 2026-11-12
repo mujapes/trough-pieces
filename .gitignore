@@ -10,3 +10,4 @@ out/certfuzz
 out/check.txt
 __pycache__/
 out/render
+out/script.txt

@@ -20,7 +20,8 @@ wrong=0; lines=0
 for f in files:
     o,e,res=ours(f); n=ref(['node'],f); q=ref(['qjs'],f); lines+=n.count('\n')
     if '-v' in sys.argv: print(o,e,res)
-    if o!=n or n!=q:
+    if o==n and n!=q: print('note %s: ours and node agree, this qjs differs'%os.path.basename(f))
+    elif o!=n or n!=q:
         wrong+=1; ol,nl,ql=o.split('\n'),n.split('\n'),q.split('\n')
         k=next((i for i in range(max(len(ol),len(nl))) if (ol[i:i+1]!=nl[i:i+1])),-1)
         ow,nw=(ol[k:k+1] or [''])[0].split(' '),(nl[k:k+1] or [''])[0].split(' '); j=next((i for i in range(max(len(ow),len(nw))) if ow[i:i+1]!=nw[i:i+1]),0)
