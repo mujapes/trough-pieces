@@ -53,21 +53,10 @@ k_ln2:  .quad 0x3ff71547652b82fe            // 1 / ln 2; then ln 2 in three part
         .quad 0x3fe62e42fefa39ef, 0x3c7abc9e3b39803f, 0x3907b57a079a1934
 k_ln10: .quad 0x40026bb1bbb55516, 0xbcaf48ad494ea3e9
 k_sqrt2: .quad 0x3ff6a09e667f3bcd
-// q_exp: e to the power of the pair (d0, d1) -> d0. The power is cut to r = it - k ln 2, r / 512 goes through nine terms
-// of the series 1 + r(1 + r/2(1 + r/3(...))), the sum is squared nine times and scaled by 2^k in two steps, the second a
-// fused one so that the pair is rounded only once, small results included. Uses x9-x12, d0-d7, d16-d24.
-q_exp:
+// q_expp: e to the power of the pair (d0, d1), within 746 either way -> the pair (d0, d1) and x11: the answer is the pair
+// times 2^x11. Uses x9-x12, d0-d7, d16-d24.
+q_expp:
     str     x30, [sp, #-16]!
-    fcmp    d0, d0
-    b.vs    9f
-    mov     x9, #710
-    scvtf   d16, x9
-    fcmp    d0, d16
-    b.gt    7f
-    mov     x9, #-746
-    scvtf   d16, x9
-    fcmp    d0, d16
-    b.lt    8f
     adr     x10, k_ln2
     ldp     d4, d5, [x10]
     ldp     d6, d7, [x10, #16]
@@ -109,6 +98,10 @@ q_exp:
     bl      dd_mul
     subs    x12, x12, #1
     b.ne    2b
+    ldr     x30, [sp], #16
+    ret
+// q_scale: the pair (d0, d1) times 2^x11 -> d0, rounded once (in two steps, the second a fused one). Uses x9, x10, d16, d17.
+q_scale:
     asr     x9, x11, #1
     sub     x10, x11, x9
     add     x9, x9, #1023
@@ -121,6 +114,40 @@ q_exp:
     fmul    d1, d1, d16
     fmul    d1, d1, d17
     fmadd   d0, d0, d17, d1
+    ret
+// dd_sqrt: the square root of the pair (d0, d1), not below zero -> the pair. Uses d16-d19.
+dd_sqrt:
+    fcmp    d0, #0.0
+    b.eq    9f
+    fsqrt   d16, d0
+    fmul    d17, d16, d16
+    fnmsub  d18, d16, d16, d17
+    fsub    d19, d0, d17
+    fsub    d19, d19, d18
+    fadd    d19, d19, d1
+    fadd    d17, d16, d16
+    fdiv    d19, d19, d17
+    fadd    d0, d16, d19
+    fsub    d17, d0, d16
+    fsub    d1, d19, d17
+9:  ret
+// q_exp: e to the power of the pair (d0, d1) -> d0. The power is cut to r = it - k ln 2, r / 512 goes through nine terms
+// of the series 1 + r(1 + r/2(1 + r/3(...))), the sum is squared nine times and scaled by 2^k in two steps, the second a
+// fused one so that the pair is rounded only once, small results included. Uses x9-x12, d0-d7, d16-d24.
+q_exp:
+    str     x30, [sp, #-16]!
+    fcmp    d0, d0
+    b.vs    9f
+    mov     x9, #710
+    scvtf   d16, x9
+    fcmp    d0, d16
+    b.gt    7f
+    mov     x9, #-746
+    scvtf   d16, x9
+    fcmp    d0, d16
+    b.lt    8f
+    bl      q_expp
+    bl      q_scale
 9:  ldr     x30, [sp], #16
     ret
 7:  mov     x9, #0x7ff0000000000000
@@ -544,3 +571,553 @@ n_tan:
 9:  mov     x0, #0x7ff8000000000000
     NOUT
     .ltorg
+// The arc functions. k_atan: the arc tangent of 0/8, 1/8, ... 8/8 as pairs.
+    .balign 8
+k_atan:
+    .quad 0x0000000000000000, 0x0000000000000000
+    .quad 0x3fbfd5ba9aac2f6e, 0xbc4cd37686760c17
+    .quad 0x3fcf5b75f92c80dd, 0x3c68ab6e3cf7afbd
+    .quad 0x3fd6f61941e4def1, 0xbc7c63aae6f6e918
+    .quad 0x3fddac670561bb4f, 0x3c7a2b7f222f65e2
+    .quad 0x3fe1e00babdefeb4, 0xbc5928df287a668f
+    .quad 0x3fe4978fa3269ee1, 0x3c72419a87f2a458
+    .quad 0x3fe700a7c5784634, 0xbc78c34d25aadef6
+    .quad 0x3fe921fb54442d18, 0x3c81a62633145c07
+// q_atan2: the angle of the point whose height is the pair Y (d0, d1) and whose distance along is the pair X (d2, d3), both
+// finite and not both nought -> the pair (d0, d1), from minus pi to pi. The smaller (without signs) over the larger is t,
+// from 0 to 1; c is the nearest eighth to t and u = (t - c) / (1 + t c), at most a sixteenth; the angle of u is
+// u(1 - u^2/3 + u^4/5 - ...) to u^30, and the table gives the angle of c. Then pi/2 less it if the two were changed over,
+// pi less that if X was below nought, and Y's sign. Uses x9, x10, x12-x15, d0-d3, d16-d29.
+q_atan2:
+    str     x30, [sp, #-16]!
+    fmov    x14, d0
+    fmov    x15, d2
+    tbz     x14, #63, 1f
+    fneg    d0, d0
+    fneg    d1, d1
+1:  tbz     x15, #63, 2f
+    fneg    d2, d2
+    fneg    d3, d3
+2:  mov     x13, #0
+    fcmp    d0, d2
+    b.le    3f
+    mov     x13, #1
+    fmov    d16, d0
+    fmov    d0, d2
+    fmov    d2, d16
+    fmov    d16, d1
+    fmov    d1, d3
+    fmov    d3, d16
+3:  bl      dd_div
+    fmov    d21, d0
+    fmov    d22, d1
+    fmov    d16, #8.0
+    fmul    d16, d0, d16
+    fcvtas  x10, d16
+    cbz     x10, 4f
+    scvtf   d29, x10
+    fmov    d16, #0.125
+    fmul    d29, d29, d16
+    fmov    d2, d29
+    movi    d3, #0
+    bl      dd_mul
+    fmov    d2, #1.0
+    movi    d3, #0
+    bl      dd_add
+    fmov    d27, d0
+    fmov    d28, d1
+    fmov    d0, d21
+    fmov    d1, d22
+    fneg    d2, d29
+    movi    d3, #0
+    bl      dd_add
+    fmov    d2, d27
+    fmov    d3, d28
+    bl      dd_div
+4:  fmov    d23, d0
+    fmov    d24, d1
+    fmov    d2, d0
+    fmov    d3, d1
+    bl      dd_mul
+    fmov    d25, d0
+    fmov    d26, d1
+    mov     x12, #31
+    fmov    d0, #1.0
+    movi    d1, #0
+    scvtf   d2, x12
+    movi    d3, #0
+    bl      dd_div
+5:  sub     x12, x12, #2
+    fmov    d2, d25
+    fmov    d3, d26
+    bl      dd_mul
+    fneg    d27, d0
+    fneg    d28, d1
+    fmov    d0, #1.0
+    movi    d1, #0
+    scvtf   d2, x12
+    movi    d3, #0
+    bl      dd_div
+    fmov    d2, d27
+    fmov    d3, d28
+    bl      dd_add
+    cmp     x12, #1
+    b.hi    5b
+    fmov    d2, d23
+    fmov    d3, d24
+    bl      dd_mul
+    adr     x9, k_atan
+    add     x9, x9, x10, lsl #4
+    ldp     d2, d3, [x9]
+    bl      dd_add
+    cbz     x13, 6f
+    fneg    d2, d0
+    fneg    d3, d1
+    adr     x9, k_pio2
+    ldp     d0, d1, [x9]
+    bl      dd_add
+6:  tbz     x15, #63, 7f
+    fneg    d2, d0
+    fneg    d3, d1
+    adr     x9, k_pio2
+    ldp     d0, d1, [x9]
+    fadd    d0, d0, d0
+    fadd    d1, d1, d1
+    bl      dd_add
+7:  tbz     x14, #63, 8f
+    fneg    d0, d0
+    fneg    d1, d1
+8:  ldr     x30, [sp], #16
+    ret
+// 31 atan, 32 atan2, 33 asin, 34 acos
+n_atan:
+    NIN
+    ARGNUM  0
+    fcmp    d0, #0.0
+    b.vs    n_num
+    b.eq    n_num
+    fmov    d2, #1.0
+    fabs    d4, d0
+    mov     x9, #0x7ff0000000000000
+    fmov    d6, x9
+    fcmp    d4, d6
+    b.ne    1f
+    fmov    x9, d0                      // endless: a quarter turn, by the point (1, 0) stood on end
+    fmov    d0, #1.0
+    movi    d2, #0
+    tbz     x9, #63, 1f
+    fneg    d0, d0
+1:  movi    d1, #0
+    movi    d3, #0
+    bl      q_atan2
+    fadd    d0, d0, d1
+    b       n_num
+n_atan2:
+    NIN
+    ARGNUM  0
+    str     d0, [sp, #40]
+    ARGNUM  1
+    fmov    d2, d0
+    ldr     d0, [sp, #40]
+    fcmp    d0, d2
+    b.vs    9f
+    fabs    d4, d0
+    fabs    d5, d2
+    mov     x9, #0x7ff0000000000000
+    fmov    d6, x9
+    fcmp    d4, d6
+    b.eq    1f
+    fcmp    d5, d6
+    b.ne    3f
+1:  fmov    d7, #1.0                    // one of them endless: an endless one counts as 1 and the other as nought
+    movi    d16, #0
+    fcmp    d4, d6
+    fcsel   d4, d7, d16, eq
+    fcmp    d5, d6
+    fcsel   d5, d7, d16, eq
+    fmov    x9, d0
+    fmov    x10, d4
+    and     x9, x9, #0x8000000000000000
+    orr     x10, x10, x9
+    fmov    d0, x10
+    fmov    x9, d2
+    fmov    x10, d5
+    and     x9, x9, #0x8000000000000000
+    orr     x10, x10, x9
+    fmov    d2, x10
+3:  fcmp    d0, #0.0
+    b.ne    5f
+    fmov    x9, d2                      // no height: nought itself (its sign kept) forwards, pi with its sign backwards
+    tbz     x9, #63, n_num
+    ldr     d1, k_pio2
+    fadd    d1, d1, d1
+    fmov    x9, d0
+    fmov    d0, d1
+    tbz     x9, #63, n_num
+    fneg    d0, d0
+    b       n_num
+5:  movi    d1, #0
+    movi    d3, #0
+    bl      q_atan2
+    fadd    d0, d0, d1
+    b       n_num
+9:  mov     x0, #0x7ff8000000000000
+    NOUT
+n_asin:
+    mov     x2, #0
+    b       1f
+n_acos:
+    mov     x2, #1
+1:  NIN
+    str     x2, [sp, #40]
+    ARGNUM  0
+    fabs    d4, d0
+    fmov    d5, #1.0
+    fcmp    d4, d5
+    b.hi    9b
+    ldr     x2, [sp, #40]
+    cbnz    x2, 2f
+    fcmp    d0, #0.0
+    b.eq    n_num
+2:  fmov    d30, d0                     // the root of (1 - x)(1 + x) is the other side of the triangle
+    fmov    d0, #1.0
+    movi    d1, #0
+    fneg    d2, d30
+    movi    d3, #0
+    bl      dd_add
+    fmov    d27, d0
+    fmov    d28, d1
+    fmov    d0, #1.0
+    movi    d1, #0
+    fmov    d2, d30
+    movi    d3, #0
+    bl      dd_add
+    fmov    d2, d27
+    fmov    d3, d28
+    bl      dd_mul
+    bl      dd_sqrt
+    ldr     x2, [sp, #40]
+    cbnz    x2, 3f
+    fmov    d2, d0
+    fmov    d3, d1
+    fmov    d0, d30
+    movi    d1, #0
+    b       4f
+3:  fmov    d2, d30
+    movi    d3, #0
+4:  bl      q_atan2
+    fadd    d0, d0, d1
+    b       n_num
+// 35 expm1: below a thirty-second by its own series x(1 + x/2(1 + x/3(...))), otherwise e^x as a pair less one
+n_expm1:
+    NIN
+    ARGNUM  0
+    fcmp    d0, #0.0
+    b.vs    n_num
+    b.eq    n_num
+    fabs    d4, d0
+    mov     x9, #0x3fa0000000000000
+    fmov    d5, x9
+    fcmp    d4, d5
+    b.hs    3f
+    fmov    d23, d0
+    movi    d24, #0
+    fmov    d0, #1.0
+    movi    d1, #0
+    mov     x12, #16
+1:  fmov    d2, d23
+    fmov    d3, d24
+    bl      dd_mul
+    scvtf   d2, x12
+    movi    d3, #0
+    bl      dd_div
+    fmov    d2, #1.0
+    movi    d3, #0
+    bl      dd_add
+    sub     x12, x12, #1
+    cmp     x12, #1
+    b.hi    1b
+    fmov    d2, d23
+    fmov    d3, d24
+    bl      dd_mul
+    fadd    d0, d0, d1
+    b       n_num
+3:  mov     x9, #709
+    scvtf   d5, x9
+    fcmp    d0, d5
+    b.le    4f
+    movi    d1, #0
+    bl      q_exp
+    b       n_num
+4:  mov     x9, #-50
+    scvtf   d5, x9
+    fcmp    d0, d5
+    b.ge    5f
+    fmov    d0, #-1.0
+    b       n_num
+5:  movi    d1, #0
+    bl      q_expp
+    add     x9, x11, #1023
+    lsl     x9, x9, #52
+    fmov    d16, x9
+    fmul    d0, d0, d16
+    fmul    d1, d1, d16
+    fmov    d2, #-1.0
+    movi    d3, #0
+    bl      dd_add
+    fadd    d0, d0, d1
+    b       n_num
+// 36 log1p: u = 1 + x as the machine rounds it and c what that lost, exactly; the answer is ln u + d - d^2/2, d = c / u
+n_log1p:
+    NIN
+    ARGNUM  0
+    fcmp    d0, #0.0
+    b.vs    n_num
+    b.eq    n_num
+    fmov    d16, #1.0
+    fadd    d29, d0, d16
+    fsub    d17, d29, d16
+    fsub    d18, d29, d17
+    fsub    d18, d16, d18
+    fsub    d17, d0, d17
+    fadd    d30, d18, d17
+    fmov    d0, d29
+    bl      q_logs
+    fsub    d16, d0, d0
+    fcmp    d16, #0.0
+    b.ne    n_num
+    fmov    d27, d0
+    fmov    d28, d1
+    fmov    d0, d30
+    movi    d1, #0
+    fmov    d2, d29
+    movi    d3, #0
+    bl      dd_div
+    fmul    d16, d0, d0
+    fmov    d17, #0.5
+    fmsub   d1, d16, d17, d1
+    fmov    d2, d27
+    fmov    d3, d28
+    bl      dd_add
+    fadd    d0, d0, d1
+    b       n_num
+// 37 sinh, 38 cosh, 39 tanh. Below a half, sinh and tanh go by the sine's and cosine's series with the square's sign
+// turned; otherwise by E = e^|x| as a pair: (E - 1/E) / 2, (E + 1/E) / 2, and the first over the second. Past 40 the 1/E
+// is too small to tell.
+n_sinh:
+    mov     x2, #0
+    b       1f
+n_cosh:
+    mov     x2, #1
+    b       1f
+n_tanh:
+    mov     x2, #2
+1:  NIN
+    str     x2, [sp, #40]
+    ARGNUM  0
+    ldr     x2, [sp, #40]
+    fcmp    d0, #0.0
+    b.vs    n_num
+    b.ne    2f
+    cmp     x2, #1
+    b.ne    n_num
+    fmov    d0, #1.0
+    b       n_num
+2:  fmov    x14, d0
+    mov     x15, x2
+    fabs    d29, d0
+    fmov    d16, #0.5
+    fcmp    d29, d16
+    b.hs    5f
+    cmp     x15, #1
+    b.eq    6f
+    fmul    d0, d29, d29
+    fnmsub  d1, d29, d29, d0
+    fneg    d23, d0
+    fneg    d24, d1
+    mov     x13, #1
+    bl      q_ser
+    fmov    d2, d29
+    movi    d3, #0
+    bl      dd_mul
+    cmp     x15, #2
+    b.ne    8f
+    fmov    d30, d0
+    fmov    d31, d1
+    mov     x13, #0
+    bl      q_ser
+    fmov    d2, d0
+    fmov    d3, d1
+    fmov    d0, d30
+    fmov    d1, d31
+    bl      dd_div
+    b       8f
+5:  mov     x9, #40
+    scvtf   d16, x9
+    fcmp    d29, d16
+    b.ls    6f
+    cmp     x15, #2
+    b.ne    51f
+    fmov    d0, #1.0
+    movi    d1, #0
+    b       8f
+51: mov     x9, #711
+    scvtf   d16, x9
+    fcmp    d29, d16
+    b.ls    52f
+    mov     x9, #0x7ff0000000000000
+    fmov    d0, x9
+    movi    d1, #0
+    b       8f
+52: fmov    d0, d29
+    movi    d1, #0
+    bl      q_expp
+    sub     x11, x11, #1
+    bl      q_scale
+    movi    d1, #0
+    b       8f
+6:  fmov    d0, d29
+    movi    d1, #0
+    bl      q_expp
+    add     x9, x11, #1023
+    lsl     x9, x9, #52
+    fmov    d16, x9
+    fmul    d0, d0, d16
+    fmul    d1, d1, d16
+    fmov    d30, d0
+    fmov    d31, d1
+    fmov    d2, d0
+    fmov    d3, d1
+    fmov    d0, #1.0
+    movi    d1, #0
+    bl      dd_div
+    fmov    d27, d0
+    fmov    d28, d1
+    cmp     x15, #1
+    b.eq    7f
+    fneg    d2, d0
+    fneg    d3, d1
+    fmov    d0, d30
+    fmov    d1, d31
+    bl      dd_add
+    cbz     x15, 71f
+    fmov    d25, d0
+    fmov    d26, d1
+    fmov    d0, d30
+    fmov    d1, d31
+    fmov    d2, d27
+    fmov    d3, d28
+    bl      dd_add
+    fmov    d2, d0
+    fmov    d3, d1
+    fmov    d0, d25
+    fmov    d1, d26
+    bl      dd_div
+    b       8f
+7:  fmov    d2, d30
+    fmov    d3, d31
+    bl      dd_add
+71: fmov    d16, #0.5
+    fmul    d0, d0, d16
+    fmul    d1, d1, d16
+8:  fadd    d0, d0, d1
+    cmp     x15, #1
+    b.eq    n_num
+    tbz     x14, #63, n_num
+    fneg    d0, d0
+    b       n_num
+// 40 cbrt: e to a third of the logarithm, in pairs throughout, so that whole cube roots come out whole
+n_cbrt:
+    NIN
+    ARGNUM  0
+    fsub    d16, d0, d0
+    fcmp    d16, #0.0
+    b.ne    n_num
+    fcmp    d0, #0.0
+    b.eq    n_num
+    fmov    x14, d0
+    fabs    d0, d0
+    bl      q_log
+    fmov    d2, #3.0
+    movi    d3, #0
+    bl      dd_div
+    bl      q_expp
+    bl      q_scale
+    tbz     x14, #63, n_num
+    fneg    d0, d0
+    b       n_num
+// 41 hypot: the root of the sum of the squares of however many numbers. Each is made a number where it lies; the endless
+// wins over not a number; all are scaled by 2^-600 or 2^600 when the largest is far from 1, squared exactly as pairs,
+// summed, rooted, scaled back and rounded once.
+n_hypot:
+    NIN
+    str     xzr, [sp, #40]
+1:  ldr     x9, [sp, #40]
+    ldr     x10, [sp, #16]
+    cmp     x9, x10
+    b.hs    2f
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1, x9, lsl #3]
+    bl      v_number
+    ldr     x9, [sp, #40]
+    ldr     x1, [sp, #24]
+    str     d0, [x1, x9, lsl #3]
+    add     x9, x9, #1
+    str     x9, [sp, #40]
+    b       1b
+2:  ldr     x1, [sp, #24]
+    movi    d4, #0
+    mov     x12, #0
+    mov     x9, #0
+3:  cmp     x9, x10
+    b.hs    4f
+    ldr     d0, [x1, x9, lsl #3]
+    add     x9, x9, #1
+    fabs    d0, d0
+    fcmp    d0, d0
+    b.vc    31f
+    mov     x12, #1
+    b       3b
+31: fmax    d4, d4, d0
+    b       3b
+4:  fmov    d0, d4
+    mov     x9, #0x7ff0000000000000
+    fmov    d6, x9
+    fcmp    d4, d6
+    b.eq    n_num
+    cbnz    x12, 9f
+    fcmp    d4, #0.0
+    b.eq    n_num
+    fmov    x13, d4
+    lsr     x13, x13, #52
+    mov     x11, #0
+    fmov    d5, #1.0
+    cmp     x13, #(1023 + 500)
+    b.ls    5f
+    mov     x11, #600
+    mov     x14, #(1023 - 600)
+    b       55f
+5:  cmp     x13, #(1023 - 500)
+    b.hs    6f
+    mov     x11, #-600
+    mov     x14, #(1023 + 600)
+55: lsl     x14, x14, #52
+    fmov    d5, x14
+6:  movi    d0, #0
+    movi    d1, #0
+    mov     x9, #0
+7:  cmp     x9, x10
+    b.hs    8f
+    ldr     d2, [x1, x9, lsl #3]
+    add     x9, x9, #1
+    fmul    d2, d2, d5
+    fmul    d21, d2, d2
+    fnmsub  d3, d2, d2, d21
+    fmov    d2, d21
+    bl      dd_add
+    b       7b
+8:  bl      dd_sqrt
+    bl      q_scale
+    b       n_num
+9:  mov     x0, #0x7ff8000000000000
+    NOUT

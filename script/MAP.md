@@ -349,7 +349,7 @@ Objects, arrays and functions in the heap, and the instructions that work on the
 - 1312 `i_iter` value -> the array to loop over: an array is itself, a string gives its characters
 - 1329 `i_fornext` + 32 bits: how far to jump when there are no more. array, place -> array, place + 1, item
 
-## lib.S (578 lines)
+## lib.S (580 lines)
 The library (stage 6): what the language has built in. Two halves. The routines here are the built-ins written in machine code; script/prelude.js (taken into compile.S as it stands, and translated before every program) gives them their names and writes the rest in the language itself: everything that calls a function it was handed (map, sort, ...) and whatever has not been written here yet. A routine moves from there to here by getting a number in n_table. A built-in function is a function whose plan has flag 32 and, where the instructions' start would be, its number. m_call hands over to m_native. The routine is called with w0 how many arguments, x1 where they are (at least four places
 - 9 `m_native` The library (stage 6): what the language has built in. Two halves. The routines here are the built-ins written in machine code; script/prelude.js (taken into compile.S as it stands, and translated before every program) gives them their names and writes the res
 - 38 `m_answer` m_answer: a call's answer x0 goes to its place x12. A call of kind x13 3 or 4 was an object's toString, made by m_toprim for the top value or the one under it: the answer (the usual text if it is itself an object) takes the object's place and the stack is as i
@@ -376,18 +376,28 @@ The library (stage 6): what the language has built in. Two halves. The routines 
 - 458 `n_substring` 17 substring: the units from one place up to another (either order; each held within the string). Wide only if it must be.
 - 523 `n_upper` 18 toUpperCase, 19 toLowerCase: English and western European letters, so far (not ÿ, ß, µ, nor anything past 255)
 
-## math.S (547 lines)
+## math.S (1124 lines)
 The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exactly. The answer is the pair rounded once, so it is the correctly rounded one except where the true value lies within about 2^-90 of halfway between two doubles (not proved absent; none met in the checks). dd_mul, dd_add, dd_div: the pair A (d0, d1) with the pair B (d2, d3) -> A. Use d16-d20 and nothing else.
 - 6 `dd_mul` The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exac
-- 59 `q_exp` q_exp: e to the power of the pair (d0, d1) -> d0. The power is cut to r = it - k ln 2, r / 512 goes through nine terms of the series 1 + r(1 + r/2(1 + r/3(...))), the sum is squared nine times and scaled by 2^k in two steps, the second a fused one so that the 
-- 134 `q_log` q_log: the natural logarithm of d0 (above zero, finite) -> the pair (d0, d1). The number is m 2^e with m between root a half and root two; ln m = 2 atanh s, s = (m - 1) / (m + 1), by 22 terms of s(1 + s^2/3 + s^4/5 + ...); then e ln 2 is added. Uses x9-x12, d0
-- 213 `q_logs` q_logs: the same for any number: not a number below zero, endless at zero and at the endless
-- 231 `m_powfrac` m_powfrac: from the power instruction: d1 to the power d0, which is not a whole number (or is not a number)
-- 268 `n_mexp` 20 exp, 21 log, 22 log2, 23 log10
-- 298 `n_random` 24 random: a number from 0 up to but not 1 (xorshift; the same run of numbers in every world until the host gives a seed)
-- 328 `q_ser` q_ser: the series 1 - t/(a b)(1 - t/(c d)(1 - ...)) of fifteen terms, t the pair (d23, d24): with x13 0 the cosine's (divisors 1 2, 3 4, ...), with x13 1 the sine's over its angle (2 3, 4 5, ...) -> the pair (d0, d1). Uses x9, x10, x12.
-- 359 `q_sincos` q_sincos: for the number d0 (finite, not zero), taken without its sign: x11 the quarter turn its angle falls nearest (only the low two bits mean anything), and of what is left over, r (within pi/4 either way), the sine as the pair (d25, d26) and the cosine as 
-- 492 `n_sin` 25 sin, 26 cos, 27 tan
+- 58 `q_expp` q_expp: e to the power of the pair (d0, d1), within 746 either way -> the pair (d0, d1) and x11: the answer is the pair times 2^x11. Uses x9-x12, d0-d7, d16-d24.
+- 104 `q_scale` q_scale: the pair (d0, d1) times 2^x11 -> d0, rounded once (in two steps, the second a fused one). Uses x9, x10, d16, d17.
+- 119 `dd_sqrt` dd_sqrt: the square root of the pair (d0, d1), not below zero -> the pair. Uses d16-d19.
+- 137 `q_exp` q_exp: e to the power of the pair (d0, d1) -> d0. The power is cut to r = it - k ln 2, r / 512 goes through nine terms of the series 1 + r(1 + r/2(1 + r/3(...))), the sum is squared nine times and scaled by 2^k in two steps, the second a fused one so that the 
+- 161 `q_log` q_log: the natural logarithm of d0 (above zero, finite) -> the pair (d0, d1). The number is m 2^e with m between root a half and root two; ln m = 2 atanh s, s = (m - 1) / (m + 1), by 22 terms of s(1 + s^2/3 + s^4/5 + ...); then e ln 2 is added. Uses x9-x12, d0
+- 240 `q_logs` q_logs: the same for any number: not a number below zero, endless at zero and at the endless
+- 258 `m_powfrac` m_powfrac: from the power instruction: d1 to the power d0, which is not a whole number (or is not a number)
+- 295 `n_mexp` 20 exp, 21 log, 22 log2, 23 log10
+- 325 `n_random` 24 random: a number from 0 up to but not 1 (xorshift; the same run of numbers in every world until the host gives a seed)
+- 355 `q_ser` q_ser: the series 1 - t/(a b)(1 - t/(c d)(1 - ...)) of fifteen terms, t the pair (d23, d24): with x13 0 the cosine's (divisors 1 2, 3 4, ...), with x13 1 the sine's over its angle (2 3, 4 5, ...) -> the pair (d0, d1). Uses x9, x10, x12.
+- 386 `q_sincos` q_sincos: for the number d0 (finite, not zero), taken without its sign: x11 the quarter turn its angle falls nearest (only the low two bits mean anything), and of what is left over, r (within pi/4 either way), the sine as the pair (d25, d26) and the cosine as 
+- 519 `n_sin` 25 sin, 26 cos, 27 tan
+- 591 `q_atan2` q_atan2: the angle of the point whose height is the pair Y (d0, d1) and whose distance along is the pair X (d2, d3), both finite and not both nought -> the pair (d0, d1), from minus pi to pi. The smaller (without signs) over the larger is t, from 0 to 1; c is 
+- 693 `n_atan` 31 atan, 32 atan2, 33 asin, 34 acos
+- 812 `n_expm1` 35 expm1: below a thirty-second by its own series x(1 + x/2(1 + x/3(...))), otherwise e^x as a pair less one
+- 871 `n_log1p` 36 log1p: u = 1 + x as the machine rounds it and c what that lost, exactly; the answer is ln u + d - d^2/2, d = c / u
+- 907 `n_sinh` 37 sinh, 38 cosh, 39 tanh. Below a half, sinh and tanh go by the sine's and cosine's series with the square's sign turned; otherwise by E = e^|x| as a pair: (E - 1/E) / 2, (E + 1/E) / 2, and the first over the second. Past 40 the 1/E is too small to tell.
+- 1030 `n_cbrt` 40 cbrt: e to a third of the logarithm, in pairs throughout, so that whole cube roots come out whole
+- 1052 `n_hypot` 41 hypot: the root of the sum of the squares of however many numbers. Each is made a number where it lies; the endless wins over not a number; all are scaled by 2^-600 or 2^600 when the largest is far from 1, squared exactly as pairs, summed, rooted, scaled ba
 
 ## json.S (379 lines)
 JSON.parse in machine code (stage 6). 30 in n_table. The text is read where it lies in its string: x23 the place, x24 the end (the machine's own x23 and x24 are put back at the end; m_fail puts them back itself), W_JWIDE whether a unit is two bytes. One routine per kind of value, calling each other; values being built are held on the processor's stack. Anything the grammar does not allow: SyntaxError. A reviver, if given, is applied in prelude.js.

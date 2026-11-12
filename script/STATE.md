@@ -221,3 +221,13 @@ SyntaxError otherwise). `JSON.stringify` (indent, replacer function, toJSON) and
 found a real fault outside JSON: `a["0"]` on an array did not reach item 0; `m_index` now takes text that is a whole number
 as printed (to nine digits). Not made: a replacer given as a list of names; escaping lone halves of a pair in stringify.
 31 built-in numbers in `n_table` (29 routines in machine code, 2 are call and apply).
+**Stage 6, sixth unit (2026-11-12 night, new conversation): the rest of Math in machine code: atan, atan2, asin, acos, expm1,
+log1p, sinh, cosh, tanh, cbrt, hypot (built-ins 31 to 41; `math.S`).** `python3 -I checks/arcs.py out/script.asm [n] [seed]`
+(mpmath, 2000 bits): 25944 values over three seeds, 0 wrong, first run; 136 fixed corner cases (signed noughts, the endless,
+all 49 atan2 pairs) agree with node. How: `q_atan2` (the smaller over the larger, a table of nine angles `k_atan`, a series
+to u^30) carries all four arc functions (asin and acos hand it x and the root of (1 - x)(1 + x), `dd_sqrt`); `q_expp` is
+`q_exp` before its scaling (a pair and a power of two; `q_scale` rounds once) and carries expm1, sinh, cosh, tanh, cbrt
+(e to a third of `q_log`); small expm1 has its own series, small sinh and tanh use `q_ser` with the square's sign turned;
+hypot squares exactly as pairs after scaling by 2^600 either way. 40 routines in machine code. Not made: asinh, acosh, atanh,
+fround, clz32, imul; a hypot that lies exactly half way between two doubles (possible, not met) may round either way.
+Next: Map, Set, Symbol.iterator enough for for..of over them.

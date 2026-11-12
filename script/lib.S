@@ -573,5 +573,7 @@ n_table:
     .word   n_substring - n_table, n_upper - n_table, n_lower - n_table, n_mexp - n_table, n_log - n_table
     .word   n_log2 - n_table, n_log10 - n_table, n_random - n_table, n_sin - n_table, n_cos - n_table, n_tan - n_table
     .word   n_undef - n_table, n_undef - n_table, n_jparse - n_table
-    .equ    N_COUNT, 31
+    .word   n_atan - n_table, n_atan2 - n_table, n_asin - n_table, n_acos - n_table, n_expm1 - n_table, n_log1p - n_table
+    .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table
+    .equ    N_COUNT, 42
     .ltorg
