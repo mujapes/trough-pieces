@@ -14,6 +14,8 @@ if [ -x "out/test-$P" ]; then "./out/test-$P" "out/$P.$V" >> "out/$P.$V.check" 2
 # The code and its entry list are two files and cannot be replaced in one step. The running app once read the new list with the old
 # code and jumped into the middle of it: Trough died (2026-11-11 16:31). So the pair carries a seal: the fingerprints of exactly the
 # code and the list that belong together. The seal is removed first and written last; the app loads nothing whose files do not match it.
+# Kept for going back: the build that is live now, and which one it was. tools/guard.py puts it back if the new one goes badly.
+if [ -f "out/$P.bin" ] && [ -f "out/$P.entries" ] && ! cmp -s "out/$P.bin" "out/$P.$V.bin"; then cp "out/$P.bin" "out/$P.prev.bin"; cp "out/$P.entries" "out/$P.prev.entries"; cp "out/$P.live" "out/$P.prev.live" 2>/dev/null || true; fi
 rm -f "out/$P.pair"
 cp "out/$P.$V.entries" "out/$P.entries.tmp" && mv "out/$P.entries.tmp" "out/$P.entries"
 cp "out/$P.$V.bin" "out/$P.bin.tmp" && mv "out/$P.bin.tmp" "out/$P.bin"
@@ -21,5 +23,7 @@ printf '%s %s\n' "$(sha256sum < "out/$P.bin" | cut -d' ' -f1)" "$(sha256sum < "o
 echo "$V" > "out/$P.live"
 echo "$(date +%Y-%m-%dT%H:%M:%S) $P $V $(wc -c < "out/$P.bin") bytes" >> out/history.log
 echo "promoted $P to $V ($(wc -c < "out/$P.bin") bytes)"
+# On trial: the guard watches the running app take it, and goes back by itself if the app dies or refuses it.
+date +%s > "out/$P.trial"; (nohup python3 tools/guard.py "$P" > "out/$P.guard.log" 2>&1 &) 2>/dev/null
 # Show it: every promotion lands on the home screen's progress card without anyone remembering to.
 [ -x /data/user/0/t.t/files/home/.local/bin/trough-show ] && /data/user/0/t.t/files/home/.local/bin/trough-show "Promoted $P ($V): passed its recorded checks" >/dev/null 2>&1 || true
