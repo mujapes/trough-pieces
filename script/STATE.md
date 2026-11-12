@@ -250,3 +250,11 @@ Math is complete.** `q_log1pp` (the logarithm of 1 + a pair) carries log1p and t
 `checks/arcs.py` 150 3: 8858 values, 0 wrong, first run that built; `Math.asinh(1e300)` and `acosh(1e300)`: node is a unit
 off, ours exact. 46 routines in machine code. Trap met: `n_nan` is num.S's text "NaN", not a routine (mine is `n_notnum`).
 Next: join, indexOf, slice into lib.S; shapes; RegExp.
+**Stage 6, ninth unit: array join, indexOf, slice in machine code (built-ins 49 to 51). `arrays3.js` passes: 34 of 34.**
+`m_native` sends 49-51 to the prelude's own version (W_FALLBACK, registered by `__n(-9..-11, f)`; a turn of the call like
+`call`) when `this` is not an array, and join also when an item is an object (its toString may be the program's). `n_join`
+is two passes (texts and sizes, then one string filled). Measured: 30 joins of 300 numbers with indexOf and slice take
+about 20 ms; the prelude's join filled the 1.2 MB test world after about five (a new string per item, nothing given back
+before stage 7), so no time comparison was had. Found, not made: empty places in a list `[, 'a', ,]` are a SyntaxError;
+a full world ends the run with no error text. 49 routines in machine code.
+Next: shapes; string indexOf, slice, split, trim, concat and array includes, lastIndexOf, concat into lib.S; RegExp.

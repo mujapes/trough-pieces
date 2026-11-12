@@ -1,13 +1,13 @@
 # script: the map (made by tools/scriptmap.py; do not edit)
 
 
-## world.S (158 lines)
+## world.S (159 lines)
 The world: everything a running program has, in one block the host owns (kind 6). Nothing in it is an address: every reference is a distance from the block's start, so a world can be moved, saved, or handed to a new build of this piece. x19 is the world's start wherever this file's routines are used.
-- 56 `VAL` VAL: a tagged value with no payload -> \reg
-- 62 `w_begin` w_begin: makes the block at x19 a fresh world -> x0 1, or -1 if it is not a world block or is under a megabyte. The room is shared out by size: an eighth for instructions, a thirty-second each for constants and globals, a sixteenth each for printed text and th
-- 111 `w_alloc` w_alloc: x0 bytes of the heap (rounded up to 8) -> x0 where (a distance from the world's start), or 0 if the world is full. Uses x9, x10.
-- 125 `w_string` w_string: a string value holding the x1 bytes at x0 -> x0 the value, or 0 if the world is full. A string in the heap is its length (8 bytes), then its bytes. Uses x9-x13.
-- 144 `w_out` w_out: the x1 bytes at x0 join what the program has printed (what does not fit is dropped). Uses x9-x12.
+- 57 `VAL` VAL: a tagged value with no payload -> \reg
+- 63 `w_begin` w_begin: makes the block at x19 a fresh world -> x0 1, or -1 if it is not a world block or is under a megabyte. The room is shared out by size: an eighth for instructions, a thirty-second each for constants and globals, a sixteenth each for printed text and th
+- 112 `w_alloc` w_alloc: x0 bytes of the heap (rounded up to 8) -> x0 where (a distance from the world's start), or 0 if the world is full. Uses x9, x10.
+- 126 `w_string` w_string: a string value holding the x1 bytes at x0 -> x0 the value, or 0 if the world is full. A string in the heap is its length (8 bytes), then its bytes. Uses x9-x13.
+- 145 `w_out` w_out: the x1 bytes at x0 join what the program has printed (what does not fit is dropped). Uses x9-x12.
 
 ## lex.S (932 lines)
 script, written by hand (ARM64): Trough's own JavaScript engine. The meaning and the plan are script/intent.md. This file: the words (stage 1). Entries: x0 block, x1 numbers (16-bit), x2 how many, x3 argument, x4 call table. Calls nothing. While words are being read: x20 the text, x21 how long, x22 where we are, w23 the word's kind, w24 its id (which keyword or punctuation), x25 where it starts, x26 how long it is, w27 whether a line ended before it, w28 whether a slash here would begin a pattern, d8 a number's value. Kinds: 0 the end, 1 name, 2 keyword, 3 number, 4 string, 5 template, 6 punctuation, 7 pattern, 8 a number meant as a big
@@ -349,34 +349,37 @@ Objects, arrays and functions in the heap, and the instructions that work on the
 - 1310 `i_iter` value -> the array to loop over: an array is itself, a string gives its characters
 - 1326 `i_fornext` + 32 bits: how far to jump when there are no more. array, place -> array, place + 1, item
 
-## lib.S (618 lines)
+## lib.S (858 lines)
 The library (stage 6): what the language has built in. Two halves. The routines here are the built-ins written in machine code; script/prelude.js (taken into compile.S as it stands, and translated before every program) gives them their names and writes the rest in the language itself: everything that calls a function it was handed (map, sort, ...) and whatever has not been written here yet. A routine moves from there to here by getting a number in n_table. A built-in function is a function whose plan has flag 32 and, where the instructions' start would be, its number. m_call hands over to m_native. The routine is called with w0 how many arguments, x1 where they are (at least four places
 - 9 `m_native` The library (stage 6): what the language has built in. Two halves. The routines here are the built-ins written in machine code; script/prelude.js (taken into compile.S as it stands, and translated before every program) gives them their names and writes the res
-- 38 `m_answer` m_answer: a call's answer x0 goes to its place x12. A call of kind x13 3 or 4 was an object's toString, made by m_toprim for the top value or the one under it: the answer (the usual text if it is itself an object) takes the object's place and the stack is as i
-- 64 `m_drain` m_drain: from an instruction of x6 bytes that wants an array to go through and met, on top, something else: the prelude's function (W_ITERFN) is called with it (call kind 5), its answer takes the value's place and the instruction runs again.
-- 83 `m_toprim` m_toprim: from an instruction of one byte that met an object where it wants text or a number: x5 the object, x4 1 if it is the top value, 2 if the one under. A plain object with a toString that is a function has it called, and the instruction runs again with t
-- 117 `m_fcall` 28 call, 29 apply (of a function): not routines but turns of the call itself: `this` is the function to call, the first argument its `this`; the rest (call) or the items of the second, an array (apply), are its arguments.
-- 175 `n_function` n_function: a built-in function for the routine numbered x0 -> x0 the value, or 0 if the world is full
-- 206 `NIN` Inside a routine: NIN keeps how many arguments (16), where (24) and `this` (32); 40 is free. ARGNUM: argument \n as a number -> d0. THISSTR: `this` as a string value -> x0 and kept at 32. n_num, n_bool: the answer d0, or w0 as true or false.
-- 211 `NOUT` macro
-- 215 `ARGNUM` macro n
-- 220 `THISSTR` macro
-- 226 `MATH1` macro name, ins
-- 246 `n_maker` 0, __n: with a number from 0 up, a built-in function for that routine; with -1 to -6 and an object, that object is what plain objects, arrays, functions, strings, numbers, booleans inherit from; with -7, none of them inherits anything yet.
-- 298 `n_ident` 42: a number that is an object's alone for as long as the world lasts (where it lies); Map and Set tell objects apart by it
-- 311 `n_round` 5 round: to the nearest whole number, halves upward; a zero keeps the number's sign
-- 329 `n_sign` 7 sign
-- 340 `n_min` 8 min, 9 max: of all the arguments; not a number if any is not
-- 369 `n_arr` n_arr: `this` must be an array -> x9 where it is. Uses x10, x16.
-- 388 `n_push` 10 push: each argument becomes the array's new last item -> its length
-- 408 `n_pop` 11 pop: the array loses its last item -> it
-- 420 `n_isarray` 12 Array.isArray
-- 433 `n_keys` 13 Object.keys: the value's own names, as an array of strings
-- 448 `n_hasown` 14 hasOwnProperty (an object's named properties only, so far: not an array's items or length)
-- 465 `n_charcode` 15 charCodeAt: the unit at that place, or not a number
-- 486 `n_fromcc` 16: a string of the one unit given (String.fromCharCode is built on it)
-- 495 `n_substring` 17 substring: the units from one place up to another (either order; each held within the string). Wide only if it must be.
-- 560 `n_upper` 18 toUpperCase, 19 toLowerCase: English and western European letters, so far (not ÿ, ß, µ, nor anything past 255)
+- 70 `m_answer` m_answer: a call's answer x0 goes to its place x12. A call of kind x13 3 or 4 was an object's toString, made by m_toprim for the top value or the one under it: the answer (the usual text if it is itself an object) takes the object's place and the stack is as i
+- 96 `m_drain` m_drain: from an instruction of x6 bytes that wants an array to go through and met, on top, something else: the prelude's function (W_ITERFN) is called with it (call kind 5), its answer takes the value's place and the instruction runs again.
+- 115 `m_toprim` m_toprim: from an instruction of one byte that met an object where it wants text or a number: x5 the object, x4 1 if it is the top value, 2 if the one under. A plain object with a toString that is a function has it called, and the instruction runs again with t
+- 149 `m_fcall` 28 call, 29 apply (of a function): not routines but turns of the call itself: `this` is the function to call, the first argument its `this`; the rest (call) or the items of the second, an array (apply), are its arguments.
+- 207 `n_function` n_function: a built-in function for the routine numbered x0 -> x0 the value, or 0 if the world is full
+- 238 `NIN` Inside a routine: NIN keeps how many arguments (16), where (24) and `this` (32); 40 is free. ARGNUM: argument \n as a number -> d0. THISSTR: `this` as a string value -> x0 and kept at 32. n_num, n_bool: the answer d0, or w0 as true or false.
+- 243 `NOUT` macro
+- 247 `ARGNUM` macro n
+- 252 `THISSTR` macro
+- 258 `MATH1` macro name, ins
+- 278 `n_maker` 0, __n: with a number from 0 up, a built-in function for that routine; with -1 to -6 and an object, that object is what plain objects, arrays, functions, strings, numbers, booleans inherit from; with -7, none of them inherits anything yet.
+- 339 `n_ident` 42: a number that is an object's alone for as long as the world lasts (where it lies); Map and Set tell objects apart by it
+- 352 `n_round` 5 round: to the nearest whole number, halves upward; a zero keeps the number's sign
+- 370 `n_sign` 7 sign
+- 381 `n_min` 8 min, 9 max: of all the arguments; not a number if any is not
+- 410 `n_arr` n_arr: `this` must be an array -> x9 where it is. Uses x10, x16.
+- 429 `n_push` 10 push: each argument becomes the array's new last item -> its length
+- 449 `n_pop` 11 pop: the array loses its last item -> it
+- 463 `n_join` 49 join. m_native has seen that `this` is an array with no object in it. Two passes: a copy of the array has each item made text (0 for undefined and null) while the units are counted, then one string of that size is filled. Beyond the frame: 0 how far, 8 unit
+- 580 `n_aindexof` 50 indexOf (of an array): the same bits are the same value unless they are the number that is not one; other pairs go to v_strict
+- 622 `n_aslice` 51 slice (of an array)
+- 659 `n_isarray` 12 Array.isArray
+- 672 `n_keys` 13 Object.keys: the value's own names, as an array of strings
+- 687 `n_hasown` 14 hasOwnProperty (an object's named properties only, so far: not an array's items or length)
+- 704 `n_charcode` 15 charCodeAt: the unit at that place, or not a number
+- 725 `n_fromcc` 16: a string of the one unit given (String.fromCharCode is built on it)
+- 734 `n_substring` 17 substring: the units from one place up to another (either order; each held within the string). Wide only if it must be.
+- 799 `n_upper` 18 toUpperCase, 19 toLowerCase: English and western European letters, so far (not ÿ, ß, µ, nor anything past 255)
 
 ## math.S (1290 lines)
 The curved functions of Math (stage 6), and powers that are not whole. Worked in pairs: a pair is a double and a second, much smaller double that says by how much the first misses, about 105 bits between them; the fused multiply-add gives a product's miss exactly. The answer is the pair rounded once, so it is the correctly rounded one except where the true value lies within about 2^-90 of halfway between two doubles (not proved absent; none met in the checks). dd_mul, dd_add, dd_div: the pair A (d0, d1) with the pair B (d2, d3) -> A. Use d16-d20 and nothing else.

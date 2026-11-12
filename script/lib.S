@@ -12,6 +12,38 @@ m_native:
     b.eq    m_fcall
     cmp     x9, #29
     b.eq    m_fapply
+    cmp     x9, #49                     // 49-51 take an array only (join: one with no objects in it): anything else
+    b.lo    0f                          // goes to the prelude's function for it instead, by a turn of the call
+    cmp     x9, #51
+    b.hi    0f
+    lsr     x8, x11, #48
+    mov     w7, #T_OBJECT
+    cmp     w8, w7
+    b.ne    5f
+    and     x8, x11, #0xffffffffffff
+    add     x8, x19, x8
+    ldr     x7, [x8]
+    cmp     x7, #4
+    b.ne    5f
+    cmp     x9, #49
+    b.ne    0f
+    ldr     w7, [x8, #A_LEN]
+    ldr     x8, [x8, #A_ITEMS]
+    add     x8, x19, x8
+6:  cbz     x7, 0f
+    sub     x7, x7, #1
+    ldr     x10, [x8, x7, lsl #3]
+    lsr     x10, x10, #48
+    mov     w14, #T_OBJECT
+    cmp     w10, w14
+    b.ne    6b
+5:  sub     x8, x9, #49
+    add     x8, x19, x8, lsl #3
+    ldr     x8, [x8, #W_FALLBACK]
+    cbz     x8, 0f
+    str     x8, [x1, #-8]
+    b       m_call
+0:
     add     x8, x1, #32
     cmp     x8, x26
     b.hi    m_deep
@@ -284,7 +316,16 @@ n_maker:
     b.ne    3b
     str     x10, [x13, #O_PROTO]
     b       3b
-2:  cmp     x9, #7
+2:  cmp     x9, #8
+    b.lo    21f
+    cmp     x9, #10
+    b.hi    4f
+    ldr     x1, [sp, #24]
+    ldr     x10, [x1, #8]
+    add     x9, x19, x9, lsl #3
+    str     x10, [x9, #(W_FALLBACK - 64)]
+    b       n_undef
+21: cmp     x9, #7
     b.ne    4f
     ldr     x1, [sp, #24]
     ldr     x10, [x1, #8]
@@ -415,6 +456,204 @@ n_pop:
     ldr     x11, [x9, #A_ITEMS]
     add     x11, x19, x11
     ldr     x0, [x11, x10, lsl #3]
+    NOUT
+// 49 join. m_native has seen that `this` is an array with no object in it. Two passes: a copy of the array has each item
+// made text (0 for undefined and null) while the units are counted, then one string of that size is filled.
+// Beyond the frame: 0 how far, 8 units in all, 16 whether any is wide; 64 the copy, 72 the text between.
+n_join:
+    NIN
+    sub     sp, sp, #32
+    ldr     x1, [sp, #56]
+    ldr     x0, [x1]
+    TAGIS   x0, T_UNDEF
+    b.ne    1f
+    mov     w0, #','
+    bl      w_unit
+    b       2f
+1:  bl      v_text
+2:  cbz     x0, n_full
+    str     x0, [sp, #72]
+    ldr     x9, [sp, #64]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     w1, [x9, #A_LEN]
+    ldr     x0, [x9, #A_ITEMS]
+    add     x0, x19, x0
+    bl      a_from
+    cbz     x0, n_full
+    str     x0, [sp, #64]
+    stp     xzr, xzr, [sp]
+    str     xzr, [sp, #16]
+3:  ldr     x9, [sp, #64]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     w12, [x9, #A_LEN]
+    ldr     x11, [sp]
+    cmp     x11, x12
+    b.hs    6f
+    ldr     x13, [x9, #A_ITEMS]
+    add     x13, x19, x13
+    ldr     x0, [x13, x11, lsl #3]
+    lsr     x14, x0, #48
+    mov     w15, #T_UNDEF
+    cmp     w14, w15
+    b.eq    4f
+    mov     w15, #T_NULL
+    cmp     w14, w15
+    b.eq    4f
+    bl      v_text
+    cbz     x0, n_full
+    b       5f
+4:  mov     x0, #0
+5:  ldr     x9, [sp, #64]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     x13, [x9, #A_ITEMS]
+    add     x13, x19, x13
+    ldr     x11, [sp]
+    str     x0, [x13, x11, lsl #3]
+    add     x11, x11, #1
+    str     x11, [sp]
+    cbz     x0, 3b
+    and     x0, x0, #0xffffffffffff
+    ldr     x10, [x19, x0]
+    ldp     x14, x15, [sp, #8]
+    add     x14, x14, w10, uxtw
+    orr     x15, x15, x10, lsr #32
+    stp     x14, x15, [sp, #8]
+    b       3b
+6:  ldr     x5, [sp, #72]
+    and     x5, x5, #0xffffffffffff
+    ldr     x4, [x19, x5]
+    ldp     x14, x6, [sp, #8]
+    cbz     x12, 7f
+    sub     x9, x12, #1
+    and     x10, x4, #0xffffffff
+    madd    x14, x9, x10, x14
+    orr     x6, x6, x4, lsr #32
+7:  and     x6, x6, #1
+    stp     x14, x6, [sp, #8]
+    lsl     x0, x14, x6
+    add     x0, x0, #8
+    bl      w_alloc
+    cbz     x0, n_full
+    mov     x7, x0
+    ldp     x14, x6, [sp, #8]
+    add     x8, x19, x0
+    orr     x9, x14, x6, lsl #32
+    str     x9, [x8], #8
+    ldr     x9, [sp, #64]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     w16, [x9, #A_LEN]
+    ldr     x17, [x9, #A_ITEMS]
+    add     x17, x19, x17
+    ldr     x5, [sp, #72]
+    and     x5, x5, #0xffffffffffff
+    add     x5, x19, x5
+    ldr     x4, [x5], #8
+    mov     x15, #0
+8:  cmp     x15, x16
+    b.hs    9f
+    cbz     x15, 81f
+    mov     x10, x5
+    and     x13, x4, #0xffffffff
+    lsr     x12, x4, #32
+    and     x12, x12, #1
+    bl      s_copy
+81: ldr     x0, [x17, x15, lsl #3]
+    add     x15, x15, #1
+    cbz     x0, 8b
+    and     x0, x0, #0xffffffffffff
+    add     x10, x19, x0
+    ldr     x9, [x10], #8
+    and     x13, x9, #0xffffffff
+    lsr     x12, x9, #32
+    and     x12, x12, #1
+    bl      s_copy
+    b       8b
+9:  orr     x0, x7, #(T_STRING << 48)
+    add     sp, sp, #32
+    NOUT
+// 50 indexOf (of an array): the same bits are the same value unless they are the number that is not one; other pairs go
+// to v_strict
+n_aindexof:
+    NIN
+    ARGNUM  1
+    fcvtzs  x11, d0
+    bl      n_arr
+    ldr     w12, [x9, #A_LEN]
+    cmp     x11, #0
+    b.ge    1f
+    adds    x11, x11, x12
+    csel    x11, xzr, x11, mi
+1:  str     x11, [sp, #40]
+    bl      n_arr
+    ldr     w12, [x9, #A_LEN]
+    ldr     x11, [sp, #40]
+    cmp     x11, x12
+    b.hs    8f
+    ldr     x13, [x9, #A_ITEMS]
+    add     x13, x19, x13
+    ldr     x0, [x13, x11, lsl #3]
+    ldr     x1, [sp, #24]
+    ldr     x1, [x1]
+    cmp     x0, x1
+    b.ne    2f
+    lsr     x14, x0, #48
+    mov     w15, #T_UNDEF
+    cmp     w14, w15
+    b.hs    7f
+    fmov    d0, x0
+    fcmp    d0, d0
+    b.vc    7f
+    b       3f
+2:  bl      v_strict
+    cbnz    w0, 7f
+3:  ldr     x11, [sp, #40]
+    add     x11, x11, #1
+    b       1b
+7:  ldr     x11, [sp, #40]
+    scvtf   d0, x11
+    b       n_num
+8:  fmov    d0, #-1.0
+    b       n_num
+// 51 slice (of an array)
+n_aslice:
+    NIN
+    ARGNUM  0
+    fcvtzs  x9, d0
+    str     x9, [sp, #40]
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1, #8]
+    mov     x10, #0x7fffffff
+    TAGIS   x0, T_UNDEF
+    b.eq    2f
+    bl      v_number
+    fcvtzs  x10, d0
+2:  mov     x11, x10
+    ldr     x12, [sp, #40]
+    bl      n_arr
+    ldr     w13, [x9, #A_LEN]
+    cmp     x12, #0
+    b.ge    3f
+    adds    x12, x12, x13
+    csel    x12, xzr, x12, mi
+3:  cmp     x12, x13
+    csel    x12, x13, x12, gt
+    cmp     x11, #0
+    b.ge    4f
+    adds    x11, x11, x13
+    csel    x11, xzr, x11, mi
+4:  cmp     x11, x13
+    csel    x11, x13, x11, gt
+    subs    x1, x11, x12
+    csel    x1, xzr, x1, lt
+    ldr     x0, [x9, #A_ITEMS]
+    add     x0, x19, x0
+    add     x0, x0, x12, lsl #3
+    bl      a_from
+    cbz     x0, n_full
     NOUT
 // 12 Array.isArray
 n_isarray:
@@ -613,5 +852,6 @@ n_table:
     .word   n_atan - n_table, n_atan2 - n_table, n_asin - n_table, n_acos - n_table, n_expm1 - n_table, n_log1p - n_table
     .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table, n_ident - n_table
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
-    .equ    N_COUNT, 49
+    .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table
+    .equ    N_COUNT, 52
     .ltorg

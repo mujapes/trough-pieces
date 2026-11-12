@@ -26,6 +26,7 @@ A.slice=function(a,b){var l=this.length,r=[];b=clamp(b,l,l);for(var i=clamp(a,l,
 A.concat=function(){var r=[],l=this.length,i;for(i=0;i<l;i++)r.push(this[i]);for(var j=0;j<arguments.length;j++){var x=arguments[j];if(Array.isArray(x))for(i=0;i<x.length;i++)r.push(x[i]);else r.push(x)}return r};
 A.reverse=function(){var i=0,j=this.length-1;while(i<j){var t=this[i];this[i]=this[j];this[j]=t;i++;j--}return this};
 A.join=function(s){if(s===undefined)s=',';var r='',l=this.length;for(var i=0;i<l;i++){if(i)r+=s;var v=this[i];if(v!==undefined&&v!==null)r+=v}return r};
+__n(-9,A.join);__n(-10,A.indexOf);__n(-11,A.slice);A.join=__n(49);A.indexOf=__n(50);A.slice=__n(51);
 A.toString=function(){return this.join()};
 A.forEach=function(f){var l=this.length;for(var i=0;i<l;i++)f(this[i],i,this)};
 A.map=function(f){var l=this.length,r=[];for(var i=0;i<l;i++)r.push(f(this[i],i,this));return r};
