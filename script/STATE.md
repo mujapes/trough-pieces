@@ -559,3 +559,12 @@ NEXT, for await (bbc's last SyntaxError): in s_each/s_for, after `for` accept ke
 iterator); loop: DUP, GETP next, CALLM 0, await it (OP_YIELD, through __awrap in an async generator), DUP, GETP done, JT to the
 end; GETP value; assign to D as for..of does; S; JMP loop; end: POP the result, POP the iterator. break/continue: the loop
 record as for..of keeps it (one place on the machine stack: the iterator). Read s_each first: reuse its target assignment.
+
+**Thirtieth unit [by Opus]: for await (2026-11-13).** compile.S s_for takes `await` before `(` ([sp,#20]); s_each at 90: emits
+it = __aiter(E), 0; each round PICK 1, __astep, await (c_await_op: through __awrap inside an async generator), DUP, __adone,
+JF / POP / JMP out, __aval, then joins for..of's assignment at 91. New helpers c_callg1 (call a global with one argument) and
+c_await_op. prelude.js: __aiter (Symbol.asyncIterator, else a wrapper over the sync iterator awaiting each value), __astep,
+__adone, __aval. 47 of 47 (`forawait.js`).
+FOUND (older, not fixed): a generator (function*, any kind) made INSIDE another function, whose body has let/const, comes out
+undefined: `function f(){var h=function*(){const z=4};console.log(typeof h)}f()` prints undefined. Plain and async functions
+are fine; top level is fine. Look at c_function/c_kept with a block-scoped body (c_block_in record, F_FUNC flags). Next unit.

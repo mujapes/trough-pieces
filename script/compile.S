@@ -2984,6 +2984,10 @@ c_object:
     b       7f
 c_w_spread: .ascii "__spread"
 c_w_awrap:  .ascii "__awrap"
+c_w_aiter:  .ascii "__aiter"
+c_w_astep:  .ascii "__astep"
+c_w_adone:  .ascii "__adone"
+c_w_aval:   .ascii "__aval"
     .balign 4
 19: bl      next_word
     bl      c_assign
@@ -4648,7 +4652,15 @@ s_do:
     b       s_done
 s_for:
     bl      next_word
-    EXPECT  35
+    str     wzr, [sp, #20]              // for await: 1 here (read by s_each)
+    cmp     w23, #K_KEYWORD
+    b.ne    79f
+    cmp     w24, #36
+    b.ne    79f
+    mov     w9, #1
+    str     w9, [sp, #20]
+    bl      next_word
+79: EXPECT  35
     bl      c_peek_each
     cbnz    w0, s_each
     mov     w9, #39
@@ -4764,6 +4776,8 @@ s_each:                                 // for (name in value), for (name of val
     bl      next_word
     bl      c_expr
     EXPECT  36
+    ldr     w9, [sp, #20]
+    cbnz    w9, 90f
     ldr     w9, [sp, #56]
     mov     w0, #OP_KEYS
     mov     w10, #OP_ITER
@@ -4778,7 +4792,7 @@ s_each:                                 // for (name in value), for (name of val
     bl      c_jump
     str     x0, [sp, #16]
     bl      c_copyscope
-    ldr     w0, [sp, #24]
+91: ldr     w0, [sp, #24]
     cmn     w0, #1
     b.eq    4f
     bl      c_store
@@ -4809,6 +4823,70 @@ s_each:                                 // for (name in value), for (name of val
     OP      OP_POP
     OP      OP_POP
     b       s_done
+90: adr     x0, c_w_aiter               // for await (D of E): it = __aiter(E), 0; each round: r = await __astep(it),
+    mov     x1, #7                      // out when __adone(r), else D = __aval(r)
+    bl      c_callg1
+    mov     x0, #0
+    bl      c_const
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #8]
+    OP      OP_PICK
+    mov     w0, #1
+    bl      c_byte
+    adr     x0, c_w_astep
+    mov     x1, #7
+    bl      c_callg1
+    bl      c_await_op
+    OP      OP_DUP
+    adr     x0, c_w_adone
+    mov     x1, #7
+    bl      c_callg1
+    mov     w0, #OP_JF
+    bl      c_jump
+    str     w0, [sp, #56]
+    OP      OP_POP
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #16]
+    ldr     w0, [sp, #56]
+    bl      c_patch
+    adr     x0, c_w_aval
+    mov     x1, #6
+    bl      c_callg1
+    bl      c_copyscope
+    b       91b
+// c_callg1: x0 a global's name (in the piece), x1 its length: writes a call of it with the value on top as its one argument
+c_callg1:
+    str     x30, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    sub     x25, x0, x20
+    mov     x26, x1
+    bl      c_global
+    ldp     x25, x26, [sp], #16
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    OP      OP_SWAP
+    OP      OP_CALL
+    mov     w0, #1
+    bl      c_byte
+    ldr     x30, [sp], #16
+    ret
+// c_await_op: writes the await of the value on top (wrapped by __awrap first inside an async generator)
+c_await_op:
+    str     x30, [sp, #-16]!
+    bl      c_realfn
+    cbz     x1, 1f
+    ldr     x9, [x1, #R_FLAGS]
+    and     x9, x9, #192
+    cmp     x9, #192
+    b.ne    1f
+    adr     x0, c_w_awrap
+    mov     x1, #7
+    bl      c_callg1
+1:  OP      OP_YIELD
+    ldr     x30, [sp], #16
+    ret
 s_return:
     bl      c_realfn
     cbz     x1, c_unexpected

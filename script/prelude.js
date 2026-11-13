@@ -198,7 +198,7 @@ return k===0?ds(p)+' '+ts(p)+' '+zone():k===1?ds(p):k===2?ts(p)+' '+zone():k===3
 P.toString=P['\x01Symbol.toPrimitive']=fmt(0);P.toDateString=fmt(1);P.toTimeString=fmt(2);P.toUTCString=P.toGMTString=fmt(3);P.toLocaleDateString=fmt(4);P.toLocaleTimeString=fmt(5);P.toLocaleString=fmt(6);
 })(__n);
 var __q;if(!__q)__q={m:[],t:[],id:0};
-var __awrap;var Promise,setTimeout,setInterval,clearTimeout,clearInterval,queueMicrotask,__jobs;
+var __awrap,__aiter,__astep,__adone,__aval;var Promise,setTimeout,setInterval,clearTimeout,clearInterval,queueMicrotask,__jobs;
 (function(n,Q){var now=n(54),setclock=n(57),setwake=n(58),F=Math.floor;
 function P(ex){if(!(this instanceof P))throw new TypeError("Promise constructor cannot be invoked without 'new'");if(typeof ex!=='function')throw new TypeError('Promise resolver '+ex+' is not a function');
 this._s=0;this._v=undefined;this._r=[];var p=this,done=false;
@@ -252,6 +252,9 @@ step(null)})});
 // an async generator: its calls are kept aside as a generator's; an await inside goes out wrapped by __awrap, and is awaited
 // here before the body goes on; a yield's value is awaited and settles the promise its next() gave. Requests wait their turn.
 var AWK={};__awrap=function(v){return {__aw:AWK,v:v}};
+__aiter=function(o){var f=o['\x01Symbol.asyncIterator'];if(f!=null)return f.call(o);var it=o['\x01Symbol.iterator'].call(o);
+return {next:function(){var r=it.next();if(r.done)return Promise.resolve(r);return Promise.resolve(r.value).then(function(v){return {done:false,value:v}})}}};
+__astep=function(it){return it.next()};__adone=function(r){return !!r.done};__aval=function(r){return r.value};
 function AG(h){this._h=h;this._q=[];this._run=this._s=this._d=false}
 function en(g,m,v){return new Promise(function(ok,no){g._q.push({m:m,v:v,ok:ok,no:no});if(!g._run)pump(g)})}
 function pump(g){if(!g._q.length){g._run=false;return}g._run=true;var q=g._q.shift();
