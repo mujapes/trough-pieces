@@ -1,3 +1,4 @@
+var __blobs={},__blobn=0; // [by Opus] blob: URLs made by URL.createObjectURL: their text, so a script pointed at one runs it
 // What a page's scripts see: document, elements, window. Written in the language over the dom piece (dom/intent.md);
 // every answer comes from the tree, nothing about the page is kept here except one object per node.
 var __d=function(s){var r=__host('d'+s);if(r==='\u0001E')throw new Error('the page tree refused: '+s.slice(0,40));return r};
@@ -75,7 +76,7 @@ class Element extends Node{
  get tagName(){return __d('n'+this.__n).toUpperCase()}
  get localName(){return __d('n'+this.__n)}
  getAttribute(k){var s=__d('g'+this.__n+' '+k);return s.charAt(0)=='1'?s.slice(1):null}
- setAttribute(k,v){__d('s'+this.__n+' '+k+' '+v)}
+ setAttribute(k,v){if(k==='src'&&this.tagName==='SCRIPT'&&__blobs[v]!==undefined){this.textContent=__blobs[v];return}__d('s'+this.__n+' '+k+' '+v)}
  hasAttribute(k){return __d('g'+this.__n+' '+k).charAt(0)=='1'}
  removeAttribute(k){__d('u'+this.__n+' '+k)}
  toggleAttribute(k,f){var h=this.hasAttribute(k);if(f===undefined)f=!h;if(f&&!h)this.setAttribute(k,'');else if(!f&&h)this.removeAttribute(k);return !!f}
@@ -229,7 +230,7 @@ function URL(u,b){u=''+u;var m=/^([a-zA-Z][\w+.-]*:)(.*)$/.exec(u);if(!m){if(b==
  this.protocol=m[1].toLowerCase();var r=m[2],h=/^\/\/([^\/?#]*)(.*)$/.exec(r);this.username='';this.password='';if(h){var a=h[1],at=a.lastIndexOf('@');if(at>=0){var c=a.slice(0,at).split(':');this.username=c[0];this.password=c[1]||'';a=a.slice(at+1)}this.host=a.toLowerCase().replace(/:(80|443)$/,function(x){return(x===':80'&&this.protocol==='http:')||(x===':443'&&this.protocol==='https:')?'':x}.bind(this));r=h[2]}else this.host='';
  var q=/^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(r);this.pathname=h?__dots(q[1]||'/')||'/':q[1];this.search=q[2]&&q[2].length>1?q[2]:'';this.hash=q[3]&&q[3].length>1?q[3]:'';var me=this;this.searchParams=new URLSearchParams(this.search);this.searchParams._u=function(){var t=me.searchParams.toString();me.search=t?'?'+t:''}}
 URL.prototype={get hostname(){return this.host.replace(/:\d+$/,'')},get port(){var m=/:(\d+)$/.exec(this.host);return m?m[1]:''},get origin(){return this.host?this.protocol+'//'+this.host:'null'},get href(){return this.protocol+(this.host||this.protocol==='file:'?'//':'')+(this.username?this.username+(this.password?':'+this.password:'')+'@':'')+this.host+this.pathname+this.search+this.hash},toString:function(){return this.href},toJSON:function(){return this.href}};
-URL.canParse=function(u,b){try{new URL(u,b);return true}catch(e){return false}};URL.createObjectURL=function(){return 'blob:'+location.origin+'/0'};URL.revokeObjectURL=function(){};
+URL.canParse=function(u,b){try{new URL(u,b);return true}catch(e){return false}};URL.createObjectURL=function(b){var u='blob:'+location.origin+'/'+(++__blobn);__blobs[u]=b&&b.__s!==undefined?b.__s:'';return u};URL.revokeObjectURL=function(){};
 // [by Opus] names pages test for: fragments are elements here; observers never report (nothing is laid out or watched yet)
 var DocumentFragment=Element,ShadowRoot=Element,Text=Element,Comment=Element,CharacterData=Element,HTMLTemplateElement=Element,HTMLDialogElement=Element,HTMLButtonElement=Element,HTMLSelectElement=Element,HTMLTextAreaElement=Element,SVGElement=Element;
 function __Observer(f){this._f=f}__Observer.prototype={observe:function(){},unobserve:function(){},disconnect:function(){},takeRecords:function(){return[]}};

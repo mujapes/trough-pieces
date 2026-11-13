@@ -1005,3 +1005,8 @@ constant. Now W_SHASH (world.S: a u32 table as large as the constants region, ze
 string constants by FNV-1a of header+bytes (linear probing; names skip copies above 65536 as before). New constants and
 function plans go in through c_addnew (no search). Header 896. 87 of 87, big/many-consts.js. GitHub 52 -> 30 s (5/0),
 Wikipedia 15 -> 6.8 s (11/0), Guardian 31/0 17 s.
+Unit 76 [by Opus]: Reddit 27/4 -> 28/0. (1) blob: URLs: URL.createObjectURL keeps the Blob's text (__blobs, document.js top);
+a script element whose src is set to one gets that text instead (setAttribute), so it runs inline. (2) host/browse.c built
+module calls in a 2200-byte buffer: long data: modules (Reddit's polyfill loaders) were cut, giving empty SyntaxErrors. Now a
+heap buffer sized to the URL. Profiling GitHub after unit 75: most samples outside the engine (network/TLS), so engine speed
+is no longer its limit. Wikipedia 11/0, NPR 23/2 (world full at 96 MB + one TypeError), HN 1/0.

@@ -211,8 +211,8 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
             seen = realloc(seen, (size_t)(seen_n + 1) * sizeof *seen); if (!seen) exit(4); seen[seen_n++] = node; fresh++; tree_askf(&s, "C", node, "");
             int ours = module || tn <= 1 || (tn >= 11 && same_word((const uint8_t *)v + tn - 11, s.answer + 64 + tn, "javascript")); if (!ours) continue;   /* not data */
             long long sn = tree_askf(&s, "g", node, " src") - 1;
-            if (sn > 0 && module) { char call[2200]; int k = snprintf(call, sizeof call, "__module(\""); for (long long i = 0; i < sn && k < 2150; i++) { char c = v[i]; if (c == '"' || c == '\\') call[k++] = '\\'; call[k++] = c; } k += snprintf(call + k, sizeof call - k, "\")");
-                run_script(&s, (const uint8_t *)call, (size_t)k, address); continue; }
+            if (sn > 0 && module) { size_t cap = (size_t)sn * 2 + 32; char *call = malloc(cap); if (!call) exit(4); int k = snprintf(call, cap, "__module(\""); for (long long i = 0; i < sn; i++) { char c = v[i]; if (c == '"' || c == '\\') call[k++] = '\\'; call[k++] = c; } k += snprintf(call + k, cap - k, "\")");   /* [by Opus] whole URL (data: modules can be long) */
+                run_script(&s, (const uint8_t *)call, (size_t)k, address); free(call); continue; }
             if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block(v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
                 char where[2048] = "", why[300] = "", after[64]; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
                 if (got) { size_t i = 0, gn = length(got); while (i < gn && got[64 + i] <= ' ') i++; if (i < gn && got[64 + i] == '<') { free(got); got = 0; snprintf(why, sizeof why, "a page came back, not a script"); } }   /* an error page is not a program */
