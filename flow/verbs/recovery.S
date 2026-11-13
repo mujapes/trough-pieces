@@ -156,12 +156,28 @@ key:
     b.ne    5b
     ldrb    w13, [x14, #-1]
 addch:
+    ldr     w14, [x20, #T_PIPE]         // a program is running: the key is its input
+    cbnz    w14, tokey
     cmp     x12, #1000
     b.hs    3b
     SA      x14, T_TYPED
     strb    w13, [x14, x12]
     add     x12, x12, #1
     str     x12, [x20, #T_TLEN]
+    b       3b
+// tokey: one byte (w13, or w15 at tokey15) written to the running program's terminal
+tokey:
+    mov     w15, w13
+tokey15:
+    strb    w15, [x20, #116]
+    stp     x9, x23, [sp, #96]
+    ldr     w0, [x20, #T_PIPE]
+    sub     w0, w0, #1
+    add     x1, x20, #116
+    mov     x2, #1
+    mov     x8, #64
+    svc     #0
+    ldp     x9, x23, [sp, #96]
     b       3b
 // tapkey: a tap (x9 the event) on our own keyboard: which key, its glow, and what it does
 tapkey:
@@ -202,6 +218,9 @@ tapkey:
     b       3b
 1:  cmp     w13, #8
     b.ne    2f
+    ldr     w14, [x20, #T_PIPE]
+    mov     w15, #0x7f
+    cbnz    w14, tokey15
     cbz     x12, 3b
     sub     x12, x12, #1
     str     x12, [x20, #T_TLEN]
@@ -218,6 +237,9 @@ tapkey:
     sub     w13, w13, #32
     b       addch
 send:
+    ldr     w14, [x20, #T_PIPE]
+    mov     w15, #13
+    cbnz    w14, tokey15
     stp     x9, x23, [sp, #96]
     SA      x14, T_TYPED
     strb    wzr, [x14, x12]             // the line, ended by a zero
@@ -1127,11 +1149,37 @@ run:
     ldr     x1, [x20, #T_ARGV]
     SA      x0, T_PATH
     bl      resolve
-5:  add     x0, x20, #T_FDS             // pipe2(fds, O_CLOEXEC)
-    mov     x1, #0x80000
-    mov     x8, #59
+5:  mov     x0, #-100                   // a pseudo terminal: its master here, not blocking
+    adr     x1, ptmx
+    // read+write, no controlling tty, close on exec, not blocking
+    mov     x2, #0x0902
+    movk    x2, #0x8, lsl #16
+    mov     x8, #56
     svc     #0
     tbnz    x0, #63, 8f
+    str     w0, [x20, #T_FDS]
+    str     wzr, [x20, #120]            // unlock it
+    mov     x1, #0x5431
+    movk    x1, #0x4004, lsl #16
+    add     x2, x20, #120
+    mov     x8, #29
+    svc     #0
+    ldr     w0, [x20, #T_FDS]           // its number: /dev/pts/N
+    mov     x1, #0x5430
+    movk    x1, #0x8004, lsl #16
+    add     x2, x20, #120
+    mov     x8, #29
+    svc     #0
+    ldr     w0, [x20, #T_FDS]           // its size in characters: 60 rows, 45 columns
+    mov     x1, #0x5414
+    mov     w9, #60
+    strh    w9, [x20, #124]
+    mov     w9, #45
+    strh    w9, [x20, #126]
+    str     wzr, [x20, #128 - 0]
+    add     x2, x20, #124
+    mov     x8, #29
+    svc     #0
     mov     x0, #17                     // fork: clone(SIGCHLD)
     mov     x1, #0
     mov     x2, #0
@@ -1142,40 +1190,57 @@ run:
     tbnz    x0, #63, 8f
     cbz     x0, child
     str     w0, [x20, #T_CHILD]
-    ldr     w0, [x20, #(T_FDS + 4)]     // the parent keeps the reading end only, not blocking
-    mov     x8, #57
-    svc     #0
-    ldr     w0, [x20, #T_FDS]
-    mov     x1, #4                      // F_SETFL
-    mov     x2, #0x800
-    mov     x8, #25
-    svc     #0
     ldr     w9, [x20, #T_FDS]
     add     w9, w9, #1
     str     w9, [x20, #T_PIPE]
+    str     wzr, [x20, #84]             // the escape reader starts plain
     b       cmd_end
 8:  bl      fail
     b       cmd_end
-child:                                  // in the new process: output and errors to the pipe, the folder, then the program
-    ldr     w0, [x20, #(T_FDS + 4)]
-    mov     x1, #1
-    mov     x2, #0
-    mov     x8, #24
+child:                                  // in the new process: a session of its own on the terminal's other end
+    mov     x8, #157                    // setsid
     svc     #0
-    ldr     w0, [x20, #(T_FDS + 4)]
-    mov     x1, #2
-    mov     x2, #0
-    mov     x8, #24
-    svc     #0
-    mov     x0, #-100                   // stdin from nothing
-    adr     x1, devnull
-    mov     x2, #0
+    SA      x10, T_TMP                  // "/dev/pts/" and the number
+    adr     x11, pts
+1:  ldrb    w12, [x11], #1
+    cbz     w12, 2f
+    strb    w12, [x10], #1
+    b       1b
+2:  ldr     w12, [x20, #120]
+    mov     w13, #10
+    add     x17, x20, #160              // digits, backwards into a small room (sp must stay aligned)
+    mov     x14, #0
+3:  udiv    w15, w12, w13
+    msub    w16, w15, w13, w12
+    add     w16, w16, #'0'
+    strb    w16, [x17, x14]
+    add     x14, x14, #1
+    mov     w12, w15
+    cbnz    w12, 3b
+4:  subs    x14, x14, #1
+    ldrb    w16, [x17, x14]
+    strb    w16, [x10], #1
+    b.ne    4b
+    strb    wzr, [x10]
+    mov     x0, #-100
+    SA      x1, T_TMP
+    mov     x2, #2
     mov     x8, #56
     svc     #0
-    mov     x1, #0
+    mov     x21, x0
+    mov     x1, #0x540e                 // it becomes the controlling terminal
+    mov     x2, #0
+    mov     x8, #29
+    svc     #0
+    mov     x22, #0                     // input, output, errors
+5:  mov     x0, x21
+    mov     x1, x22
     mov     x2, #0
     mov     x8, #24
     svc     #0
+    add     x22, x22, #1
+    cmp     x22, #3
+    b.lo    5b
     SA      x0, T_CWD
     mov     x8, #49                     // chdir
     svc     #0
@@ -1194,6 +1259,55 @@ child:                                  // in the new process: output and errors
     mov     x0, #127                    // it could not be started
     mov     x8, #93
     svc     #0
+// plain(x0 how many at T_TMP) -> x0 how many are left: escape sequences (ESC [ ... final, ESC ] ... BEL, ESC and one) and
+// carriage returns taken out, in place. Its state (84) carries over between reads. Stage one of the terminal: no screen yet.
+plain:
+    SA      x10, T_TMP
+    mov     x11, #0                     // read
+    mov     x12, #0                     // written
+    ldr     w13, [x20, #84]
+1:  cmp     x11, x0
+    b.hs    9f
+    ldrb    w14, [x10, x11]
+    add     x11, x11, #1
+    cbz     w13, 2f
+    cmp     w13, #1                     // after ESC
+    b.ne    3f
+    mov     w13, #0
+    cmp     w14, #'['
+    b.ne    11f
+    mov     w13, #2
+    b       1b
+11: cmp     w14, #']'
+    b.ne    1b
+    mov     w13, #3
+    b       1b
+3:  cmp     w13, #2                     // in ESC [: until a byte from @ to ~
+    b.ne    4f
+    cmp     w14, #0x40
+    b.lo    1b
+    cmp     w14, #0x7e
+    b.hi    1b
+    mov     w13, #0
+    b       1b
+4:  cmp     w14, #7                     // in ESC ]: until BEL (or ESC)
+    b.eq    41f
+    cmp     w14, #27
+    b.ne    1b
+41: mov     w13, #0
+    b       1b
+2:  cmp     w14, #27
+    b.ne    21f
+    mov     w13, #1
+    b       1b
+21: cmp     w14, #13
+    b.eq    1b
+    strb    w14, [x10, x12]
+    add     x12, x12, #1
+    b       1b
+9:  str     w13, [x20, #84]
+    mov     x0, x12
+    ret
 // pump: the running program's output into the console; at its end, the pipe closed, the process collected, its code shown
 pump:
     ldr     w9, [x20, #T_PIPE]
@@ -1204,10 +1318,22 @@ pump:
     mov     x2, #4096
     mov     x8, #63
     svc     #0
-    cmn     x0, #11                     // nothing yet
-    b.eq    8f
+    cmn     x0, #11                     // nothing yet: has it ended without ever opening its terminal?
+    b.ne    0f
+    ldr     w0, [x20, #T_CHILD]
+    add     x1, x20, #T_FDS
+    mov     x2, #1                      // WNOHANG
+    mov     x3, #0
+    mov     x8, #260
+    svc     #0
+    cmp     x0, #0
+    b.le    8f
+    str     wzr, [x20, #T_CHILD]
+    b       1f
+0:
     cmp     x0, #0
     b.le    1f
+    bl      plain
     mov     x2, x0
     SA      x1, T_TMP
     bl      con_add
@@ -1218,12 +1344,13 @@ pump:
     svc     #0
     str     wzr, [x20, #T_PIPE]
     ldr     w0, [x20, #T_CHILD]
+    cbz     w0, 12f
     add     x1, x20, #T_FDS
     mov     x2, #0
     mov     x3, #0
     mov     x8, #260                    // wait4
     svc     #0
-    ldr     w10, [x20, #T_FDS]
+12: ldr     w10, [x20, #T_FDS]
     ubfx    w10, w10, #8, #8            // the exit code
     adr     x1, m_exit
     SA      x11, T_TMP
@@ -1308,6 +1435,8 @@ dot: .asciz "."
 dotdot: .asciz ".."
 sysbin: .asciz "/system/bin/"
 devnull: .asciz "/dev/null"
+ptmx: .asciz "/dev/ptmx"
+pts: .asciz "/dev/pts/"
 env_path: .asciz "PATH=/system/bin"
 env_home: .asciz "HOME=/sdcard/Android/media/t.flow"
 env_tmp: .asciz "TMPDIR=/sdcard/Android/media/t.flow"
