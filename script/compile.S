@@ -527,7 +527,7 @@ c_addnew:                               // [by Opus] (x9 W_CONST_N; x10 is set h
     ldr     x11, [x19, #W_CONST_LO]     // [by Opus] below 65536 while that is under 3/4 full or a name is made; else above
     ldr     x12, [x19, #W_NAMEK]
     cbnz    x12, 4f
-    mov     x12, #49152
+    mov     x12, #8192                  // [by Opus] (was 49152: YouTube needs more names than that left)
     cmp     x11, x12
     b.lo    4f
     mov     x11, #0x10000

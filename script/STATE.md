@@ -988,7 +988,7 @@ global-banner-disable (instruction area full; more code runs now) - next to look
 Unit 73 [by Opus]: past 65536 constants. GitHub's "program is too big" was the constant table's 16-bit index (65536 exactly;
 code area only 4.7 of 12.6 MB). Now: OP_CONSTW 99 and OP_CLOSUREW 100 take 24 bits (c_op16 picks the wide form by itself,
 and refuses any other instruction past 65535); names stay short: c_keyconst sets W_NAMEK so c_addconst keeps them below
-65536 (W_CONST_LO), and other constants go above 65536 once the low part is 3/4 full (W_CONST_N stays the scan bound; the gap is
+65536 (W_CONST_LO), and other constants go above 65536 once the low part holds 8192 (W_CONST_N stays the scan bound; the gap is
 zeros, harmless to the collector). c_fragment finds its function's closure by W_LASTCL instead of guessing from bytes. World
 header 880. browse.c TROUGH_TICKS also prints consts and globals. checks/big/many-consts.js (runbig.py); 87 of 87.
 GitHub 5/0 (77742 constants), Wikipedia 11/0, Guardian 31/0. LEFT: c_addconst and c_strconst search every constant on each
@@ -1027,3 +1027,9 @@ longer fails to translate but its instructions do not fit the code area even at 
 YouTube's 2 TypeErrors. DuckDuckGo: `break e` "outside a loop" for a label on a for inside if(...) inside a larger function
 (reduction in progress; simple cases pass). Minimizing recipe: python ddmin over the text, keeping only candidates
 `node --check` accepts and our engine still fails the same way (runbig.py's ours()).
+Unit 79 [by Opus]: YouTube's 10.8 MB script: "too big" was NOT the code area (same spot at a 500 MB world; code is 8.1 MB) but
+names: values filled the low constants to 49152 first, leaving <16384 for names. Now values go above 65536 once 8192 low
+places are used (compile.S c_addconst). The gap 8192..65535 wastes table room, so big/many-consts.js now needs runhuge.py
+(a 32 MB world's table holds 125000). YouTube 43 run, 3 failed: two TypeErrors (t9 78:416, t25 10:2054) and "the regular
+expression is too large": an HTML-entity pattern of ~2200 alternatives exceeds RX_MAXW 32768 words; regex programs use 16-bit
+words and jump distances, so this needs wider jumps or a literal-alternation instruction (trie / set of strings).
