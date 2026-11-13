@@ -284,6 +284,9 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
     char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 17, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0, editing = 0; char typed[512] = ""; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; job *now = 0; scripts *live = 0; double ticked = 0, refilled = -1e9; int tapped = 0; static int applied[PICS]; pic *pics = 0; int pic_n = 0;
     { const char *need[][2] = {{"url","resolve"},{"url","part"},{"url","port"},{"http","request"},{"http","status"},{"http","header"},{"http","packed"},{"http","body"},{"inflate","unpack"},{"tls","feed"},{"png","decode"},{"jpeg","decode"},{"gif","decode"},{"image","blit"},{"image","smooth"},{"image","stretch"},{"paint","clear"},{"page","pictures"},{"page","link"}}; for (size_t i = 0; i < sizeof need / sizeof need[0]; i++) entry(need[i][0], need[i][1]); }   /* every piece is loaded before a second thread exists */ static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
+    struct flowfield { uint32_t n, spare; double p[510]; } *fl = 0; long long fl_seen = -1;
+    { char fp[600]; snprintf(fp, sizeof fp, "%s", argv[3]); char *sl = strrchr(fp, '/'); snprintf(sl ? sl + 1 : fp, sizeof fp - (size_t)(sl ? sl + 1 - fp : 0), "flow.field");
+      int fd = open(fp, O_RDWR | O_CREAT, 0600); if (fd >= 0 && !ftruncate(fd, 4096)) { void *m = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (m != MAP_FAILED) { fl = m; if (!fl->n) fl->n = 1; } } if (fd >= 0) close(fd); }
     for (;;) {
         if (fresh) { fresh = 0; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); if (body) { int ran, failed; scripts_free(live); live = 0; body = with_scripts(body, address, roots, &ran, &failed, &live); } scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
             job_leave(now); now = 0; pics = 0; pic_n = 0; memset(applied, 0, sizeof applied);
@@ -336,6 +339,11 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
         else if (st.st_size < read_to) read_to = 0;
         for (int i = 0; i < pic_n; i++) if (!applied[i] && __atomic_load_n(&pics[i].state, __ATOMIC_SEQ_CST)) { applied[i] = 1;   /* a picture has arrived (or failed): the strips it sits in are drawn again */
             if (pics[i].state == 1) { for (int k = 0; k < KEPT; k++) if (strip_at[k] >= 0 && (long long)pics[i].y < (strip_at[k] + 1) * TILE && (long long)pics[i].y + pics[i].h > strip_at[k] * TILE) strip_at[k] = -1; dirty = 1; } }
+        if (fl) { /* [by Opus] Flow: the field's value 0 is the scroll. Input sets it outright; a target written by the model
+                     (trough-flow) is reached by morphing, a share of the way each turn of this loop */
+            if (scroll != fl_seen) { fl->p[0] = fl->p[1] = (double)scroll; }
+            if (fl->n && entry("flow", "step")((void *)fl, 0, 0, 3000, table)) { long long limit = tall + BAR > (long long)H ? tall + BAR - H : 0; long long y = (long long)fl->p[0]; scroll = y < 0 ? 0 : y > limit ? limit : y; dirty = 1; }
+            fl_seen = scroll; }
         if (!dirty && !fresh) usleep(4000); } }
 int main(int argc, char **argv) {
     if (argc < 4) { fprintf(stderr, "browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]\n   or: browse <pieces out dir> --ask <key file> <model> <prompt file> [most tokens]\n"); return 2; }

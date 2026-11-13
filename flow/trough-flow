@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+# trough-flow set INDEX VALUE: writes a target into the background browser's Flow field (0 = scroll row); the screen morphs to it.
+# trough-flow get: values and targets.  [by Opus]
+import sys,mmap,os,struct
+f=os.path.expanduser('~/.trough/flow.field'); fd=os.open(f,os.O_RDWR); m=mmap.mmap(fd,4096)
+n=struct.unpack_from('<I',m,0)[0]
+if sys.argv[1]=='set':
+  i=int(sys.argv[2]); v=float(sys.argv[3])
+  if i>=n: struct.pack_into('<I',m,0,i+1)
+  struct.pack_into('<d',m,8+16*i+8,v)
+else:
+  for i in range(n): print(i,*struct.unpack_from('<dd',m,8+16*i))
