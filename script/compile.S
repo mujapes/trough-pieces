@@ -679,7 +679,21 @@ c_lvdup:
 // c_wordconst: the same for the current word's own text.
 c_wordconst:
     str     x30, [sp, #-16]!
-    add     x0, x20, x25
+    mov     x9, #0                      // [by Opus] a name with \u escapes is read as a string would be (c_string skips one byte at each end)
+5:  cmp     x9, x26
+    b.hs    6f
+    add     x10, x25, x9
+    ldrb    w10, [x20, x10]
+    add     x9, x9, #1
+    cmp     w10, #'\\'
+    b.ne    5b
+    sub     x25, x25, #1
+    add     x26, x26, #2
+    bl      c_string
+    add     x25, x25, #1
+    sub     x26, x26, #2
+    b       1f
+6:  add     x0, x20, x25
     mov     x1, x26
     bl      w_text
     cbz     x0, c_full

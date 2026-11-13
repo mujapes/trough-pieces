@@ -755,3 +755,10 @@ m_keylist skips symbol keys (texts starting with unit 1), so Object.keys / for-i
 still returns [] and a rest does not copy symbol keys. Debug trick: /tmp copy of compile.S with each c_notyet given its own
 message ("notyet at LINE"). checks/programs rest-computed.js, class-in-block.js; 57 of 57. GitHub: k0 fine; f18 now
 "Unexpected token"; 'length' of undefined at line 4 col 86259 (twice).
+Unit 41, stage 2f [by Opus]: names may hold \u escapes (lex.S w_uesc; c_wordconst decodes such a name as a string; variable
+names compare raw text, so `xy` and `xy` are different variables still); dom/document.js: DocumentFragment and other
+element names, IntersectionObserver / MutationObserver / ResizeObserver / PerformanceObserver that never report.
+checks/programs/name-escapes.js; 58 of 58. GITHUB: EVERY MODULE TRANSLATES now. Run-time: `DataView is not defined` (no
+typed arrays at all in the engine: ArrayBuffer, Uint8Array.., DataView), after which a webpack runtime fails 300 times
+('call' of undefined, line 4 col 156, probably from timers); 'illegal invocation' at line 138 col 160598.
+NEXT: typed arrays and DataView (engine, machine code: a byte block kind; element get/set by type), then recheck GitHub.

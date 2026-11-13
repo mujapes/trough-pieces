@@ -135,7 +135,9 @@ w_word:
     cmp     w9, #9
     b.ls    w_not_name
     b       1f
-6:  NAMEPART w0, w_not_name
+6:  cmp     w0, #'\\'                  // [by Opus] \u1234 or \u{..} begins a name too
+    b.eq    w_uesc
+    NAMEPART w0, w_not_name
     sub     w9, w0, #'0'
     cmp     w9, #9
     b.ls    w_number
@@ -143,8 +145,34 @@ w_word:
     cmp     x22, x21
     b.hs    2f
     ldrb    w0, [x20, x22]
+    cmp     w0, #'\\'
+    b.eq    w_uesc
     NAMEPART w0, 2f
     b       1b
+w_uesc:                                 // at a backslash: \u is part of the name (moved to its last character, then on); else the name ends
+    add     x9, x22, #1
+    cmp     x9, x21
+    b.hs    w_uend
+    ldrb    w10, [x20, x9]
+    cmp     w10, #'u'
+    b.ne    w_uend
+    add     x22, x22, #1
+    add     x9, x22, #1
+    cmp     x9, x21
+    b.hs    1b
+    ldrb    w10, [x20, x9]
+    cmp     w10, #'{'
+    b.ne    1b
+71: add     x22, x22, #1
+    cmp     x22, x21
+    b.hs    2f
+    ldrb    w10, [x20, x22]
+    cmp     w10, #'}'
+    b.ne    71b
+    b       1b
+w_uend:
+    cmp     x22, x25                    // a lone backslash: nothing read yet is not a name
+    b.eq    w_not_name
 2:  sub     x26, x22, x25
     mov     w23, #K_NAME
     mov     w28, #0
