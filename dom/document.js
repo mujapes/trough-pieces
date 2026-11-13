@@ -127,7 +127,7 @@ class Element extends Node{
  scrollIntoView(){}
  click(){this.dispatchEvent(new Event('click',{bubbles:true}))}
 }
-var HTMLElement=Element;
+var HTMLElement=Element;function NodeList(){}NodeList.prototype=Array.prototype;function HTMLCollection(){}HTMLCollection.prototype=Array.prototype;var HTMLDivElement=Element,HTMLAnchorElement=Element,HTMLImageElement=Element,HTMLInputElement=Element,HTMLFormElement=Element,HTMLScriptElement=Element,HTMLIFrameElement=Element,HTMLButtonElement=Element,SVGElement=Element;
 class Document extends Node{
  constructor(n){super(n,9);this.readyState='loading';this.cookie='';this.referrer='';this.hidden=false;this.visibilityState='visible';this.compatMode='CSS1Compat'}
  getElementById(i){return __w(__d('i '+i))}

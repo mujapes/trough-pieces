@@ -662,3 +662,29 @@ On the bench every variant of that wrapper behaves (one earlier bench run printe
 rethrow, not reproduced since: layout-sensitive corruption). (3) Repeated big JSON.parse in a 4 MB world says "full" (8 MB is
 fine): probably fragmentation of the non-moving collector, not a leak. NEXT: replay NPR offline (save its scripts and fetched
 bodies) so the crash can be caught under gdb with the world dumped; check j_err's unwind (W_NSP) and the reviver walk.
+Crash, second look [by Opus]: at the fault sp == x29 == a HOST frame (saved lr 0x55555523b4 = browse.c's return from
+with_scripts), x19/x21 point into browse's .rodata (0x9410/0x9160), x22 into the host heap, x24 (JSON end) is right. So the
+processor stack was set back to the host's frame while a JSON read went on: something restored a stale sp. Checked and NOT it:
+n_fail/n_full (sp from W_NSP, set at the only builtin dispatch, lib.S:66), the JSON nesting guard, j_number's own frame.
+Suspects left: anything that saves and later restores sp or a frame across runs (generator/async snapshots, OP_GENSNAP; the
+__host round trip; try records holding sp). Gdb recipe: `cp /tmp/dbg2/s.bin out/script.asm.bin; gdb -batch -ex run -ex 'x/24gx
+$sp' --args out/browse out https://www.npr.org /tmp/x.png` (restore script.new.bin after).
+Also checked, not it: regex translator (saves and restores x20-x28 on every way out; only `mov sp, x29` frame resets).
+Crash, third look [by Opus]: hardware breakpoints on all seven sp-reset instructions (compile c_fail, n_full, n_fail, regex
+exits; condition: new sp == the host frame 0x7ff7fb7bf0) did NOT fire before the fault; a trap build (/tmp/dbg2: brk when
+sp > W_NBASE at every builtin dispatch and w_alloc) faulted in w_alloc before its check could run. So the likely story: an
+ENTER frame's saved registers/lr were overwritten, LEAVE restored host x19-x28 and "returned" into JSON code. Next: a watch on
+the ENTER frame's saved x30 conditioned on $pc inside the piece (0x7ff7362000-0x7ff7382000), set after the first `run` entry
+(watching from main is swamped by host writes); also review regex.S:439/1048 (variable `sub sp`) and lex.S:517.
+Crash, fourth look [by Opus], PARKED: a watch on 0x7ff7fb7b88 limited to the script piece's code (0x7ff7362000-0x7ff737c000;
+the piece mapped after it, at +0x1a000, is a different one) never fired, so the "overwritten ENTER frame" guess is unproven
+(the frame's address was assumed from the crash sp). The shipped engine does not crash on NPR; only the debug-prelude variant
+does. Parked after four turns because the cost was rising without narrowing; next time start by recording every ENTER's sp
+and every LEAVE's (a ring in the world header, debug build only) and comparing with the crash.
+
+**Thirty-ninth unit [by Opus]: DOM names (2026-11-13).** dom/document.js: NodeList and HTMLCollection (prototype = Array's, as
+our lists are arrays), HTMLDivElement and eight more element names aliasing Element. Guardian: the NodeList failure is gone;
+now its polyfill bundle (ran-8.js, sent because our user agent is unknown) reads `document.documentElement` with `document`
+undefined at line 157 although nothing in the bundle shadows it: NEXT, find why (the bundle runs inside (function(self){..})
+(window); a polyfill may redefine something on window). Also open: Guardian 'g' of undefined (line 1, column 42258); GitHub
+runs 0 scripts (modules, probably); NPR 299 JSON errors.
