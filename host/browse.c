@@ -129,7 +129,7 @@ static long attribute(const uint8_t *tag, const uint8_t *end, const char *name, 
         if (*q == '"' || *q == '\'') { const uint8_t *c = memchr(q + 1, *q, (size_t)(end - q - 1)); if (!c) return -1; *v = q + 1; return c - q - 1; }
         const uint8_t *c = q; while (c < end && *c != ' ' && *c != '>' && *c != '\n') c++; *v = q; return c - q; }
     return -1; }
-typedef struct { uint8_t *world, *out, *answer, *tree, *req; size_t answer_room, req_room; char title[512]; int dead, ran, failed, fetched; const uint8_t *roots; } scripts;
+typedef struct { uint8_t *world, *out, *answer, *tree, *req; size_t answer_room, req_room; char title[512]; int dead, ran, failed, fetched; const uint8_t *roots; char which[24]; } scripts;
 /* one request to the page's tree (the dom piece); the answer is in s->answer from byte 64, its length returned (negative: refused) */
 static long long tree_ask(scripts *s, const uint8_t *q, size_t n) { if (n > s->req_room) return -2; memcpy(s->req + 64, q, n); resize(s->req, n); resize(s->answer, s->answer_room); at(42, s->req); at(43, s->answer); int16_t h[2] = {42, 43};
     return entry("dom.asm", "ask")(s->tree, h, 2, 0, table); }
@@ -159,7 +159,7 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
                 fprintf(stderr, "fetch %s: %s\n", where[0] ? where : "?", got ? "came" : why); free(got); free(base); free(rel); free(full); resize(s->answer, gn + 1); text_of(s->answer, qw, 2, 0, table); continue; }
             memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
         if (r == 0) return;
-        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); s->failed++;
+        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s%s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : "", getenv("TROUGH_KEEP_ALL") ? (snprintf(s->which, sizeof s->which, " [ran-%d]", s->ran), s->which) : ""); free(e); s->failed++;
             const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep && text) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }
             return; } }
     fprintf(stderr, "script: stopped after too many steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }

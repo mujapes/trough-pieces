@@ -519,3 +519,15 @@ while a later script runs, and its place is in the earlier script's text: search
 its aCallable check J, after which the caller calls t: something whose typeof is "function" cannot be called. Not confirmed.)
 Known: OP_LINE positions are not tied to a script, so callbacks report into the wrong file; tagging W_POS with a script
 number needs a world field (the header is full at 576: W_POS took 568).
+
+**Twenty-seventh unit [by Opus]: what was called, and the BBC's last run-time stop found (2026-11-13).** machine.S m_call: calling
+a non-function now says what it was ("TypeError: undefined is not a function", null, a number, a string, a boolean, an object):
+m_notfn_v / m_notfn_o. host/browse.c: with TROUGH_KEEP_ALL each run-time error is followed by " [ran-N]", the script running
+when it happened (s->which). 45 of 45.
+FOUND (not fixed): bbc ran-55 is `self.__SSG_MANIFEST=new Set([])`; it fails because core-js (ran-7) has REPLACED Set, Map and
+Symbol: our Symbol() gives a string, so core-js's check (`Object(Symbol()) instanceof Symbol`, typeof "symbol") fails and it
+installs its own Symbol. Its Symbol.iterator is then a key no array has (`[1][Symbol.iterator]` is undefined after core-js
+loads), so anything iterated by library code fails. Reproduce: /tmp-style bench file = small stand-ins for window/document +
+ran-7.js + `[1][Symbol.iterator]()`. FIX: a real symbol type (a tag of its own, typeof "symbol", unique, usable as a property
+key, never equal to a string, Object(sym) instanceof Symbol, description, toString "Symbol(desc)", well-known symbols that the
+engine's own for..of / spread / toPrimitive use instead of the '@@iterator' strings). Next unit.

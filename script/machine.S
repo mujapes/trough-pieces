@@ -286,6 +286,46 @@ m_full:
     adr     x0, e_full
     mov     x1, #(e_wrong - e_full)
     b       m_fail
+// m_notfn_v: the value x2 was called: the error says what kind of value it was ("TypeError: undefined is not a function").
+// m_notfn_o: the same for an object that is not a function.
+m_notfn_o:
+    adr     x0, e_nf_object
+    mov     x1, #(e_nf_end - e_nf_object)
+    b       m_fail
+m_notfn_v:
+    lsr     x3, x2, #48
+    adr     x0, e_nf_number
+    mov     x1, #(e_nf_undef - e_nf_number)
+    mov     w16, #T_UNDEF
+    cmp     w3, w16
+    b.lo    m_fail
+    adr     x0, e_nf_undef
+    mov     x1, #(e_nf_null - e_nf_undef)
+    b.eq    m_fail
+    adr     x0, e_nf_null
+    mov     x1, #(e_nf_bool - e_nf_null)
+    mov     w16, #T_NULL
+    cmp     w3, w16
+    b.eq    m_fail
+    adr     x0, e_nf_bool
+    mov     x1, #(e_nf_string - e_nf_bool)
+    mov     w16, #T_BOOL
+    cmp     w3, w16
+    b.eq    m_fail
+    adr     x0, e_nf_string
+    mov     x1, #(e_nf_object - e_nf_string)
+    mov     w16, #T_STRING
+    cmp     w3, w16
+    b.eq    m_fail
+    b       m_notfn
+e_nf_number: .ascii "TypeError: a number is not a function"
+e_nf_undef:  .ascii "TypeError: undefined is not a function"
+e_nf_null:   .ascii "TypeError: null is not a function"
+e_nf_bool:   .ascii "TypeError: a boolean is not a function"
+e_nf_string: .ascii "TypeError: a string is not a function"
+e_nf_object: .ascii "TypeError: an object is not a function"
+e_nf_end:
+    .balign 4
 m_notfn:
     adr     x0, e_notfn
     mov     x1, #(e_notfn_end - e_notfn)
@@ -1294,12 +1334,12 @@ m_call:                                 // w0 arguments from x1 on, the function
     lsr     x3, x2, #48
     mov     w16, #T_OBJECT
     cmp     w3, w16
-    b.ne    m_notfn
+    b.ne    m_notfn_v
     and     x2, x2, #0xffffffffffff
     add     x2, x19, x2
     ldr     x3, [x2]
     cmp     x3, #1
-    b.ne    m_notfn
+    b.ne    m_notfn_o
     ldr     x4, [x2, #F_PLAN]
     add     x4, x19, x4                 // its plan
     ldr     w5, [x4, #16]
