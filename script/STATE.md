@@ -1018,3 +1018,12 @@ structuredClone (plain data, Map/Set/Date/RegExp, cycles), more reflected string
 matching `(` only when a slash follows; strings in between are not understood). es2022-array.js, regex-after-paren.js;
 89 of 89. Wikipedia 11/0, GitHub 5/0. NPR's TypeError is inside its obfuscated bot-detection script: skipped.
 NEXT: Apple's last, YouTube 3, DuckDuckGo 1, CNN 1, NYT 1, Amazon (0 scripts run: why?).
+Unit 78 [by Opus]: (1) c_scan_block: `function` at a line's start was taken for a declaration even after `=`/`,`/`(` etc.
+(`var i=` NEWLINE `function(){},Q=1` in a block inside a function then failed "not made yet": YouTube). Now the line's start
+counts only if the word before is not punctuation other than ) ] } (kept at sp+36). newline-function-value.js; 89+1 of 90.
+(2) Amazon sends a 3.7 KB bot page with no scripts: nothing to do. (3) YouTube's main script is 10.8 MB: after the fix it no
+longer fails to translate but its instructions do not fit the code area even at a 200 MB world (25 MB area). Suspect: OP_LINE
+(9 bytes per statement). NEXT: a shorter line record (delta form, or a side table of instruction offset -> place), then
+YouTube's 2 TypeErrors. DuckDuckGo: `break e` "outside a loop" for a label on a for inside if(...) inside a larger function
+(reduction in progress; simple cases pass). Minimizing recipe: python ddmin over the text, keeping only candidates
+`node --check` accepts and our engine still fails the same way (runbig.py's ours()).

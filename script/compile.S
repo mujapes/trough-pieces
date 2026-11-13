@@ -1586,6 +1586,7 @@ c_scan_block:
     stp     w9, wzr, [sp]
     stp     wzr, wzr, [sp, #8]
     stp     wzr, w9, [sp, #16]
+    str     wzr, [sp, #36]
     str     xzr, [x29, #88]
 1:  bl      next_word
 100: cbz    w23, 9f
@@ -1705,7 +1706,20 @@ c_scan_block:
     bl      c_scan_inner
     cbnz    w2, 8f
     mov     w3, #1
-    orr     w6, w6, w27                 // at a statement's start (or a line's): a declaration, and its name is a variable here
+    ldr     w9, [sp, #36]               // [by Opus] a line's start counts only if the word before could end a statement:
+    lsr     w10, w9, #8                 // not after punctuation other than ) ] } (`var i=` NEWLINE `function(){}` is a value)
+    and     w9, w9, #0xff
+    mov     w11, w27
+    cmp     w10, #K_PUNCT
+    b.ne    104f
+    cmp     w9, #34
+    b.eq    104f
+    cmp     w9, #36
+    b.eq    104f
+    cmp     w9, #38
+    b.eq    104f
+    mov     w11, #0
+104: orr    w6, w6, w11                 // at a statement's start (or a line's): a declaration, and its name is a variable here
     cbz     w6, 8f
     mov     w4, #3
     b       8f
@@ -1796,6 +1810,8 @@ c_scan_block:
 8:  stp     w1, w2, [sp]
     stp     w3, w4, [sp, #8]
     stp     w5, w7, [sp, #16]
+    orr     w9, w24, w23, lsl #8        // [by Opus] the word before, for the next one
+    str     w9, [sp, #36]
     b       1b
 9:  ldr     x22, [sp, #24]
     ldr     w28, [sp, #32]
