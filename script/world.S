@@ -47,6 +47,8 @@
     .equ W_FALLBACK, 432                // three functions of the prelude: join, indexOf, slice in the language, for what built-ins 49-51 do not take
     .equ W_CONST_LO, 864                // [by Opus] how many constants below 65536 (names must be there; others go above once it is 3/4 full)
     .equ W_NAMEK, 872                   // [by Opus] the compiler is making a name's constant (it must be below 65536)
+    .equ W_SHASH, 880                   // [by Opus] the string constants' index: u32 each (a constant's number + 1; 0 empty)
+    .equ W_SHMASK, 888                  // [by Opus] its size - 1 (a power of two)
     .equ W_LASTCL, 856                  // [by Opus] the compiler: where in its function's instructions the last closure was put (c_fragment)
     .equ W_PUSHFB, 848                  // [by Opus] the prelude's push for a `this` that is not an array (not a root: Array.__pushfb holds it)
     .equ W_K_TOPRIM, 504                // the key Symbol.toPrimitive ("\001Symbol.toPrimitive")
@@ -101,7 +103,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #880                   // [by Opus] 864 W_CONST_LO, 872 W_NAMEK, 856 W_LASTCL, 848 W_PUSHFB. 832 W_BIGPROTO, 840 spare. 824 W_BADCALL, 808 W_STRESS, 816 W_STRESS_END. The header: 808 bytes (800 W_TEXTNO, 576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
+    mov     x11, #896                   // [by Opus] 880 W_SHASH, 888 W_SHMASK, 864 W_CONST_LO, 872 W_NAMEK, 856 W_LASTCL, 848 W_PUSHFB. 832 W_BIGPROTO, 840 spare. 824 W_BADCALL, 808 W_STRESS, 816 W_STRESS_END. The header: 808 bytes (800 W_TEXTNO, 576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]
@@ -116,6 +118,21 @@ w_begin:
     lsr     x13, x12, #4
     stp     x11, xzr, [x19, #W_GLOB]
     str     x13, [x19, #W_GLOB_CAP]
+    add     x11, x11, x12
+    str     x11, [x19, #W_SHASH]        // [by Opus] the string constants' index, as large as the constants (2 places each), zeroed
+    lsr     x13, x12, #2
+    clz     x14, x13
+    mov     x15, #1
+    neg     x14, x14
+    add     x14, x14, #63
+    lsl     x15, x15, x14
+    sub     x13, x15, #1
+    str     x13, [x19, #W_SHMASK]
+    add     x14, x19, x11
+    add     x15, x14, x12
+91: stp     xzr, xzr, [x14], #16
+    cmp     x14, x15
+    b.lo    91b
     add     x11, x11, x12
     lsr     x12, x9, #4
     and     x12, x12, #-16

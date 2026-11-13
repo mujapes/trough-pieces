@@ -520,7 +520,11 @@ c_addconst:
     b.eq    3f
     add     x11, x11, #1
     b       1b
-2:  ldr     x11, [x19, #W_CONST_LO]     // [by Opus] below 65536 while that is under 3/4 full or a name is made; else above
+2:
+c_addnew:                               // [by Opus] (x9 W_CONST_N; x10 is set here) a constant known to be new
+    ldr     x10, [x19, #W_CONST]
+    add     x10, x19, x10
+    ldr     x11, [x19, #W_CONST_LO]     // [by Opus] below 65536 while that is under 3/4 full or a name is made; else above
     ldr     x12, [x19, #W_NAMEK]
     cbnz    x12, 4f
     mov     x12, #49152
@@ -552,38 +556,51 @@ c_strconst:
     and     x2, x0, #0xffffffffffff
     add     x3, x19, x2
     ldr     x4, [x3], #8
-    ldr     x9, [x19, #W_CONST_N]
+    lsr     x5, x4, #32                 // [by Opus] the text's hash (FNV-1a over its bytes and its header) finds it in W_SHASH
+    and     x6, x4, #0xffffffff
+    lsl     x6, x6, x5                  // (how many bytes: the units, twice over if wide)
+    ldr     x7, =0xcbf29ce484222325
+    ldr     x15, =0x100000001b3
+    eor     x7, x7, x4
+    mul     x7, x7, x15
+    mov     x14, #0
+7:  cmp     x14, x6
+    b.hs    8f
+    ldrb    w16, [x3, x14]
+    eor     x7, x7, x16
+    mul     x7, x7, x15
+    add     x14, x14, #1
+    b       7b
+8:  eor     x7, x7, x7, lsr #29
+    ldr     x8, [x19, #W_SHASH]
+    add     x8, x19, x8
+    ldr     x16, [x19, #W_SHMASK]
+    and     x7, x7, x16
     ldr     x10, [x19, #W_CONST]
     add     x10, x19, x10
-    mov     x11, #0
-1:  cmp     x11, x9
-    b.hs    5f
+1:  ldr     w11, [x8, x7, lsl #2]
+    cbz     w11, 5f
+    sub     w11, w11, #1
     ldr     x12, [x10, x11, lsl #3]
-    lsr     x13, x12, #48
-    mov     w14, #T_STRING
-    cmp     w13, w14
-    b.ne    4f
     and     x12, x12, #0xffffffffffff
     add     x12, x19, x12
     ldr     x13, [x12], #8
     cmp     x13, x4
     b.ne    4f
-    ldr     x14, [x19, #W_NAMEK]        // [by Opus] a name cannot use a copy above 65536
+    ldr     x14, [x19, #W_NAMEK]        // a name cannot use a copy above 65536
     cbz     x14, 6f
     cmp     x11, #0x10, lsl #12
     b.hs    4f
 6:  mov     x14, #0
-2:  lsr     x5, x4, #32                 // (how many bytes: the units, twice over if wide)
-    and     x6, x4, #0xffffffff
-    lsl     x6, x6, x5
-    cmp     x14, x6
+2:  cmp     x14, x6
     b.hs    3f
     ldrb    w15, [x12, x14]
-    ldrb    w16, [x3, x14]
+    ldrb    w9, [x3, x14]
     add     x14, x14, #1
-    cmp     w15, w16
+    cmp     w15, w9
     b.eq    2b
-4:  add     x11, x11, #1
+4:  add     x7, x7, #1
+    and     x7, x7, x16
     b       1b
 3:  ldr     x9, [x19, #W_LAST]          // the string just made is undone (its start bit too), if it is the newest at the top
     cmp     x9, x2
@@ -598,8 +615,13 @@ c_strconst:
     mov     w0, #OP_CONST
     bl      c_op16
     ret     x17
-5:  mov     x30, x17
-    b       c_const
+5:  ldr     x9, [x19, #W_CONST_N]       // a new constant, without searching them all again; its place goes in the index
+    bl      c_addnew
+    add     w9, w0, #1
+    str     w9, [x8, x7, lsl #2]
+    mov     w11, w0
+    b       31b
+    .ltorg
 // c_is: is the current word exactly the x1 bytes at x0 -> flags: eq if so. Uses x9-x11.
 c_is:
     cmp     x26, x1
@@ -2170,7 +2192,8 @@ c_function:
     str     x9, [x29, #F_FUNC]
     ldr     x9, [sp, #64]
     str     x9, [x29, #F_LOOP]
-    bl      c_addconst
+    ldr     x9, [x19, #W_CONST_N]     // [by Opus] a plan is always new
+    bl      c_addnew
     ldr     w9, [sp, #8]
     cmp     w9, #1
     b.ne    91f
@@ -4210,7 +4233,8 @@ c_w_ctor_end:
     str     x10, [x9, #32]
     mov     x16, #(T_OBJECT << 48)
     orr     x0, x0, x16
-    bl      c_addconst
+    ldr     x9, [x19, #W_CONST_N]     // [by Opus] a plan is always new
+    bl      c_addnew
     mov     w1, w0
     mov     w0, #OP_CLOSURE
     bl      c_op16

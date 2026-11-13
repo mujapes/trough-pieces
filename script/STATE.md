@@ -1000,3 +1000,8 @@ bitmap. Now each free-list link holds the distance in its low 40 bits and its ow
 found from the bitmap as before); the sweep and g_fit's split keep them; host/browse.c masks links. Also TROUGH_TIMES=1
 prints when each script is loaded. Wikipedia 45 s -> 15 s (11/0), GitHub 5/0 (52 s: next suspect the quadratic constant
 search), Guardian 31/0, BBC 62/0. 87 of 87.
+Unit 75 [by Opus]: string constants found by hash. gdb sampling on GitHub put the top cost in c_strconst's search of every
+constant. Now W_SHASH (world.S: a u32 table as large as the constants region, zeroed at begin, W_SHMASK its size-1) indexes
+string constants by FNV-1a of header+bytes (linear probing; names skip copies above 65536 as before). New constants and
+function plans go in through c_addnew (no search). Header 896. 87 of 87, big/many-consts.js. GitHub 52 -> 30 s (5/0),
+Wikipedia 15 -> 6.8 s (11/0), Guardian 31/0 17 s.
