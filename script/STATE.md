@@ -869,3 +869,12 @@ COLLECTOR FAULT (next, high): on github.com with the default world, chunk 97 mod
 does not happen. So a function object's plan/closure is damaged by a collection. Reproduce in a bench: /tmp/h2.js style harness
 (chunks via node, mini require) in a small world with many collections.
 After that on GitHub (400 MB world): RegExp with \p{RI}, \p{Emoji}, \p{EMod}, \u{...} and flag u (landing-pages 426:122916).
+Unit 52 [by Opus] findings (no code change): the GitHub "an object is not a function" (97 module uk, statement at 58:52285,
+`let n=\`${o({...})}...\``) happens ONLY at TROUGH_WORLD_MB=96 (the default); 64, 80, 112, 128, 200, 400 all pass it. It is
+deterministic at 96, and any probe code in that module hides it (allocation timing). Bench harnesses (node-built chunk
+harness, new Function closures under garbage at 8-40 MB) do not reproduce it. Leading suspects: a root the collector misses
+during run-time compiling (c_fragment keeps names above the value stack top; string-literal double copy + w_cut in compile.S
+~2440-2490 relies on W_LAST adjacency across a possible collection). NEXT: a collection-stress switch (collect every N slow
+allocations, or keep W_HEAP_END just above the top) so the fault shows up in small bench programs; then fix.
+Probe tip: JS String.replace treats $` and $' in the replacement specially; use r.replace(a,function(){return b}).
+Also seen: nf3-style plain closures + 20k-object garbage rounds fill a 24 MB world (40 MB fine): retention worth a look.
