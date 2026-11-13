@@ -1,0 +1,13 @@
+<html><head><title>Script test</title><script>var count = 0; function item(t){ count++; return '<li>' + count + '. ' + t + '</li>' }</script>
+<script src="lib.js"></script></head>
+<body><h1>Written by scripts</h1>
+<p>Static line before.</p>
+<script>document.write('<p>Hello from a script at ' + location.href + '</p>'); console.log('first inline ran');</script>
+<ul><script type="text/javascript">
+for (const t of words()) document.write(item(t));
+document.title = 'Changed ' + document.title;
+</script></ul>
+<script type="application/json">{"not": "a program"}</script>
+<script>null.broken</script>
+<script>async function later(){ await null; return 6 * 7 } later().then(function(v){ console.log('async gave', v) }); document.write('<p>Sum of squares: ' + [1,2,3].map(x => x*x).reduce((a,b) => a+b) + ', title is now "' + document.title + '".</p>')</script>
+<p>Static line after.</p></body></html>

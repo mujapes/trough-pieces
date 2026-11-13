@@ -350,3 +350,17 @@ number 1 and its block holding the answer (UTF-8; kept in W_ANSWER 552), then ca
 /tmp/h paths) prints "host said Grüße from the host Grüße from the host". 61 routines in machine code.
 Next: host/browse.c finds a page's <script> elements, loads each into one world (a small `document` written in the language
 over `__host`: write, title), splices document.write's text into the page before `page render`; then a `dom` piece.
+**Seventeenth unit: the browser host runs a page's scripts (host/browse.c, `with_scripts`; C, as the host is).** Before
+`page render`, every <script> element (inline, or fetched by src; type absent or ...javascript) is loaded in page order into one
+32 MB world of `script.asm`; `document` (write, writeln, title), `location.href`, `navigator.userAgent`, `window` are a few
+lines of the language over `__host` (`page_opening` in browse.c); what a script writes takes its element's place in the page's
+text. Console output and errors go to the host's stderr; the result line says how many scripts ran and failed. Both the
+one-picture path and the live screen (`--serve`) call it. Seen: `checks/page/index.html` + `lib.js` (served from a throwaway
+bench server on 127.0.0.1): the picture shows the script-written paragraph, a three-item list from a generator in the fetched
+file, and the sum line with the changed title; a JSON block skipped; a throwing script did not stop the next; `async gave 42`.
+Real sites (news.ycombinator.com, www.wikipedia.org, example.com): no crash, pages draw as before, their scripts fail for want
+of a tree ("not a function": getElementById and kin); one SyntaxError in Wikipedia's inline script at column 5690 (not looked
+at); example.com reported one failed script, not looked at. Not made: timers after the page is drawn (the host gives the clock
+but never calls `clock 0`), modules, defer/async order, document.write of a further <script>, events, any tree.
+Next: the `dom` piece (the page as a tree, in machine code) and getElementById, textContent, innerHTML, createElement,
+appendChild over `__host`; find Wikipedia's SyntaxError; lazy loops over generators; shapes; the fuzz job.

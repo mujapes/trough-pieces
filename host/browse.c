@@ -113,6 +113,66 @@ static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, s
     if (bn < 0) { snprintf(why, room_why, "the reply's body could not be read"); return 0; } resize(body, (size_t)bn);
     if (packed == 1) { at(33, body); int16_t qb[1] = {33}; uint8_t *plain = block(2, room); long long un = unpack(plain, qb, 1, 0, table); if (un < 0) { snprintf(why, room_why, "the packed body could not be unpacked"); return 0; } resize(plain, (size_t)un); body = plain; }
     return body; }
+/* --- scripts: the page's <script> elements, each run in one world of our own engine (the script piece), in page order. A script
+ * reaches the page through `document`, written in the language over the engine's one way of asking its host: document.write's text
+ * takes the script element's place in the page, so it is read like any other part. The host's part: finding the elements, fetching
+ * the ones named by src, the clock, and answering what is asked. No tree of the page yet: that is the dom piece, to come. --- */
+static const char page_opening[] =
+    "var document={write:function(){var s='';for(var i=0;i<arguments.length;i++)s+=arguments[i];__host('w'+s)},"
+    "writeln:function(){var s='';for(var i=0;i<arguments.length;i++)s+=arguments[i];__host('w'+s+'\\n')},"
+    "get title(){return __host('t')},set title(v){__host('T'+v)}};"
+    "var location={href:__host('l'),toString:function(){return this.href}};var navigator={userAgent:'Trough'};var window={document:document,location:location,navigator:navigator};";
+static int same_word(const uint8_t *p, const uint8_t *end, const char *w) { size_t n = strlen(w); if ((size_t)(end - p) < n) return 0; for (size_t i = 0; i < n; i++) if ((p[i] | 32) != (uint8_t)w[i] && p[i] != (uint8_t)w[i]) return 0; return 1; }
+/* an attribute's value inside a tag's text (name="v", name='v', name=v) -> its length, the value at *v; -1 if it is not there */
+static long attribute(const uint8_t *tag, const uint8_t *end, const char *name, const uint8_t **v) { size_t n = strlen(name);
+    for (const uint8_t *p = tag; p + n < end; p++) { if (!(p[-1] == ' ' || p[-1] == '\n' || p[-1] == '\t' || p[-1] == '\r') || !same_word(p, end, name)) continue; const uint8_t *q = p + n; while (q < end && (*q == ' ' || *q == '\n')) q++;
+        if (q >= end || *q != '=') { if (q >= end || *q == ' ' || *q == '>' ) { *v = q; return 0; } continue; } q++; while (q < end && (*q == ' ' || *q == '\n')) q++; if (q >= end) return -1;
+        if (*q == '"' || *q == '\'') { const uint8_t *c = memchr(q + 1, *q, (size_t)(end - q - 1)); if (!c) return -1; *v = q + 1; return c - q - 1; }
+        const uint8_t *c = q; while (c < end && *c != ' ' && *c != '>' && *c != '\n') c++; *v = q; return c - q; }
+    return -1; }
+typedef struct { uint8_t *world, *out, *answer; char title[512]; int began, dead, ran, failed; } scripts;
+/* one script's text through the engine; what it writes into the document is added to *made */
+static void run_script(scripts *s, const uint8_t *text, size_t n, const char *address, uint8_t **made, size_t *made_n, size_t *made_room) {
+    entry5 load = entry("script.asm", "load"), run = entry("script.asm", "run"), text_of = entry("script.asm", "text"), error = entry("script.asm", "error");
+    uint8_t *source = text_block((const char *)text, n); at(41, source); int16_t qs[1] = {41}, qw[2] = {40, 1};
+    if (load(s->world, qs, 1, 0, table) < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); free(source); s->failed++; return; }
+    free(source); s->ran++;
+    for (int turn = 0; turn < 400; turn++) {
+        long long r = run(s->world, 0, 0, 20000000, table), t = text_of(s->out, qw, 1, 0, table); size_t bytes = t < 0 ? 0 : (size_t)(t & 0xffffffff), want = t < 0 ? 0 : (size_t)(t >> 32); const uint8_t *o = s->out + 64;
+        size_t said = want ? want - 1 : bytes; if (said) fprintf(stderr, "console: %.*s", (int)said, o);
+        if (want) { const uint8_t *q = o + want - 1; size_t qn = bytes - (want - 1); const char *a = ""; size_t an = 0;
+            if (qn && q[0] == 'w') { if (*made_n + qn > *made_room) { *made_room = (*made_n + qn) * 2; *made = realloc(*made, *made_room); if (!*made) exit(4); } memcpy(*made + *made_n, q + 1, qn - 1); *made_n += qn - 1; }
+            else if (qn && q[0] == 't') { a = s->title; an = strlen(a); }
+            else if (qn && q[0] == 'T') { size_t k = qn - 1 < sizeof s->title - 1 ? qn - 1 : sizeof s->title - 1; memcpy(s->title, q + 1, k); s->title[k] = 0; }
+            else if (qn && q[0] == 'l') { a = address; an = strlen(a); }
+            memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
+        if (r == 0) return;
+        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); s->failed++; return; } }
+    fprintf(stderr, "script: stopped after eight thousand million steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }
+static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, size_t room_why);
+/* the page's text with its scripts run: each script element replaced by what it wrote. The same block if there is no script. */
+static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *roots, int *ran, int *failed) {
+    const uint8_t *d = body + 64, *end = d + length(body), *p = d, *copied = d; scripts s; memset(&s, 0, sizeof s); uint8_t *page = 0; size_t page_n = 0, page_room = 0; *ran = *failed = 0;
+    if (end - d > 8 && (!memcmp(d, "\x89PNG", 4) || (d[0] == 0xff && d[1] == 0xd8) || !memcmp(d, "GIF8", 4))) return body;
+    for (const uint8_t *t = d; t + 16 < end; t++) if (t[0] == '<' && same_word(t + 1, end, "title>")) { const uint8_t *c = t + 7; while (c + 2 < end && !(c[0] == '<' && c[1] == '/')) c++; size_t k = (size_t)(c - t - 7) < sizeof s.title - 1 ? (size_t)(c - t - 7) : sizeof s.title - 1; memcpy(s.title, t + 7, k); s.title[k] = 0; break; }
+    while (p + 8 < end) { p = memchr(p, '<', (size_t)(end - p - 8)); if (!p) break; if (!same_word(p + 1, end, "script") || !(p[7] == '>' || p[7] == ' ' || p[7] == '\n' || p[7] == '\t' || p[7] == '\r')) { p++; continue; }
+        const uint8_t *tag_end = memchr(p, '>', (size_t)(end - p)); if (!tag_end) break; const uint8_t *text = tag_end + 1, *close = text; while (close + 9 <= end && !(close[0] == '<' && close[1] == '/' && same_word(close + 2, end, "script"))) close++; if (close + 9 > end) close = end;
+        const uint8_t *after = memchr(close, '>', (size_t)(end - close)); after = after ? after + 1 : end;
+        const uint8_t *v; long tn = attribute(p + 7, tag_end, "type", &v); int ours = tn <= 0 || (tn >= 10 && same_word(v + tn - 10, tag_end, "javascript"));   /* not data, not a module (modules: to come) */
+        if (page_n + (size_t)(p - copied) + 1 > page_room) { page_room = (page_n + (size_t)(end - d)) * 2 + 64; page = realloc(page, page_room); if (!page) exit(4); } memcpy(page + page_n, copied, (size_t)(p - copied)); page_n += (size_t)(p - copied); copied = after;
+        if (ours && !s.dead) {
+            if (!s.began) { s.began = 1; s.world = block(6, 32u << 20); s.out = block(2, 1u << 20); s.answer = block(2, 4096); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
+                struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+                entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
+                size_t none = 0, room = 0; uint8_t *drop = 0; run_script(&s, (const uint8_t *)page_opening, sizeof page_opening - 1, address, &drop, &none, &room); free(drop); s.ran = 0; }
+            long sn = attribute(p + 7, tag_end, "src", &v);
+            if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block((const char *)v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
+                char where[2048] = "", why[300] = ""; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
+                if (got) { run_script(&s, got + 64, length(got), address, &page, &page_n, &page_room); free(got); } else { fprintf(stderr, "script %.*s: %s\n", (int)sn, v, why[0] ? why : "not an address we can follow"); s.failed++; } free(base); free(rel); free(full); }
+            else run_script(&s, text, (size_t)(close - text), address, &page, &page_n, &page_room); }
+        p = after; }
+    if (!page) return body;
+    uint8_t *fresh = block(2, page_n + (size_t)(end - copied)); memcpy(fresh + 64, page, page_n); memcpy(fresh + 64 + page_n, copied, (size_t)(end - copied)); free(page); free(s.world); free(s.out); free(s.answer); *ran = s.ran; *failed = s.failed; return fresh; }
 /* The live screen: browse <out dir> --serve <picture file> <events file> <width> <height> [address]
  * The picture file is a surface as the pieces know it (64-byte head, then the dots) that the app maps and shows; bytes 24-31 of
  * the head are a counter this host raises after every redraw. The events file gets one line per event from the app:
@@ -148,7 +208,7 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0, editing = 0; char typed[512] = ""; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; job *now = 0; static int applied[PICS]; pic *pics = 0; int pic_n = 0;
     { const char *need[][2] = {{"url","resolve"},{"url","part"},{"url","port"},{"http","request"},{"http","status"},{"http","header"},{"http","packed"},{"http","body"},{"inflate","unpack"},{"tls","feed"},{"png","decode"},{"jpeg","decode"},{"gif","decode"},{"image","blit"},{"image","smooth"},{"image","stretch"},{"paint","clear"},{"page","pictures"},{"page","link"}}; for (size_t i = 0; i < sizeof need / sizeof need[0]; i++) entry(need[i][0], need[i][1]); }   /* every piece is loaded before a second thread exists */ static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
     for (;;) {
-        if (fresh) { fresh = 0; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
+        if (fresh) { fresh = 0; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); if (body) { int ran, failed; body = with_scripts(body, address, roots, &ran, &failed); } scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
             job_leave(now); now = 0; pics = 0; pic_n = 0; memset(applied, 0, sizeof applied);
             if (body) { at(34, body); at(35, font); uint8_t *list = block(2, 65536); int16_t qq[4] = {34, 35, (int16_t)size_px, (int16_t)W}; long long ln = entry("page", "pictures")(list, qq, 4, 0, table);
                 now = calloc(1, sizeof *now); pics = now->p; snprintf(now->address, sizeof now->address, "%s", address); now->roots = roots;
@@ -218,6 +278,7 @@ int main(int argc, char **argv) {
     size_t got = length(reply), room = (got * 4 > 200000 ? got * 4 : 200000) * 6; int16_t qr[1] = {32}; long long packed = packed_of(0, qr, 1, 0, table); uint8_t *body = block(2, room); long long bn = body_of(body, qr, 1, 0, table);
     if (bn < 0) { printf("%.*s -> %lld, %zu bytes, %s; the reply's body could not be read\n", (int)length(address), address + 64, status, got, secure); return 1; } resize(body, (size_t)bn);
     if (packed == 1) { at(33, body); int16_t qb[1] = {33}; uint8_t *plain = block(2, room); long long un = unpack(plain, qb, 1, 0, table); if (un < 0) { printf("the packed body could not be unpacked\n"); return 1; } resize(plain, (size_t)un); body = plain; bn = un; }
+    int ran = 0, failed = 0; { char where[2048]; snprintf(where, sizeof where, "%.*s", (int)length(address), address + 64); body = with_scripts(body, where, roots, &ran, &failed); bn = (long long)length(body); }
     at(34, body); at(35, font); const uint8_t *d = body + 64; const char *kind = bn > 8 && !memcmp(d, "\x89PNG\r\n\x1a\n", 8) ? "png" : bn > 2 && d[0] == 0xff && d[1] == 0xd8 ? "jpeg" : bn > 4 && !memcmp(d, "GIF8", 4) ? "gif" : 0;
     uint8_t *screen; long long answer;
     if (kind) {   /* a picture rather than a page: our own decoder for its kind, then the image piece fits it to the screen's width */
@@ -228,6 +289,6 @@ int main(int argc, char **argv) {
         entry("paint", "clear")(screen, 0, 0, 0xffffffffll, table); int16_t qi[5] = {36, 0, 0, (int16_t)W, (int16_t)H}; entry("image", iw > W ? "smooth" : "blit")(screen, qi, 5, 0, table);
         printf("%.*s -> %lld, %zu bytes, %s; %s picture %u x %u decoded by our own piece; %.0f ms in all\n", (int)length(address), address + 64, status, got, secure, kind, iw, ih, now_ms() - started); }
     else { screen = surface(1, W, H, 4); entry("paint", "clear")(screen, 0, 0, 0xffffffffll, table); int16_t qg[4] = {34, 35, (int16_t)size_px, (int16_t)scroll}; answer = entry("page", "render")(screen, qg, 4, 0, table);
-        printf("%.*s -> %lld, %zu bytes, %s; body %lld bytes%s; page is %lld dots tall; %.0f ms in all\n", (int)length(address), address + 64, status, got, secure, bn, packed == 1 ? " after unpacking" : "", answer, now_ms() - started); }
+        printf("%.*s -> %lld, %zu bytes, %s; body %lld bytes%s; %d scripts run, %d failed; page is %lld dots tall; %.0f ms in all\n", (int)length(address), address + 64, status, got, secure, bn, packed == 1 ? " after unpacking" : "", ran, failed, answer, now_ms() - started); }
     if (!write_png(argv[3], screen + 64, W, H)) { printf("could not write %s\n", argv[3]); return 1; }
     return 0; }
