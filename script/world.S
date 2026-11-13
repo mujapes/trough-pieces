@@ -47,6 +47,7 @@
     .equ W_K_TOPRIM, 504                // the text "@@toPrimitive"
     .equ W_K_VALUEOF, 496               // the text "valueOf"
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
+    .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below
     .equ T_UNDEF, 0xfff9

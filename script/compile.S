@@ -20,6 +20,7 @@
     .equ F_PTOP, 80                     // translation in the machine's idle stack; from its other end, declared functions waiting
     .equ C_DEEPEST, 400
     // a function's record
+    .equ F_PEND, 160                    // what the next function translated is to be: 64 a generator, 128 an async function (0: neither)
     .equ R_PARENT, 0
     .equ R_NAMES, 8                     // its names (parameters first), and how many
     .equ R_COUNT, 16
@@ -67,8 +68,9 @@
 
 // c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
 c_compile:
-    stp     x29, x30, [sp, #-160]!
+    stp     x29, x30, [sp, #-176]!
     mov     x29, sp
+    str     xzr, [x29, #F_PEND]
     mov     x9, #-1
     stp     x9, xzr, [x29, #F_CONSTPOS]
     str     xzr, [x29, #F_DECLKIND]
@@ -143,7 +145,7 @@ c_compile:
     str     w9, [x19, #W_STATE]
     mov     x0, #1
 c_out:
-    ldp     x29, x30, [sp], #160
+    ldp     x29, x30, [sp], #176
     ret
 // c_native_in: the opening lines can name the maker of built-in functions, `__n` (a global, made the first time);
 // c_native_out: nothing after them can: its name becomes the empty one.
@@ -617,7 +619,8 @@ c_scan_meth:
     cmp     w24, #33
     b.ne    0f
     ldr     x11, [x29, #F_FUNC]
-    mov     x12, #1
+    ldr     x12, [x11, #R_FLAGS]
+    orr     x12, x12, #1
     str     x12, [x11, #R_FLAGS]
     b       8f
 0:  cmp     w9, #1
@@ -1350,7 +1353,8 @@ c_scan_expr:
 6:  bl      next_word
     b       1b
 7:  ldr     x9, [x29, #F_FUNC]
-    mov     x10, #1
+    ldr     x10, [x9, #R_FLAGS]
+    orr     x10, x10, #1
     str     x10, [x9, #R_FLAGS]
 8:  add     sp, sp, #16
     LEXBACK
@@ -1510,9 +1514,73 @@ c_scan_block:
     ldr     x30, [sp, #40]
     add     sp, sp, #48
     ret
+// c_kept: at the start of a body: a generator or an async function keeps its call aside here and answers with what the
+// prelude makes of it; the body runs when it is resumed. c_peek: the word after the current one -> w0 its kind, w1 which,
+// w2 whether a line ended before it.
+c_kept:
+    ldr     x9, [x29, #F_FUNC]
+    ldr     x9, [x9, #R_FLAGS]
+    tst     x9, #192
+    b.eq    1f
+    str     x30, [sp, #-16]!
+    lsr     w9, w9, #7
+    and     w9, w9, #1
+    mov     w0, #OP_GENSNAP
+    orr     w0, w0, w9, lsl #8
+    bl      c_op8
+    OP      OP_RET
+    ldr     x30, [sp], #16
+1:  ret
+c_op8:                                  // two bytes: w0's low two
+    stp     x30, x0, [sp, #-16]!
+    and     w0, w0, #0xff
+    bl      c_byte
+    ldr     x0, [sp, #8]
+    lsr     w0, w0, #8
+    and     w0, w0, #0xff
+    bl      c_byte
+    ldr     x30, [sp], #16
+    ret
+c_peek:
+    str     x30, [sp, #-16]!
+    LEXSAVE
+    bl      next_word
+    mov     w0, w23
+    mov     w1, w24
+    mov     w2, w27
+    LEXBACK
+    ldr     x30, [sp], #16
+    ret
+// c_inkept: is the function being translated of the kind x0 (64 a generator, 128 async) -> flags: ne if so. Uses x9.
+c_inkept:
+    ldr     x9, [x29, #F_FUNC]
+    cbz     x9, 1f
+    ldr     x9, [x9, #R_FLAGS]
+    tst     x9, x0
+    ret
+1:  cmp     x9, x9
+    ret
+// c_methkind: before a method's name in an object or a class: * makes it a generator, async (before a name) async.
+c_methkind:
+    str     x30, [sp, #-16]!
+    ISP     45, 1f
+    mov     x9, #64
+    b       2f
+1:  ISK     35, 9f
+    bl      c_peek
+    cmp     w0, #K_PUNCT
+    b.ne    3f
+    cmp     w1, #37                     // async [key]() is a method; async( and async: and async, are a plain name
+    b.ne    9f
+3:  mov     x9, #128
+2:  str     x9, [x29, #F_PEND]
+    bl      next_word
+9:  ldr     x30, [sp], #16
+    ret
 c_scan_inner:                           // marks the function being translated as having inner functions. Uses x9, x10.
     ldr     x9, [x29, #F_FUNC]
-    mov     x10, #1
+    ldr     x10, [x9, #R_FLAGS]
+    orr     x10, x10, #1
     str     x10, [x9, #R_FLAGS]
     ret
 // c_function: a function, translated where it stands (jumped over when the program runs through), and its plan made a
@@ -1538,9 +1606,18 @@ c_function:
     stp     xzr, xzr, [sp, #80]
     mov     x9, #-1
     stp     x9, xzr, [sp, #96]
+    ldr     x9, [x29, #F_PEND]
+    str     xzr, [x29, #F_PEND]
+    str     x9, [sp, #16 + R_FLAGS]
     ldr     w9, [sp, #8]
     cmp     w9, #1
     b.hi    2f
+    ISP     45, 10f                     // function* : a generator
+    mov     x9, #64
+    str     x9, [sp, #16 + R_FLAGS]
+    bl      next_word
+    ldr     w9, [sp, #8]
+10:
     cmp     w23, #K_NAME
     b.ne    1f
     stp     x25, x26, [sp, #80]
@@ -1697,13 +1774,14 @@ c_function:
     cbz     x9, 70f
     add     x0, sp, #144
     bl      c_defaults
-70: mov     w9, #34
+70: bl      c_kept
+72: mov     w9, #34
     cmp     w23, #K_PUNCT
     ccmp    w24, w9, #0, eq
     b.eq    71f
     cbz     w23, c_unexpected
     bl      c_stmt
-    b       70b
+    b       72b
 71: OP      OP_UNDEF
     OP      OP_RET
     ldr     x0, [sp, #120]
@@ -1725,7 +1803,8 @@ c_function:
     cbz     x9, 81f
     add     x0, sp, #144
     bl      c_defaults
-81: bl      c_assign
+81: bl      c_kept
+    bl      c_assign
     OP      OP_RET
     str     wzr, [sp, #12]
 9:  ldr     x0, [sp, #112]
@@ -2149,7 +2228,56 @@ c_assign:
     mov     w0, #0
     bl      c_destructure
     b       9f
-0:  bl      c_cond
+0:  ISK     32, 80f
+    mov     x0, #64
+    bl      c_inkept
+    b.eq    80f
+    bl      next_word                   // yield, yield value, yield* loopable
+    cbnz    w27, 81f
+    cbz     w23, 81f
+    cmp     w23, #K_PUNCT
+    b.ne    82f
+    cmp     w24, #45
+    b.eq    83f
+    cmp     w24, #34
+    b.eq    81f
+    cmp     w24, #36
+    b.eq    81f
+    cmp     w24, #38
+    b.lo    82f
+    cmp     w24, #40
+    b.ls    81f
+    cmp     w24, #54
+    b.ne    82f
+81: OP      OP_UNDEF
+    b       84f
+82: bl      c_assign
+84: OP      OP_YIELD
+    NOLV
+    b       9f
+83: bl      next_word                   // each item of the loopable is yielded in turn (what is sent in is dropped)
+    bl      c_assign
+    OP      OP_ITER
+    mov     x0, #0
+    bl      c_const
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #16]
+    mov     w0, #OP_FORNEXT
+    bl      c_jump
+    str     x0, [sp, #24]
+    OP      OP_YIELD
+    OP      OP_POP
+    mov     w0, #OP_JMP
+    ldr     x1, [sp, #16]
+    bl      c_jump_to
+    ldr     x0, [sp, #24]
+    bl      c_patch
+    OP      OP_POP
+    OP      OP_POP
+    OP      OP_UNDEF
+    NOLV
+    b       9f
+80: bl      c_cond
     cmp     w23, #K_PUNCT
     b.ne    9f
     adr     x9, c_asg
@@ -2309,7 +2437,17 @@ c_unary:
     b       9f
 5:  cmp     w23, #K_KEYWORD
     b.ne    6f
-    cmp     w24, #8
+    cmp     w24, #36
+    b.ne    52f
+    mov     x0, #128
+    bl      c_inkept
+    b.eq    6f
+    bl      next_word                   // await value: the call is kept aside until the value's promise settles
+    bl      c_unary
+    OP      OP_YIELD
+    NOLV
+    b       9f
+52: cmp     w24, #8
     b.ne    50f
     bl      next_word                   // delete o.name, delete o[key]: the read just written becomes the removal
     bl      c_unary
@@ -2581,7 +2719,8 @@ c_object:
     DEEPER
     OP      OP_OBJECT
     bl      next_word
-1:  cmp     w23, #K_PUNCT
+1:  bl      c_methkind
+    cmp     w23, #K_PUNCT
     b.ne    2f
     cmp     w24, #34
     b.eq    9f
@@ -3326,7 +3465,8 @@ c_class:
     bl      c_skip_pattern
     b       6b
 64: OP      OP_SWAP
-65: bl      c_propkey
+65: bl      c_methkind
+    bl      c_propkey
     ISP     35, c_notyet
     mov     w0, #4
     bl      c_function
@@ -3431,6 +3571,43 @@ c_primary:
     b       9f
 21: cmp     w24, #22
     b.eq    c_super
+    cmp     w24, #35                    // async function, async name => , async (names) =>
+    b.ne    773f
+    bl      c_peek
+    cbnz    w2, 773f
+    mov     x9, #128
+    cmp     w0, #K_KEYWORD
+    b.ne    774f
+    cmp     w1, #15
+    b.ne    773f
+    str     x9, [x29, #F_PEND]
+    bl      next_word
+    bl      next_word
+    mov     w0, #0
+    bl      c_function
+    b       9f
+774:
+    cmp     w0, #K_NAME
+    b.ne    775f
+    str     x9, [x29, #F_PEND]
+    bl      next_word
+    mov     w0, #2
+    bl      c_function
+    b       9f
+775:
+    cmp     w0, #K_PUNCT
+    b.ne    773f
+    cmp     w1, #35
+    b.ne    773f
+    bl      next_word
+    bl      c_peek_paren
+    b.ne    c_notyet
+    mov     x9, #128
+    str     x9, [x29, #F_PEND]
+    mov     w0, #3
+    bl      c_function
+    b       9f
+773:
     sub     w9, w24, #33                // let, static, async, await, of, get, set may be plain names
     cmp     w9, #6
     b.ls    40f
@@ -3717,8 +3894,22 @@ s_word:
     bl      c_class
     OP      OP_POP
     b       s_done
-1:  cmp     w24, #15
+1:  cmp     w24, #35                    // async function name() { }: a declaration like any other
+    b.ne    771f
+    bl      c_peek
+    cmp     w0, #K_KEYWORD
     b.ne    s_expr
+    cmp     w1, #15
+    b.ne    s_expr
+    cbnz    w2, s_expr
+    mov     x9, #128
+    str     x9, [x29, #F_PEND]
+    bl      next_word
+    b       772f
+771:
+    cmp     w24, #15
+    b.ne    s_expr
+772:
     bl      next_word
     mov     w0, #1
     bl      c_function

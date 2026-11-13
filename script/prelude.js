@@ -235,3 +235,16 @@ if(t.at>now(0)){if(now(2))return false;setclock(t.at)}T.splice(b,1);if(t.ev){t.a
 if(typeof t.f==='function')t.f.apply(undefined,t.a);micro();return true}
 __jobs=function(){micro();var k=0,T,i,b=-1;while(run1()&&++k<1e5);T=Q.t;for(i=0;i<T.length;i++)if(b<0||T[i].at<b)b=T[i].at;setwake(b)};
 })(__n,__q);
+(function(n){var rs=n(59),RT={},GP={next:function(v){return st(this,0,v)},'return':function(v){return st(this,2,v)},'throw':function(e){return st(this,1,e)}};
+GP['@@iterator']=function(){return this};
+function st(g,m,v){if(g._r)throw new TypeError('Generator is already running');
+if(g._d||(m&&!g._s)){g._d=true;if(m===1)throw v;return{value:m?v:undefined,done:true}}
+var h=g._h,r;g._r=g._s=true;h[1]=0;
+try{r=rs(h,m?1:null,m===2?RT:v)}catch(e){g._r=false;g._d=true;if(e===RT)return{value:v,done:true};throw e}
+g._r=false;if(h[1])return{value:r,done:false};g._d=true;return{value:r,done:true}}
+function G(h){this._h=h;this._r=this._s=this._d=false}G.prototype=GP;n(-12,function(h){return new G(h)});
+n(-13,function(h){return new Promise(function(res,rej){
+function step(m,v){var r;h[1]=0;try{r=rs(h,m,v)}catch(e){rej(e);return}
+if(!h[1]){res(r);return}
+Promise.resolve(r).then(function(x){step(null,x)},function(e){step(1,e)})}
+step(null)})})})(__n);

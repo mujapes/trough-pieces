@@ -10,6 +10,8 @@ m_native:
     ldr     x9, [x4, #8]
     cmp     x9, #28
     b.eq    m_fcall
+    cmp     x9, #59
+    b.eq    m_resume
     cmp     x9, #29
     b.eq    m_fapply
     cmp     x9, #49                     // 49-51 take an array only (join: one with no objects in it): anything else
@@ -331,8 +333,16 @@ n_maker:
     b       3b
 2:  cmp     x9, #8
     b.lo    21f
-    cmp     x9, #10
+    cmp     x9, #12
     b.hi    4f
+    cmp     x9, #11
+    b.lo    22f
+    ldr     x1, [sp, #24]               // -12, -13: the prelude's two functions for kept calls
+    ldr     x10, [x1, #8]
+    add     x9, x19, x9, lsl #3
+    str     x10, [x9, #(W_GENFN - 88)]
+    b       n_undef
+22:
     ldr     x1, [sp, #24]
     ldr     x10, [x1, #8]
     add     x9, x19, x9, lsl #3
@@ -866,6 +876,6 @@ n_table:
     .word   n_sinh - n_table, n_cosh - n_table, n_tanh - n_table, n_cbrt - n_table, n_hypot - n_table, n_ident - n_table
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
-    .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table
-    .equ    N_COUNT, 59
+    .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
+    .equ    N_COUNT, 60
     .ltorg

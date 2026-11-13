@@ -319,3 +319,18 @@ promises, needs a function that can stop and go on: the machine's frames kept as
 instructions afresh, so functions of an earlier load cannot be called (several scripts in one page need appending).
 Next: async/await and generators (one mechanism: a kept frame); appending loads; running a page's <script> elements from
 host/browse.c (clock, run, `clock 0` for the wake time); shapes; the fuzz job.
+**Stage 6, fourteenth unit: generators and async functions, one mechanism (a kept call). 39 of 39 programs (`generators.js` 13
+lines, `async.js` 17 lines; each right on its first complete run).**
+Machine code (machine.S, its comment "Kept calls" says the layout): OP_GENSNAP 94, OP_YIELD 95, `m_snap`, and built-in 59
+`m_resume` (a turn of the call, like call and apply). A call that stops is copied off the stack into an array (variables, record,
+what its instructions had on the stack, seven plain numbers) and copied back above the resuming call; its open try records are
+moved and joined to the chain again. W_GENFN 528 (two values, set by `__n(-12, f)` and `__n(-13, f)`): what makes a generator
+of a holder, what drives an async function. Translator: `function*`, `yield`, `yield*` (the loopable's items in turn), methods
+`*name(){}` and `async name(){}` in objects and classes, `async function`, async arrows, `await` (the same instruction as yield).
+A function's kind waits in F_PEND (the translator's frame is 176 bytes now) and lives in its flags: 64 generator, 128 async.
+prelude.js (its last part): next, return (a private marker is thrown in so finally blocks run), throw; the async driver on promises.
+Not made: looping over a generator (`for..of`, spread) still collects everything first, so an endless generator in a loop with
+`break` never ends (the loop instructions want an array; a lazy path is needed); `yield*` drops what is sent in and the inner
+generator's final answer; async generators and `for await`; `await` at the top of a script; a catch-all in a generator also
+catches the marker of `return()`; a generator's own `prototype`; the hidden fields `_h _r _s _d` show in `for..in`.
+Next: appending loads (several scripts, one world); a page's <script> elements from host/browse.c; lazy loops; shapes; the fuzz job.

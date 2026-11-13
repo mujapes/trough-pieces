@@ -95,7 +95,9 @@
     .equ OP_COPYSCOPE, 91               // + 16 bits: how many: the scope is exchanged for a copy of itself (a loop's next turn)
     .equ OP_CONSTGET, 92                // + 16 bits (not used): stands where a const would be read to be assigned to: undefined
     .equ OP_CONSTERR, 93                // + 16 bits (not used): the assignment itself: TypeError
-    .equ OP_COUNT, 94
+    .equ OP_GENSNAP, 94                 // + 8 bits (0 a generator, 1 an async function), then OP_RET: the call as it stands is kept aside, and what the prelude makes of it is the call's answer
+    .equ OP_YIELD, 95                   // value -> (when resumed) the value sent in: the call is kept aside again and the value is the resuming call's answer
+    .equ OP_COUNT, 96
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -1418,6 +1420,7 @@ i_ret:
     b.eq    1f
     ldr     x0, [x20, #40]
 1:
+m_ret_x0:                               // (i_yield comes in here: x0 the answer, x13 the call's kind)
     ldp     x9, x10, [x20]
     ldp     x28, x11, [x20, #16]
     ldr     x12, [x20, #32]
@@ -1434,6 +1437,181 @@ i_ret:
 2:  NEXT
 3:  mov     x12, x22                    // 3, 4: the call was an object's toString, made in the middle of an instruction
     b       m_answer
+// Kept calls (generators, async functions). A call that stops in the middle is copied off the stack into an array, the
+// snapshot: its variables, its record, whatever its instructions had on the stack (open try records among them), then seven
+// plain numbers: how many variables, where its variables live if in the heap (0: on the stack), its scope, the instruction
+// to go on at, its newest open try (measured from its variables; 0: none), where its variables were on the stack, and 1 if
+// it has not started. The prelude holds it in a two-item array, the holder: the snapshot, and a mark the machine sets to 1
+// at each yield (so the prelude can tell a yield from the end). While a kept call runs, the holder lies just under its variables.
+// m_snap: the running call (down to x22) -> x0 its snapshot (0: the world is full); x15 the seventh number. The call's own
+// try records leave the chain of open ones.
+m_snap:
+    stp     x29, x30, [sp, #-16]!
+    ldr     x9, [x20, #48]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     x9, [x9, #F_PLAN]
+    add     x9, x19, x9
+    ldr     w6, [x9, #20]
+    sub     x1, x20, x6, lsl #3
+    add     x9, x22, #96
+    cmp     x9, x26
+    b.ls    0f
+    ldp     x29, x30, [sp], #16
+    b       m_deep
+0:  sub     x10, x1, x19
+    sub     x11, x27, x19
+    cmp     x27, x1
+    csel    x11, xzr, x11, eq
+    ldr     x12, [x19, #W_CODE]
+    add     x12, x19, x12
+    sub     x12, x21, x12
+    add     x12, x12, x15               // (a fresh one goes on after the OP_RET that follows)
+    ldr     x13, [x19, #W_HANDLER]
+    mov     x14, #0
+    cmp     x13, x10
+    b.ls    2f
+    sub     x14, x13, x10
+1:  add     x9, x19, x13
+    ldr     x13, [x9, #-8]
+    cmp     x13, x10
+    b.hi    1b
+    str     x13, [x19, #W_HANDLER]
+2:  stp     x6, x11, [x22]
+    stp     x28, x12, [x22, #16]
+    stp     x14, x10, [x22, #32]
+    str     x15, [x22, #48]
+    mov     x0, x1
+    add     x1, x22, #56
+    sub     x1, x1, x0
+    lsr     x1, x1, #3
+    bl      a_from
+    ldp     x29, x30, [sp], #16
+    ret
+i_gensnap:
+    ldrb    w14, [x21], #1
+    str     x14, [sp, #-16]!
+    mov     x15, #1
+    bl      m_snap
+    ldr     x14, [sp], #16
+    cbz     x0, m_full
+    stp     x0, xzr, [x22]              // the holder
+    str     x14, [sp, #-16]!
+    mov     x0, x22
+    mov     x1, #2
+    bl      a_from
+    ldr     x14, [sp], #16
+    cbz     x0, m_full
+    add     x9, x19, x14, lsl #3
+    ldr     x9, [x9, #W_GENFN]
+    stp     x9, x0, [x22], #16
+    mov     x0, #1
+    b       m_call_n
+i_yield:
+    ldr     x0, [x22, #-8]!
+    str     x0, [sp, #-16]!
+    mov     x15, #0
+    bl      m_snap
+    ldr     x14, [sp], #16
+    cbz     x0, m_full
+    ldr     x9, [x20, #48]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     x9, [x9, #F_PLAN]
+    add     x9, x19, x9
+    ldr     w6, [x9, #20]
+    sub     x1, x20, x6, lsl #3
+    ldr     x9, [x1, #-8]               // the holder
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     x9, [x9, #A_ITEMS]
+    add     x9, x19, x9
+    mov     x10, #0x3ff0000000000000
+    stp     x0, x10, [x9]
+    mov     x0, x14
+    ldr     x13, [x20, #56]
+    b       m_ret_x0
+// m_resume: built-in 59, a turn of the call itself: (holder, null or not, value). The kept call is put back on the stack
+// where the arguments were (the holder stays under it), its record made to answer this call, its try records moved to
+// where they now lie and joined to the open ones. Then it goes on: with the value as its yield's answer (null), or with
+// the value thrown where it stopped (anything else).
+m_resume:
+    ldr     x14, [x1, #8]
+    ldr     x15, [x1, #16]
+    ldr     x9, [x1]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     x9, [x9, #A_ITEMS]
+    add     x9, x19, x9
+    ldr     x9, [x9]
+    and     x9, x9, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     w5, [x9, #A_LEN]
+    ldr     x9, [x9, #A_ITEMS]
+    add     x9, x19, x9
+    sub     x5, x5, #7
+    add     x2, x1, #8
+    add     x10, x2, x5, lsl #3
+    add     x10, x10, #64
+    cmp     x10, x26
+    b.hi    m_deep
+    mov     x3, #0
+1:  ldr     x10, [x9, x3, lsl #3]
+    str     x10, [x2, x3, lsl #3]
+    add     x3, x3, #1
+    cmp     x3, x5
+    b.lo    1b
+    add     x9, x9, x5, lsl #3
+    ldp     x6, x7, [x9]
+    ldp     x8, x10, [x9, #16]
+    ldp     x16, x17, [x9, #32]
+    ldr     x4, [x9, #48]
+    add     x3, x2, x6, lsl #3
+    ldr     x9, [x19, #W_CODE]
+    add     x9, x19, x9
+    sub     x0, x21, x9
+    add     x21, x9, x10
+    sub     x10, x27, x19
+    stp     x0, x10, [x3]
+    sub     x10, x20, x19
+    stp     x28, x10, [x3, #16]
+    sub     x10, x12, x19
+    str     x10, [x3, #32]
+    str     x13, [x3, #56]
+    mov     x20, x3
+    add     x22, x2, x5, lsl #3
+    mov     x28, x8
+    add     x27, x19, x7
+    cmp     x7, #0
+    csel    x27, x2, x27, eq
+    cbz     x16, 5f
+    sub     x9, x2, x19
+    sub     x10, x9, x17
+    add     x16, x9, x16
+    ldr     x12, [x19, #W_HANDLER]
+    str     x16, [x19, #W_HANDLER]
+3:  add     x11, x19, x16
+    ldr     x0, [x11, #-32]
+    add     x0, x0, x10
+    str     x0, [x11, #-32]
+    ldr     x0, [x11, #-24]
+    cmp     x0, x17
+    csel    x0, x9, x0, eq
+    str     x0, [x11, #-24]
+    ldr     x0, [x11, #-8]
+    cmp     x0, x17
+    b.ls    4f
+    add     x16, x0, x10
+    str     x16, [x11, #-8]
+    b       3b
+4:  str     x12, [x11, #-8]
+5:  TAGIS   x14, T_NULL
+    b.ne    7f
+    cbnz    x4, 6f
+    str     x15, [x22], #8
+6:  NEXT
+7:  mov     x0, x15
+    b       m_throw
 p_space: .byte ' '
 p_line:  .byte 10
     .balign 4
@@ -1454,4 +1632,5 @@ m_table:
     .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
     .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table, i_getgq - m_table
     .word   i_scope - m_table, i_unscope - m_table, i_copyscope - m_table, i_constget - m_table, i_consterr - m_table
+    .word   i_gensnap - m_table, i_yield - m_table
     .ltorg
