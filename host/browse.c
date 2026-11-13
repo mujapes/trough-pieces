@@ -130,7 +130,7 @@ static long attribute(const uint8_t *tag, const uint8_t *end, const char *name, 
         if (*q == '"' || *q == '\'') { const uint8_t *c = memchr(q + 1, *q, (size_t)(end - q - 1)); if (!c) return -1; *v = q + 1; return c - q - 1; }
         const uint8_t *c = q; while (c < end && *c != ' ' && *c != '>' && *c != '\n') c++; *v = q; return c - q; }
     return -1; }
-typedef struct { uint8_t *world, *out, *answer, *tree, *req; size_t answer_room, req_room; char title[512]; int dead, full, ran, failed, fetched; const uint8_t *roots; char which[24]; long long zone; } scripts;
+typedef struct { uint8_t *world, *out, *answer, *tree, *req; size_t answer_room, req_room; char title[512]; int dead, full, ran, failed, fetched, modules; const uint8_t *roots; char which[24]; long long zone; } scripts;
 /* one request to the page's tree (the dom piece); the answer is in s->answer from byte 64, its length returned (negative: refused) */
 static long long tree_ask(scripts *s, const uint8_t *q, size_t n) { if (n > s->req_room) return -2; memcpy(s->req + 64, q, n); resize(s->req, n); resize(s->answer, s->answer_room); at(42, s->req); at(43, s->answer); int16_t h[2] = {42, 43};
     return entry("dom.asm", "ask")(s->tree, h, 2, 0, table); }
@@ -152,11 +152,15 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
             if (qn && q[0] == 'd') { long long got = tree_ask(s, q + 1, qn - 1); if (got < 0) { memcpy(s->answer + 64, "\x01" "E", 2); got = 2; } resize(s->answer, (size_t)got); text_of(s->answer, qw, 2, 0, table); continue; }
             else if (qn && q[0] == 'T') { size_t k = qn - 1 < sizeof s->title - 1 ? qn - 1 : sizeof s->title - 1; memcpy(s->title, q + 1, k); s->title[k] = 0; }
             else if (qn && q[0] == 'l') { a = address; an = strlen(a); }
-            else if (qn > 1 && q[0] == 'f') {   /* the page asks for an address (GET only): "1" and the body, or "0" and why not; 16 a page at most */
-                char where[2048] = "", why[300] = ""; uint8_t *base = text_block(address, strlen(address)), *rel = text_block((const char *)q + 1, qn - 1); at(30, base); at(31, rel); int16_t q2[2] = {30, 31};
-                uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + qn + 64); if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; }
-                uint8_t *got = 0; if (!where[0]) snprintf(why, sizeof why, "not an address we can follow"); else if (s->fetched >= 16) snprintf(why, sizeof why, "too many requests from one page"); else { s->fetched++; got = fetch_body(where, s->roots, why, sizeof why); }
-                size_t gn = got ? length(got) : strlen(why), head = got ? 4 : 1; if (gn > s->answer_room - head) gn = s->answer_room - head; char st[8]; snprintf(st, sizeof st, "1%03d", (int)(last_status >= 100 && last_status <= 999 ? last_status : 200));
+            else if (qn > 1 && (q[0] == 'f' || q[0] == 'M')) {   /* f: the page asks for an address (GET only): "1" and the body, or "0" and why not; 16 a page at most.
+                 * M base NEWLINE specifier: a module's text, the specifier resolved against base: "1", the address, a line end, the text; 300 modules at most */
+                int mod = q[0] == 'M'; const char *bs = address; size_t bl = strlen(address), ro = 1; char bb[2048];
+                if (mod) { const uint8_t *nl = memchr(q + 1, '\n', qn - 1); if (nl && (size_t)(nl - q - 1) < sizeof bb) { bl = (size_t)(nl - q - 1); memcpy(bb, q + 1, bl); bb[bl] = 0; if (bl) bs = bb; else bl = strlen(address); ro = (size_t)(nl - q) + 1; } }
+                char where[2048] = "", why[300] = ""; uint8_t *base = text_block(bs, bl), *rel = text_block((const char *)q + ro, qn - ro); at(30, base); at(31, rel); int16_t q2[2] = {30, 31};
+                uint8_t *full = made_text(entry("url", "resolve"), q2, 2, bl + qn + 64); if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; }
+                uint8_t *got = 0; if (!where[0]) snprintf(why, sizeof why, "not an address we can follow"); else if (!mod && s->fetched >= 16) snprintf(why, sizeof why, "too many requests from one page"); else if (mod && s->modules >= 300) snprintf(why, sizeof why, "too many modules"); else { if (mod) s->modules++; else s->fetched++; got = fetch_body(where, s->roots, why, sizeof why); }
+                char st[2100]; if (mod) snprintf(st, sizeof st, "1%s\n", where); else snprintf(st, sizeof st, "1%03d", (int)(last_status >= 100 && last_status <= 999 ? last_status : 200));
+                size_t gn = got ? length(got) : strlen(why), head = got ? strlen(st) : 1; if (gn > s->answer_room - head) gn = s->answer_room - head;
                 memcpy(s->answer + 64, got ? st : "0", head); memcpy(s->answer + 64 + head, got ? (const char *)got + 64 : why, gn); gn += head - 1;
                 fprintf(stderr, "fetch %s: %s\n", where[0] ? where : "?", got ? "came" : why); free(got); free(base); free(rel); free(full); resize(s->answer, gn + 1); text_of(s->answer, qw, 2, 0, table); continue; }
             memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
@@ -193,6 +197,8 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
             seen = realloc(seen, (size_t)(seen_n + 1) * sizeof *seen); if (!seen) exit(4); seen[seen_n++] = node; fresh++; tree_askf(&s, "C", node, "");
             int ours = module || tn <= 1 || (tn >= 11 && same_word((const uint8_t *)v + tn - 11, s.answer + 64 + tn, "javascript")); if (!ours) continue;   /* not data */
             long long sn = tree_askf(&s, "g", node, " src") - 1;
+            if (sn > 0 && module) { char call[2200]; int k = snprintf(call, sizeof call, "__module(\""); for (long long i = 0; i < sn && k < 2150; i++) { char c = v[i]; if (c == '"' || c == '\\') call[k++] = '\\'; call[k++] = c; } k += snprintf(call + k, sizeof call - k, "\")");
+                run_script(&s, (const uint8_t *)call, (size_t)k, address); continue; }
             if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block(v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
                 char where[2048] = "", why[300] = "", after[64]; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
                 if (got) { size_t i = 0, gn = length(got); while (i < gn && got[64 + i] <= ' ') i++; if (i < gn && got[64 + i] == '<') { free(got); got = 0; snprintf(why, sizeof why, "a page came back, not a script"); } }   /* an error page is not a program */

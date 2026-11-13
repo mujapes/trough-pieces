@@ -200,3 +200,12 @@ function __mark(on){var m=[],k,o;for(k in __nodes){o=__nodes[k];if(o instanceof 
  if(__clicky(document)||__clicky(document.body)||__clicky(__win)){var c=document.querySelectorAll('button,[role=button],[tabindex],summary,[data-href]');for(var i=0;i<c.length;i++)if(!c[i].closest('a'))m.push(c[i])}
  for(var j=0;j<m.length;j++){if(on)m[j].setAttribute('data-trough-click',m[j].__n);else m[j].removeAttribute('data-trough-click')}}
 function __tap(n){var o=__nodes[n];if(o)o.dispatchEvent(new Event('click',{bubbles:true}))}
+// modules: __module(specifier) runs a module once (by its final address) and gives its exports record. The page's importmap is
+// read on first use; the host resolves against the importing module's address ('M' base NEWLINE specifier).
+var __mods={},__mapd=null,__mbase='';
+function __module(s){if(__mapd===null){__mapd={};var l=document.getElementsByTagName('script');for(var i=0;i<l.length;i++)if(l[i].getAttribute('type')==='importmap'){try{var m=JSON.parse(l[i].textContent).imports||{};for(var k in m)__mapd[k]=m[k]}catch(e){}}}
+var b=__mbase;if(__mapd[s]!==undefined){s=__mapd[s];b=''}else for(var k in __mapd)if(k.charAt(k.length-1)==='/'&&s.indexOf(k)===0){s=__mapd[k]+s.slice(k.length);b='';break}
+var key=b+'\n'+s;if(__mods[key])return __mods[key];var r=__host('M'+key);if(r.charAt(0)!=='1')throw new TypeError('module '+s+': '+r.slice(1));
+var n=r.indexOf('\n'),u=r.slice(1,n);if(__mods[u])return __mods[key]=__mods[u];var ex=__mods[u]=__mods[key]={};
+var f=Function('__exports',r.slice(n+1)),o=__mbase;__mbase=u;__import.meta.url=u;try{f(ex)}finally{__mbase=o;__import.meta.url=o||location.href}return ex}
+var __import=function(s){try{return Promise.resolve(__module(s))}catch(e){return Promise.reject(e)}};__import.meta={url:location.href};

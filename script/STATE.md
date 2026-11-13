@@ -728,3 +728,10 @@ has no `__module` yet (dynamic `import()` keeps the separate `__import`). NEXT: 
 record; `export` declarations, default and lists put their names in it) and `__module` in dom/document.js: importmap, resolve
 against the importing module, fetch through __host('f'..) (the 16-request cap must not count modules), translate once with
 __compile, cache by address.
+Unit 41, stage 2b [by Opus]: exports (compile.S s_export, c_expget/c_expset/c_isfrom/c_isas; c_var copies `export
+const/let/var` simple names via bit 0x100 of F_DECLKIND; export function/class/default/{list}/{list} from; `export *` still
+skipped) into `__exports`, the module body's parameter. Loader: dom/document.js `__module` (importmap exact and prefix,
+cache by final address, import.meta.url while a module runs, `__import` for import() now resolves); host 'M base\nspec'
+request (no 16 cap, 300 modules) answering "1address\n text"; module scripts with src run as `__module("src")`.
+GitHub: modules load and run; now fails on `URL` missing and 'C' of undefined (line 4 col 4830). 51 of 51.
+NEXT: URL class in document.js; the 'C' failure; `export *`; live bindings are copies (circular imports see partial records).

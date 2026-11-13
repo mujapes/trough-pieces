@@ -4403,7 +4403,7 @@ c_w_import: .ascii "__import"
 // Statements. Each leaves the machine's stack as it found it.
 // c_var: var, let or const (the current word) and what it declares, up to but not past the end of the statement
 c_var:
-    stp     x30, xzr, [sp, #-32]!
+    stp     x30, xzr, [sp, #-48]!
     str     w24, [sp, #8]
     ldr     w9, [x29, #F_DECLKIND]
     str     w9, [sp, #16]
@@ -4433,7 +4433,8 @@ c_var:
     sub     w9, w24, #33
     cmp     w9, #6
     b.hi    c_unexpected
-2:  bl      c_declref
+2:  stp     x25, x26, [sp, #32]
+    bl      c_declref
     str     w0, [sp, #12]
     bl      next_word
     ISP     55, 3f
@@ -4446,14 +4447,21 @@ c_var:
     OP      OP_UNDEF
 4:  ldr     w0, [sp, #12]
     bl      c_store
-    OP      OP_POP
+    ldr     w9, [sp, #16]               // export const ..: the value goes to __exports under the name too
+    tbz     w9, #8, 41f
+    LEXSAVE
+    ldp     x25, x26, [sp, #64 + 32]
+    bl      c_expset
+    LEXBACK
+    b       5f
+41: OP      OP_POP
 5:  cmp     w23, #K_PUNCT
     mov     w9, #40
     ccmp    w24, w9, #0, eq
     b.eq    1b
     ldr     w9, [sp, #16]
     str     w9, [x29, #F_DECLKIND]
-    ldr     x30, [sp], #32
+    ldr     x30, [sp], #48
     ret
 // c_semi: the end of a statement: a ; or, where the language lets it be left out, a line end, a } or the end of the text
 c_semi:
@@ -4560,40 +4568,178 @@ s_again:
 s_export:
     bl      next_word
     cmp     w23, #K_KEYWORD
-    mov     w9, #7
-    ccmp    w24, w9, #0, eq
     b.ne    1f
-    bl      next_word                   // export default: what follows is the statement
-    b       s_again
-1:  cmp     w23, #K_PUNCT
-    b.ne    s_again
+    cmp     w24, #7                     // export default value: __exports.default = value
+    b.ne    11f
+    bl      c_expget
+    bl      next_word
+    bl      c_assign
+    adr     x0, c_w_default
+    mov     x1, #7
+    bl      w_string
+    cbz     x0, c_full
+    bl      c_keyconst
+    mov     w1, w0
+    mov     w0, #OP_SETP
+    bl      c_op16
+    OP      OP_POP
+    bl      c_semi
+    b       s_done
+11: cmp     w24, #28                    // export var/let/const: c_var copies each simple name out (bit 0x100 of the kind)
+    b.eq    12f
     cmp     w24, #33
-    b.eq    2f
+    b.eq    12f
+    cmp     w24, #4
+    b.ne    13f
+12: ldr     w9, [x29, #F_DECLKIND]
+    orr     w9, w9, #0x100
+    str     w9, [x29, #F_DECLKIND]
+    bl      c_var
+    ldr     w9, [x29, #F_DECLKIND]
+    and     w9, w9, #0xff
+    str     w9, [x29, #F_DECLKIND]
+    bl      c_semi
+    b       s_done
+13: LEXSAVE                             // export function / class / async function: the declaration, then its name copied out
+14: bl      next_word
+    cbz     w23, c_unexpected
+    cmp     w23, #K_NAME
+    b.ne    14b
+    stp     x25, x26, [sp, #64 + 16]
+    LEXBACK
+    bl      c_stmt
+    LEXSAVE
+    ldp     x25, x26, [sp, #64 + 16]
+    bl      c_ref
+    bl      c_raw
+    bl      c_expset
+    LEXBACK
+    b       s_done
+1:  cmp     w23, #K_PUNCT
+    b.ne    c_unexpected
     cmp     w24, #45
-    b.ne    s_again
-2:  cbz     w23, c_unexpected           // export { .. } [from "x"] / export * [as n] from "x"
-    cmp     w23, #K_STRING
-    b.eq    4f
+    b.eq    2f
+    cmp     w24, #33
+    b.ne    c_unexpected
+    str     wzr, [sp, #8]               // export { a [as b], .. } [from "x"]: is there a from?
+    LEXSAVE
+15: bl      next_word
+    cbz     w23, c_unexpected
     cmp     w23, #K_PUNCT
     mov     w9, #34
     ccmp    w24, w9, #0, eq
-    b.eq    3f
+    b.ne    15b
+    bl      next_word
+    bl      c_isfrom
+    b.ne    17f
+    bl      next_word
+    cmp     w23, #K_STRING
+    b.ne    c_unexpected
+    mov     w9, #1
+    str     w9, [sp, #64 + 8]
+    LEXSAVE
+    adr     x9, c_w_module
+    sub     x25, x9, x20
+    mov     x26, #8
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    LEXBACK
+    bl      c_string
+    bl      c_strconst
+    OP      OP_CALL
+    mov     w0, #1
+    bl      c_byte
+17: LEXBACK
+16: bl      next_word                   // each entry
+    cmp     w23, #K_PUNCT
+    b.ne    18f
+    cmp     w24, #40
+    b.eq    16b
+    b       19f                         // }
+18: ldr     w9, [sp, #8]
+    cbz     w9, 181f
+    OP      OP_DUP
+    bl      c_wordconst
+    mov     w1, w0
+    mov     w0, #OP_GETP
+    bl      c_op16
+    b       182f
+181: bl     c_ref
+    bl      c_raw
+182: LEXSAVE
+    bl      next_word
+    bl      c_isas
+    b.ne    183f
+    add     sp, sp, #64
+    bl      next_word
+    b       184f
+183: LEXBACK
+184: bl     c_expset
+    b       16b
+19: bl      next_word
+    bl      c_isfrom
+    b.ne    191f
+    bl      next_word
+    bl      next_word
+    OP      OP_POP
+191: bl     c_semi
+    b       s_done
+2:  cbz     w23, c_unexpected           // export * [as n] from "x": not recorded yet
+    cmp     w23, #K_STRING
+    b.eq    4f
     bl      next_word
     b       2b
-3:  bl      next_word                   // after }: a from "x" may follow
-    cmp     w23, #K_NAME
-    b.ne    5f
-    cmp     x26, #4
-    b.ne    5f
-    ldr     w9, [x20, x25]
-    movz    w10, #0x7266                // "fr"
-    movk    w10, #0x6d6f, lsl #16       // "om"
-    cmp     w9, w10
-    b.ne    5f
-    bl      next_word
 4:  bl      next_word
-5:  bl      c_semi
+    bl      c_semi
     b       s_done
+// c_expget: writes the reading of __exports (the module body's parameter). Keeps the reader.
+c_expget:
+    stp     x30, x25, [sp, #-32]!
+    str     x26, [sp, #16]
+    adr     x9, c_w_exports
+    sub     x25, x9, x20
+    mov     x26, #9
+    bl      c_ref
+    bl      c_raw
+    ldr     x26, [sp, #16]
+    ldp     x30, x25, [sp], #32
+    ret
+// c_expset: value on the stack; the current word is its export name: __exports[name] = value, nothing left.
+c_expset:
+    str     x30, [sp, #-16]!
+    bl      c_expget
+    OP      OP_SWAP
+    bl      c_wordconst
+    mov     w1, w0
+    mov     w0, #OP_SETP
+    bl      c_op16
+    OP      OP_POP
+    ldr     x30, [sp], #16
+    ret
+// c_isfrom / c_isas: is the current word the name from / as -> eq if so. Uses x9, x10.
+c_isfrom:
+    cmp     w23, #K_NAME
+    b.ne    1f
+    cmp     x26, #4
+    b.ne    1f
+    ldr     w9, [x20, x25]
+    movz    w10, #0x7266
+    movk    w10, #0x6d6f, lsl #16
+    cmp     w9, w10
+1:  ret
+c_isas:
+    cmp     w23, #K_NAME
+    b.ne    1f
+    cmp     x26, #2
+    b.ne    1f
+    ldrh    w9, [x20, x25]
+    mov     w10, #0x7361
+    cmp     w9, w10
+1:  ret
+c_w_exports: .ascii "__exports"
+    .balign 4
 s_import:
     bl      c_peek
     cmp     w0, #K_PUNCT
