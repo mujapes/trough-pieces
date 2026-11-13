@@ -463,3 +463,18 @@ What stops now: BBC `for await (x of y)` and `async function*` (not made), two "
 reddit and others `fetch is not defined` in a load listener. checks/runbig.py is run.py with a 32 MB world (big scripts).
 Next: fetch and XMLHttpRequest through the host (most asked for by pages now); timers after load and a tap reaching
 dispatchEvent with a redraw from the tree; async generators and for await; real modules behind `__import`; shapes; fuzz.
+
+**Twenty-third unit: pages fetch, and timers run after load (2026-11-13).** host/browse.c: a script's `__host('f' + address)`
+is answered with "1", three digits of status and the body (or "0" and why): resolved against the page, fetched by fetch_body
+(GET only, 16 a page, headers of the answer not kept). After `__fire()` the rounds go on (400 at most): when nothing new is
+to run, `clock 0` gives the next timer's time; if it is within three seconds of the page's start the clock is MOVED to it
+and the world run again (run_script with no text), 300 times at most: virtual time, no waiting. dom/document.js (in the
+language): Headers, Request, Response (text, json, clone), fetch (a promise, settled one timer later), XMLHttpRequest (open,
+send, onload/onerror/onreadystatechange/loadend, addEventListener, responseType json). Seen: dom/checks/page/fetch.html served
+from the bench (a python http.server on 8765 in that folder) -> out/fetch-page.png: fetch ok, xhr 200 state 4, a missing
+file 404, JSON read through await. old.reddit.com 17/0 and it fetched its preload address; bbc 57/6 as before.
+Not made: POST and other methods, request headers and cookies, response headers, binary bodies (arrayBuffer, blob), abort
+signals, real waiting (a timer more than 3 s out never runs in the one-shot host).
+Next: the live screen (PieceScreen) keeping the world alive: a tap reaching dispatchEvent, timers by the real clock, a redraw
+from the tree; bbc's run-time "not a function" (find with a small trace of the callee's name); async generators and
+for await; POST; modules behind `__import`; shapes; fuzz.

@@ -1,0 +1,7 @@
+<html><head><title>fetch</title></head><body><h1>Fetch and XMLHttpRequest</h1><p id="a">fetch: waiting</p><p id="b">xhr: waiting</p><p id="c">missing: waiting</p><p id="d">json: waiting</p>
+<script>
+fetch('more.js').then(function(r){return r.text().then(function(t){document.getElementById('a').textContent='fetch: ok='+r.ok+' status='+r.status+' bytes='+t.length;console.log('fetch',r.ok,t.length>0)})});
+var x=new XMLHttpRequest();x.open('GET','more.js');x.onload=function(){document.getElementById('b').textContent='xhr: status='+x.status+' state='+x.readyState+' bytes='+x.responseText.length;console.log('xhr',x.status,x.readyState)};x.send();
+fetch('nothing-here.json').then(function(r){console.log('missing came',r.status)},function(e){document.getElementById('c').textContent='missing: refused, '+e.message;console.log('missing refused')});
+(async function(){try{var r=await fetch('data.json');var j=await r.json();document.getElementById('d').textContent='json: '+j.name+' '+j.list.length;console.log('json',j.name,j.list.length)}catch(e){console.log('json failed',e.message)}})();
+</script></body></html>
