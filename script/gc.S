@@ -200,7 +200,15 @@ gc_collect:
     add     x0, x19, x0
     ldr     x1, [x19, #W_SP]
     add     x1, x19, x1
-    bl      g_range
+    ldr     x9, [x19, #W_STACK_END]     // while the machine runs, its stack top is x22 (W_SP is only written when it stops):
+    add     x9, x19, x9                 //   the higher of the two, if x22 lies inside the stack
+    cmp     x22, x0
+    b.lo    1f
+    cmp     x22, x9
+    b.hi    1f
+    cmp     x22, x1
+    csel    x1, x22, x1, hi
+1:  bl      g_range
     bl      g_drain
     mov     x0, sp
     ldr     x1, [x19, #W_NBASE]

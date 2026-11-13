@@ -645,3 +645,20 @@ missing, so `pn` holds addHandler without the instance's fields. pn is filled fr
 and q.resolve wrapped in a function Proxy whose unregistered tokens resolve to a get-everything Proxy). Not found yet how
 addHandler reaches pn; parked as low value (paywall only; the page's content is unaffected). Suspects: for..in over an instance
 (m_keylist), the function-proxy wrapper losing the target's own properties (q.resolve.x).
+
+**Open: a crash, found 2026-11-13 [by Opus].** NPR (www.npr.org): the shipped engine reports 299 "SyntaxError: Unexpected token in
+JSON (line 1, column 46376)"; a build differing ONLY in prelude.js line 78 (JSON.parse wrapped in try/catch with a console.log)
+reports none of them and then SEGFAULTS (reproduced twice). gdb: in w_alloc (`str x0,[x19,#208]`), called from j_number (json.S,
+`sub x13,x23,x15` before the string alloc), with x19 = 0x5555559410 and x21 = 0x5555559160: both inside out/browse's own text,
+i.e. host register values, so an entry's epilogue (or an unwind to a saved frame, W_NSP) ran and the piece carried on. Suspects:
+j_err / the native-throw unwind through W_NSP when builtin calls nest; w_slow + gc_collect during a JSON read. The debug build
+is in /tmp/dbg2 (s.bin). The JSON errors and the crash are probably the same fault. NEXT: reproduce on the bench (fetch NPR's
+JSON bodies: TROUGH_KEEP_ALL, or log the fetch URLs) and fix; this outranks the paywall bugs.
+Crash follow-up [by Opus]: (1) FIXED a real collector fault: gc_collect took the value stack's top from W_SP, which the machine
+writes only when it stops; while running the top is x22, so live values above a stale W_SP were not roots. Now the higher of
+W_SP and x22 (when x22 lies inside the stack). 49 of 49. (2) The NPR crash is NOT cured by it: the debug build (prelude line 78
+wrapped: try{v=p(s)}catch(e){console.log(...);throw e}) still segfaults on npr.org before printing anything, with the fixed gc.
+On the bench every variant of that wrapper behaves (one earlier bench run printed only the first console argument and lost the
+rethrow, not reproduced since: layout-sensitive corruption). (3) Repeated big JSON.parse in a 4 MB world says "full" (8 MB is
+fine): probably fragmentation of the non-moving collector, not a leak. NEXT: replay NPR offline (save its scripts and fetched
+bodies) so the crash can be caught under gdb with the world dumped; check j_err's unwind (W_NSP) and the reviver walk.
