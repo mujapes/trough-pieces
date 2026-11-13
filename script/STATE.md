@@ -576,3 +576,11 @@ c_function's [sp,#96]) or the constant it makes is what goes wrong. Next: check 
 and something else came" reset the declaration state at the `*` of `function* h`, so h was never declared in the outer
 function ahead of time, and declaring it late collided with h's own variables. Fix: the star does not count there.
 `function f(){function* h(){let z}...}` now works. 47 of 47 (case added to forawait.js).
+bbc.com/news after unit 31: 58 run, 2 failed (both the piano SDK's own deliberate errors).
+
+**Thirty-second unit [by Opus]: the live screen keeps the page's world (2026-11-13).** host/browse.c: with_scripts can hand
+its `scripts` back (keep); serve keeps it as `live`, and every 50 ms scripts_tick runs the timers that are due by the real
+clock, writes the tree out again, and if the page text changed throws the drawn strips away and redraws ("the page changed
+itself"). Checked: a page with setInterval 6 s (through httpbin.org/base64) changed itself four times in 30 s. Not yet: a tap
+reaching the page's dispatchEvent (needs the page piece to say which tree node is under a point); pictures are not re-fetched
+after a change.
