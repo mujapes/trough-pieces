@@ -1915,6 +1915,8 @@ c_scan_inner:                           // marks the function being translated a
 // 96 a declaration's variable (its reading instruction), 104 the variable holding itself (a named expression) plus one,
 // 112 the jump over it, 120 the jump to its declared functions' making, 128 where the body proper starts.
 c_function:
+    ldp     x9, x10, [x29, #F_LABEL]    // [by Opus] a label waiting for a loop outlives a function written before that loop
+    stp     x9, x10, [sp, #-16]!        // starts (e:for(var f=function(){for(;;){}};;){... break e}); restored at the end
     stp     x30, x0, [sp, #-256]!
     DEEPER
     ldr     w9, [x29, #F_DECLKIND]      // [by Opus] 248: what was declaring names around it (a const's value must not make
@@ -2236,6 +2238,8 @@ c_function:
     str     x9, [x29, #F_FCUR]
     ldr     x30, [sp]
     add     sp, sp, #256
+    ldp     x9, x10, [sp], #16
+    stp     x9, x10, [x29, #F_LABEL]
     ret
 // c_skip_default: steps over a parameter's default, from its first word to the , or ) that ends it (left as the current word)
 c_skip_default:

@@ -1033,3 +1033,8 @@ places are used (compile.S c_addconst). The gap 8192..65535 wastes table room, s
 (a 32 MB world's table holds 125000). YouTube 43 run, 3 failed: two TypeErrors (t9 78:416, t25 10:2054) and "the regular
 expression is too large": an HTML-entity pattern of ~2200 alternatives exceeds RX_MAXW 32768 words; regex programs use 16-bit
 words and jump distances, so this needs wider jumps or a literal-alternation instruction (trie / set of strings).
+Unit 80 [by Opus]: (1) c_function saves and restores F_LABEL: a function written in a labelled loop's head (e:for(var
+f=function(){for(;;){}};;){...break e}) ended with s_done clearing the label meant for the outer loop (DuckDuckGo, found by
+ddmin with node --check). label-fn-head.js; 91 of 91. DuckDuckGo 29/0. (2) document.js: canvas getContext('2d') returns a
+context that draws nothing (measureText, getImageData, gradients ...), toDataURL/toBlob, Event.initCustomEvent. YouTube 43/1
+(left: the 2200-alternative entity pattern, unit 79). Wikipedia 11/0, GitHub 5/0.
