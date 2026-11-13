@@ -105,6 +105,7 @@ static int ask(int argc, char **argv, const uint8_t *roots) {
     return stopped == 1 ? 0 : 1; }
 /* Gets what an address leads to: the reply's body, unpacked, as a block (0 with the reason in why). Follows redirects. */
 static long long last_status;   /* the status of the reply fetch_body last read */
+static char extra_header[512];   /* [by Opus] one header line (with its CRLF) the next fetch adds, or empty */
 static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, size_t room_why) {
     entry5 resolve = entry("url", "resolve"), part = entry("url", "part"), port_of = entry("url", "port"), request_of = entry("http", "request"), status_of = entry("http", "status"), header = entry("http", "header"), packed_of = entry("http", "packed"), body_of = entry("http", "body"), unpack = entry("inflate", "unpack");
     uint8_t *address = text_block(where, strlen(where)), *reply = 0;
@@ -112,6 +113,7 @@ static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, s
         at(30, address); at(31, address); int16_t q2[2] = {30, 31}; uint8_t *normal = made_text(resolve, q2, 2, length(address) + 64); if (!normal) { snprintf(why, room_why, "not an address we can follow"); return 0; } address = normal; at(30, address);
         int16_t qs[2] = {30, 1}, qc[2] = {30, 0}, q1[1] = {30}; uint8_t *site = made_text(part, qs, 2, 300), *scheme = made_text(part, qc, 2, 16), *request = made_text(request_of, q1, 1, 8192); long long port = port_of(0, q1, 1, 0, table);
         if (!site || !scheme || !request || port <= 0) { snprintf(why, room_why, "not an address we can follow"); return 0; }
+        if (extra_header[0] && request) { size_t rl = length(request), en = strlen(extra_header); if (rl >= 4 && !memcmp(request + 64 + rl - 4, "\r\n\r\n", 4)) { uint8_t *r2 = block(2, rl + en); memcpy(r2 + 64, request + 64, rl - 2); memcpy(r2 + 64 + rl - 2, extra_header, en); memcpy(r2 + 64 + rl - 2 + en, "\r\n", 2); resize(r2, rl + en); free(request); request = r2; } }
         char host[300]; size_t hn = length(site); memcpy(host, site + 64, hn); host[hn] = 0; if (host[0] == '[' && hn > 1) { memmove(host, host + 1, hn - 2); host[hn - 2] = 0; }
         int https = length(scheme) == 5 && !memcmp(scheme + 64, "https", 5);
         reply = https ? secure_fetch(host, (int)port, request, roots, why, room_why) : plain_fetch(host, (int)port, request, why, room_why); if (!reply) return 0;
@@ -165,7 +167,8 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
                  * M base NEWLINE specifier: a module's text, the specifier resolved against base: "1", the address, a line end, the text; 300 modules at most */
                 int mod = q[0] == 'M'; const char *bs = address; size_t bl = strlen(address), ro = 1; char bb[2048];
                 if (mod) { const uint8_t *nl = memchr(q + 1, '\n', qn - 1); if (nl && (size_t)(nl - q - 1) < sizeof bb) { bl = (size_t)(nl - q - 1); memcpy(bb, q + 1, bl); bb[bl] = 0; if (bl) bs = bb; else bl = strlen(address); ro = (size_t)(nl - q) + 1; } }
-                char where[2048] = "", why[300] = ""; uint8_t *base = text_block(bs, bl), *rel = text_block((const char *)q + ro, qn - ro); at(30, base); at(31, rel); int16_t q2[2] = {30, 31};
+                size_t rn = qn - ro; extra_header[0] = 0; if (!mod) { const uint8_t *nl = memchr(q + ro, '\n', rn); if (nl) { size_t en = qn - (size_t)(nl + 1 - q); if (en > 8 && en < sizeof extra_header - 3 && !memcmp(nl + 1, "accept: ", 8)) { memcpy(extra_header, nl + 1, en); memcpy(extra_header + en, "\r\n", 3); } rn = (size_t)(nl - q) - ro; } }   /* [by Opus] the page's Accept */
+                char where[2048] = "", why[300] = ""; uint8_t *base = text_block(bs, bl), *rel = text_block((const char *)q + ro, rn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31};
                 uint8_t *full = made_text(entry("url", "resolve"), q2, 2, bl + qn + 64); if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; }
                 uint8_t *got = 0; if (!where[0]) snprintf(why, sizeof why, "not an address we can follow"); else if (!mod && s->fetched >= 16) snprintf(why, sizeof why, "too many requests from one page"); else if (mod && s->modules >= 300) snprintf(why, sizeof why, "too many modules"); else { if (mod) s->modules++; else s->fetched++; got = fetch_body(where, s->roots, why, sizeof why); }
                 char st[2100]; if (mod) snprintf(st, sizeof st, "1%s\n", where); else snprintf(st, sizeof st, "1%03d", (int)(last_status >= 100 && last_status <= 999 ? last_status : 200));

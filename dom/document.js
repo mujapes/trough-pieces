@@ -174,14 +174,14 @@ Headers.prototype={set:function(k,v){this._h[String(k).toLowerCase()]=String(v)}
 var Response=function Response(body,o){o=o||{};this._b=body==null?'':String(body);this.status=o.status===undefined?200:o.status;this.ok=this.status>=200&&this.status<300;this.statusText=o.statusText||'';this.url=o.url||'';this.headers=new Headers(o.headers);this.type='basic';this.redirected=false;this.bodyUsed=false};
 Response.prototype={text:function(){this.bodyUsed=true;return Promise.resolve(this._b)},json:function(){var b=this._b;this.bodyUsed=true;return Promise.resolve().then(function(){return JSON.parse(b)})},clone:function(){return new Response(this._b,this)}};
 var Request=function Request(u,o){o=o||{};this.url=String(u&&u.url||u);this.method=(o.method||u&&u.method||'GET').toUpperCase();this.headers=new Headers(o.headers);this.body=o.body};
-function __get(u,m){if(m!=='GET')return '0only GET requests are made yet';return __host('f'+u)}
-function fetch(u,o){var r=new Request(u,o);return new Promise(function(ok,no){setTimeout(function(){var a=__get(r.url,r.method);if(a.charAt(0)==='1')ok(new Response(a.slice(4),{url:r.url,status:+a.slice(1,4)}));else no(new TypeError('Failed to fetch: '+a.slice(1)))},1)})}
+function __get(u,m,h){if(m!=='GET')return '0only GET requests are made yet';h=h?(''+h).replace(/[\r\n]/g,''):'';return __host('f'+u+(h?'\naccept: '+h:''))}
+function fetch(u,o){var r=new Request(u,o);return new Promise(function(ok,no){setTimeout(function(){var a=__get(r.url,r.method,r.headers&&r.headers.get?r.headers.get('accept'):'');if(a.charAt(0)==='1')ok(new Response(a.slice(4),{url:r.url,status:+a.slice(1,4)}));else no(new TypeError('Failed to fetch: '+a.slice(1)))},1)})}
 var XMLHttpRequest=function XMLHttpRequest(){this.readyState=0;this.status=0;this.statusText='';this.responseText='';this.response='';this.responseType='';this.responseURL='';this.timeout=0;this.withCredentials=false;this._l={};this.upload={addEventListener:function(){}}};
 XMLHttpRequest.UNSENT=0;XMLHttpRequest.OPENED=1;XMLHttpRequest.HEADERS_RECEIVED=2;XMLHttpRequest.LOADING=3;XMLHttpRequest.DONE=4;
-XMLHttpRequest.prototype={open:function(m,u){this._m=String(m).toUpperCase();this._u=String(u);this.readyState=1;this._ev('readystatechange')},setRequestHeader:function(){},overrideMimeType:function(){},getResponseHeader:function(){return null},getAllResponseHeaders:function(){return ''},abort:function(){this._off=true},
+XMLHttpRequest.prototype={open:function(m,u){this._m=String(m).toUpperCase();this._u=String(u);this.readyState=1;this._ev('readystatechange')},setRequestHeader:function(k,v){if((''+k).toLowerCase()==='accept')this._acc=v},overrideMimeType:function(){},getResponseHeader:function(){return null},getAllResponseHeaders:function(){return ''},abort:function(){this._off=true},
 addEventListener:function(t,f){(this._l[t]=this._l[t]||[]).push(f)},removeEventListener:function(t,f){var l=this._l[t]||[],i=l.indexOf(f);if(i>=0)l.splice(i,1)},
 _ev:function(t){var e={type:t,target:this,currentTarget:this,loaded:this.responseText.length,total:this.responseText.length,lengthComputable:true},l=(this._l[t]||[]).slice(),i;if(typeof this['on'+t]=='function')this['on'+t](e);for(i=0;i<l.length;i++)l[i].call(this,e)},
-send:function(){var x=this;setTimeout(function(){if(x._off)return;var a=__get(x._u,x._m),ok=a.charAt(0)==='1';x.readyState=4;x.responseURL=x._u;if(ok){x.status=+a.slice(1,4);x.statusText=x.status==200?'OK':'';x.responseText=a.slice(4);x.response=x.responseText;if(x.responseType==='json'){try{x.response=JSON.parse(x.responseText)}catch(e){x.response=null}}}
+send:function(){var x=this;setTimeout(function(){if(x._off)return;var a=__get(x._u,x._m,x._acc),ok=a.charAt(0)==='1';x.readyState=4;x.responseURL=x._u;if(ok){x.status=+a.slice(1,4);x.statusText=x.status==200?'OK':'';x.responseText=a.slice(4);x.response=x.responseText;if(x.responseType==='json'){try{x.response=JSON.parse(x.responseText)}catch(e){x.response=null}}}
 x._ev('readystatechange');x._ev(ok?'load':'error');x._ev('loadend')},1)}};
 var navigator={userAgent:'Mozilla/5.0 (Linux; Android 14) Trough/1',language:'en',languages:['en'],platform:'Linux aarch64',onLine:true,cookieEnabled:false,vendor:'',maxTouchPoints:5};
 var screen={width:360,height:720,availWidth:360,availHeight:720};
@@ -258,3 +258,12 @@ class Blob{constructor(p,o){var s='';if(p)for(var x of p)s+=typeof x==='string'?
  text(){return Promise.resolve(this.__s)} arrayBuffer(){return Promise.resolve(new TextEncoder().encode(this.__s).buffer)} slice(a,b,t){return new Blob([this.__s.slice(a,b)],{type:t})}}
 class File extends Blob{constructor(p,n,o){super(p,o);this.name=String(n);this.lastModified=o&&o.lastModified||Date.now()}}
 var crypto={getRandomValues:function(a){for(var i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*Math.pow(2,8*(a.BYTES_PER_ELEMENT||4)));return a},randomUUID:function(){var h='0123456789abcdef',s='',i,c;for(i=0;i<36;i++){if(i==8||i==13||i==18||i==23){s+='-';continue}c=Math.floor(Math.random()*16);if(i==14)c=4;else if(i==19)c=8|c&3;s+=h.charAt(c)}return s}};
+(function(){function U(a){try{return new URL(a.getAttribute('href')||'',location.href)}catch(e){return null}}
+['protocol','host','hostname','port','pathname','search','hash','origin','username','password'].forEach(function(k){Object.defineProperty(HTMLAnchorElement.prototype,k,{configurable:true,get:function(){var u=U(this);return u?u[k]:''},set:function(v){var u=U(this);if(u&&k!=='origin'){u[k]=v;this.setAttribute('href',u.href)}}})});
+Object.defineProperty(HTMLAnchorElement.prototype,'href',{configurable:true,get:function(){var u=U(this);return u?u.href:''},set:function(v){this.setAttribute('href',v)}});
+HTMLAnchorElement.prototype.toString=function(){return this.href}})();
+var frames=window;
+document.createAttribute=function(n){return {name:(''+n).toLowerCase(),value:'',nodeType:2}};
+Element.prototype.setAttributeNode=function(a){this.setAttribute(a.name,a.value);return null};
+Element.prototype.getAttributeNode=function(n){return this.hasAttribute(n)?{name:n,value:this.getAttribute(n),nodeType:2}:null};
+var DocumentType=class extends Node{},DocumentFragment=window.DocumentFragment||class extends Node{},CharacterData=window.CharacterData||class extends Node{},Attr=window.Attr||function Attr(){};

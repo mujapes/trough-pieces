@@ -905,3 +905,13 @@ Seen: errors made by the engine are objects whose `message` is an own enumerable
 no own enumerable keys); String(element) gives [object Object]. Symbol.hasInstance is not supported by instanceof.
 Sites: Wikipedia 8/0, HN 1/0, GitHub 5/0, Guardian 29/0, BBC 62/0, NPR 20/306 (299 JSON errors: next).
 Local page testing: python3 -m http.server 8765 --bind 127.0.0.1 in a folder, then out/browse out http://127.0.0.1:8765/x.html.
+Unit 57 [by Opus]: NPR 20/306 -> 23/4. (1) Accept header: XHR setRequestHeader('accept') and fetch's Request headers reach the
+host as 'f'+url+'\naccept: v'; browse.c splices that one line into the request (extra_header). OneTrust's geolocation answered
+JSONP without it (299 JSON errors). (2) document.js: <a> URL parts (protocol/host/hostname/port/pathname/search/hash/origin,
+href absolute), window.frames, createAttribute/setAttributeNode/getAttributeNode, DocumentType/DocumentFragment/CharacterData/
+Attr names. (3) machine.S LOOSEOBJ: == / != with an object on one side only (other not undefined/null) converts the object via
+m_toprim and runs again (it compared false before). (4) prelude.js: new String/Number/Boolean make wrapper objects (_pv hidden,
+String wrappers get prototype String.__w forwarding every String method to the primitive); valueOf/toString unwrap.
+looseobj.js, wrappers.js; 78 of 78. Sites: Wikipedia 8/0, GitHub 5/0, Guardian 31/0, BBC 62/0, NPR 23/4.
+NPR left: a regex too large (counted repeats are expanded; {1,63} inside {0,10} passes RX_MAXW 16384 words: needs a counting
+instruction), 'document' of undefined, an obfuscated bot check, world full once.

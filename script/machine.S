@@ -1165,13 +1165,46 @@ i_ge:
     ORDER
     cset    w0, ge
     b       m_bool
+    .macro  LOOSEOBJ                    // [by Opus] == with an object on one side only, and no undefined or null on the other:
+    lsr     x2, x0, #48                 //   the object becomes a primitive first (m_toprim; the instruction runs again)
+    lsr     x3, x1, #48
+    mov     w16, #T_OBJECT
+    cmp     w2, w16
+    cset    w6, eq
+    cmp     w3, w16
+    cset    w7, eq
+    cmp     w6, w7
+    b.eq    77f
+    cbz     w6, 76f
+    mov     w16, #T_UNDEF
+    cmp     w3, w16
+    b.eq    77f
+    mov     w16, #T_NULL
+    cmp     w3, w16
+    b.eq    77f
+    mov     x4, #2
+    mov     x5, x0
+    b       m_toprim
+76: mov     w16, #T_UNDEF
+    cmp     w2, w16
+    b.eq    77f
+    mov     w16, #T_NULL
+    cmp     w2, w16
+    b.eq    77f
+    mov     x4, #1
+    mov     x5, x1
+    b       m_toprim
+77:
+    .endm
 i_eq:
     ldp     x0, x1, [x22, #-16]
+    LOOSEOBJ
     bl      v_loose
     sub     x22, x22, #8
     b       m_bool
 i_ne:
     ldp     x0, x1, [x22, #-16]
+    LOOSEOBJ
     bl      v_loose
     sub     x22, x22, #8
     eor     w0, w0, #1

@@ -30,8 +30,8 @@ function __rxu(p){var H=function(c){var s=c.toString(16).toUpperCase();while(s.l
  return o}
 // The library's half that is written in the language (see lib.S). __n(k): the built-in routine numbered k.
 __n(-7);
-var __symobj;function Object(v){if(v===undefined||v===null)return {};if(typeof v==='symbol')return __symobj(v);return v}function Array(n){var a=[],i;if(arguments.length===1&&typeof n==='number'){if(n!==(n>>>0))throw new RangeError('Invalid array length');for(i=0;i<n;i++)a.push(undefined)}else for(i=0;i<arguments.length;i++)a.push(arguments[i]);return a}function Function(){var a=[],i,n=arguments.length;for(i=0;i<n-1;i++)a.push(''+arguments[i]);return __n(69)('(function anonymous('+a.join(',')+'\n) {\n'+(n?''+arguments[n-1]:'')+'\n})')}function String(x){if(!arguments.length)return '';if(typeof x==='symbol')return 'Symbol('+Symbol.__desc(x)+')';return ''+x}
-function Number(x){return arguments.length?+x:0}function Boolean(x){return !!x}
+var __symobj;function Object(v){if(v===undefined||v===null)return {};if(typeof v==='symbol')return __symobj(v);return v}function Array(n){var a=[],i;if(arguments.length===1&&typeof n==='number'){if(n!==(n>>>0))throw new RangeError('Invalid array length');for(i=0;i<n;i++)a.push(undefined)}else for(i=0;i<arguments.length;i++)a.push(arguments[i]);return a}function Function(){var a=[],i,n=arguments.length;for(i=0;i<n-1;i++)a.push(''+arguments[i]);return __n(69)('(function anonymous('+a.join(',')+'\n) {\n'+(n?''+arguments[n-1]:'')+'\n})')}function String(x){var v=!arguments.length?'':typeof x==='symbol'?'Symbol('+Symbol.__desc(x)+')':''+x;if(this instanceof String){if(String.__w)__n(65)(this,String.__w);__n(73)(this,'_pv',v);__n(72)(this,'_pv');__n(73)(this,'length',v.length);__n(72)(this,'length');for(var i=0;i<v.length;i++)this[i]=v.charAt(i);return this}return v}
+function Number(x){var v=arguments.length?+x:0;if(this instanceof Number){__n(73)(this,'_pv',v);__n(72)(this,'_pv');return this}return v}function Boolean(x){var v=!!x;if(this instanceof Boolean){__n(73)(this,'_pv',v);__n(72)(this,'_pv');return this}return v}
 __n(-1,Object.prototype);__n(-2,Array.prototype);__n(-3,Function.prototype);__n(-4,String.prototype);__n(-5,Number.prototype);__n(-6,Boolean.prototype);
 var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),exp:__n(20),log:__n(21),log2:__n(22),log10:__n(23),random:__n(24),sin:__n(25),cos:__n(26),tan:__n(27),atan:__n(31),atan2:__n(32),asin:__n(33),acos:__n(34),expm1:__n(35),log1p:__n(36),sinh:__n(37),cosh:__n(38),tanh:__n(39),cbrt:__n(40),hypot:__n(41),asinh:__n(43),acosh:__n(44),atanh:__n(45),fround:__n(46),clz32:__n(47),imul:__n(48),pow:function(a,b){return a**b},
 PI:3.141592653589793,E:2.718281828459045,LN2:0.6931471805599453,LN10:2.302585092994046,LOG2E:1.4426950408889634,LOG10E:0.4342944819032518,SQRT2:1.4142135623730951,SQRT1_2:0.7071067811865476};
@@ -73,7 +73,7 @@ this.length=s;for(i=2;i<arguments.length;i++)this.push(arguments[i]);for(i=0;i<t
 A.sort=function(c){var a=this,n=a.length,b=[],w,i,j,k,m,e,lo;if(!c)c=function(x,y){x=''+x;y=''+y;return x<y?-1:x>y?1:0};
 for(w=1;w<n;w*=2){for(lo=0;lo<n;lo+=2*w){m=lo+w<n?lo+w:n;e=lo+2*w<n?lo+2*w:n;i=lo;j=m;k=lo;while(i<m&&j<e){if(c(a[j],a[i])<0){b[k]=a[j];j++}else{b[k]=a[i];i++}k++}
 while(i<m){b[k]=a[i];k++;i++}while(j<e){b[k]=a[j];k++;j++}}for(i=0;i<n;i++)a[i]=b[i]}return a};
-S.charCodeAt=n(15);S.substring=n(17);S.toUpperCase=n(18);S.toLowerCase=n(19);S.toString=function(){return this};
+S.charCodeAt=n(15);S.substring=n(17);S.toUpperCase=n(18);S.toLowerCase=n(19);S.toString=S.valueOf=function(){return typeof this==='object'&&this!==null&&'_pv' in this?this._pv:this};
 String.fromCharCode=(function(f){return function(){var s='';for(var i=0;i<arguments.length;i++)s+=f(arguments[i]);return s}})(n(16));
 S.charAt=function(i){i=i|0;return i<0?'':this.substring(i,i+1)};
 S.indexOf=function(t,f){var s=''+this;t=''+t;var l=s.length,m=t.length;f=f>0?f|0:0;if(!m)return f<l?f:l;var c=t.charCodeAt(0);for(var i=f;i+m<=l;i++)if(s.charCodeAt(i)===c&&s.substring(i,i+m)===t)return i;return -1};
@@ -115,7 +115,8 @@ Number.isInteger=function(x){return typeof x==='number'&&x-x===0&&Math.floor(x)=
 Number.isFinite=function(x){return typeof x==='number'&&x-x===0};
 Number.isNaN=function(x){return x!==x};Number.parseFloat=parseFloat;Number.parseInt=parseInt;
 Number.MAX_SAFE_INTEGER=9007199254740991;Number.MIN_SAFE_INTEGER=-9007199254740991;Number.EPSILON=2.220446049250313e-16;Number.MAX_VALUE=1.7976931348623157e308;Number.MIN_VALUE=5e-324;
-N.toString=function(r){var x=+this;if(r===undefined||r===10)return ''+x;if(x!==x)return 'NaN';if(x-x!==0)return x<0?'-Infinity':'Infinity';var g=x<0?'-':'';if(x<0)x=-x;
+N.valueOf=function(){return typeof this==='object'&&this!==null&&'_pv' in this?this._pv:this};Boolean.prototype.valueOf=N.valueOf;Boolean.prototype.toString=function(){return ''+(typeof this==='object'&&this!==null&&'_pv' in this?this._pv:this)};
+N.toString=function(r){var x=typeof this==='object'&&this!==null&&'_pv' in this?this._pv:+this;if(r===undefined||r===10)return ''+x;if(x!==x)return 'NaN';if(x-x!==0)return x<0?'-Infinity':'Infinity';var g=x<0?'-':'';if(x<0)x=-x;
 var i=Math.floor(x),f=x-i,s='',D='0123456789abcdefghijklmnopqrstuvwxyz',d,c=0;do{d=i%r;s=D[d]+s;i=(i-d)/r}while(i>0);if(f>0){s+='.';while(f>0&&c<52){f*=r;d=Math.floor(f);s+=D[d];f-=d;c++}}return g+s};
 // toFixed: exact. The number is taken apart into a whole number over a power of two; its decimal digits (lowest first) are
 // moved up by the wanted places and halved that many times; the last halving's remainder says whether to round up.
@@ -419,3 +420,5 @@ globalThis.DataView=DataView})();
  B.prototype.toLocaleString=function(){return this._s};B.prototype.valueOf=function(){return Number(this._s)};B.prototype.toJSON=undefined;
  B.asIntN=function(n,v){return v};B.asUintN=function(n,v){return v};globalThis.BigInt=B})();
 if(!Object.getOwnPropertyDescriptors)Object.getOwnPropertyDescriptors=function(o){var r={},k=Object.getOwnPropertyNames(o),i;for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i]);if(Object.getOwnPropertySymbols){k=Object.getOwnPropertySymbols(o);for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i])}return r};
+
+(function(){var S=String.prototype,W=Object.create(S),k=Object.getOwnPropertyNames(S);k.forEach(function(m){var f=S[m];if(typeof f==='function'&&m!=='constructor'&&m!=='toString'&&m!=='valueOf')W[m]=function(){return f.apply(this._pv,arguments)};__n(72)(W,m)});String.__w=W})();
