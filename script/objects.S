@@ -1374,7 +1374,18 @@ m_keylist:
     ldr     x2, [x19, #W_K_CONSTRUCTOR]
     bl      o_keyeq
     b.eq    3b
-4:  ldr     x9, [sp, #16]
+4:  and     x9, x1, #0xffffffffffff     // [by Opus] a symbol (text that begins with unit 1) is not a name to list
+    add     x9, x19, x9
+    ldr     x10, [x9], #8
+    tst     x10, #0xffffffff
+    b.eq    41f
+    tbnz    x10, #32, 42f
+    ldrb    w10, [x9]
+    b       43f
+42: ldrh    w10, [x9]
+43: cmp     w10, #1
+    b.eq    3b
+41: ldr     x9, [sp, #16]
     add     x9, x19, x9
     ldr     w10, [x9, #A_LEN]
     ldr     x9, [x9, #A_ITEMS]

@@ -747,3 +747,11 @@ c_pattern keeps up to 200 keys before an object rest (was 32; frame 224 + 672); 
 checks/programs function-wide.js, rest-many-keys.js; 55 of 55. GitHub: primer-react and react-core translate; now f18 and k0
 hit "not made yet" (find with checks/runhuge.py on the module wrapped in `function __m(__exports){..}`; fetch with python
 urllib, no curl here). Module error line numbers are wrong (always 210, 11): fix c_fragment's line counting.
+Unit 41, stage 2e [by Opus]: class declarations are let-like (c_class sets F_DECLKIND 1 around c_declref), so a class in an
+inner block with its own scope no longer hits c_declare_in's "not made yet"; object rest after computed keys (c_pattern looks
+ahead for a rest at its own level, frame 888; worked-out keys go to the prelude's __rkeep, the rest calls __rest2(value, m,
+named..)); a computed key the translator folds to a number (`[1+1]`) with a rest is still "not made yet"; objects.S
+m_keylist skips symbol keys (texts starting with unit 1), so Object.keys / for-in no longer list them; getOwnPropertySymbols
+still returns [] and a rest does not copy symbol keys. Debug trick: /tmp copy of compile.S with each c_notyet given its own
+message ("notyet at LINE"). checks/programs rest-computed.js, class-in-block.js; 57 of 57. GitHub: k0 fine; f18 now
+"Unexpected token"; 'length' of undefined at line 4 col 86259 (twice).

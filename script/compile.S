@@ -3533,7 +3533,40 @@ c_pattern:
     stp     x30, x0, [sp, #-224]!           // (from 80: how many keys an object pattern has named, -1 if one was not a plain name; from 84: which constants, 200 at most [by Opus: was 32])
     str     wzr, [sp, #80]
     DEEPER
+    str     xzr, [sp, #888]             // [by Opus] 888: the object pattern ends in a rest; 892: how many keys were worked out
     cmp     w24, #33
+    b.ne    3f
+    LEXSAVE                             // a look ahead for ... at this pattern's own level
+    mov     x12, #0
+4:  bl      next_word
+    cbz     w23, 7f
+    cmp     w23, #K_PUNCT
+    b.ne    4b
+    cmp     w24, #1
+    b.ne    5f
+    cbnz    x12, 4b
+    mov     w9, #1
+    str     w9, [sp, #64 + 888]
+    b       7f
+5:  cmp     w24, #33
+    b.eq    6f
+    cmp     w24, #35
+    b.eq    6f
+    cmp     w24, #37
+    b.eq    6f
+    cmp     w24, #34
+    b.eq    8f
+    cmp     w24, #36
+    b.eq    8f
+    cmp     w24, #38
+    b.ne    4b
+8:  cbz     x12, 7f
+    sub     x12, x12, #1
+    b       4b
+6:  add     x12, x12, #1
+    b       4b
+7:  LEXBACK
+3:  cmp     w24, #33
     cset    w9, eq
     stp     w9, wzr, [sp, #24]
     cbnz    w9, 0f                      // a list pattern takes its items from anything that can be gone through
@@ -3575,6 +3608,26 @@ c_pattern:
     EXPECT  38
     mov     w9, #2
     str     w9, [sp, #20]
+    ldr     w9, [sp, #888]              // a rest follows: the worked-out key is kept for it (the prelude's __rkeep)
+    cbz     w9, 25f
+    OP      OP_DUP
+    stp     x25, x26, [sp, #-16]!
+    adr     x9, c_w_rkeep
+    sub     x25, x9, x20
+    mov     x26, #7
+    bl      c_global
+    ldp     x25, x26, [sp], #16
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    OP      OP_SWAP
+    OP      OP_CALL
+    mov     w0, #1
+    bl      c_byte
+    OP      OP_POP
+    ldr     w9, [sp, #892]
+    add     w9, w9, #1
+    str     w9, [sp, #892]
     b       25f
 21: cmp     w23, #K_STRING
     b.ne    22f
@@ -3698,6 +3751,10 @@ c_pattern:
     ldr     w10, [sp, #80]
     tbnz    w10, #31, 53f
     ldr     w9, [sp, #20]
+    ldr     w11, [sp, #888]
+    cmp     w9, #2                      // a worked-out key was kept by __rkeep
+    ccmp    w11, #0, #4, eq
+    b.ne    53f
     cmp     w9, #0
     mov     w11, #200
     ccmp    w10, w11, #2, eq
@@ -3766,15 +3823,27 @@ c_pattern:
     ldr     w9, [sp, #16 + 80]          // ...rest: the prelude's __rest(value, each key named before) -> a new object
     tbnz    w9, #31, c_notyet
     stp     x25, x26, [sp, #-32]!
-    str     wzr, [sp, #16]
+    str     xzr, [sp, #16]
     adr     x9, c_w_rest
     sub     x25, x9, x20
     mov     x26, #6
-    bl      c_global
+    ldr     w9, [sp, #32 + 16 + 892]    // with worked-out keys: __rest2(value, how many were kept, the named keys..)
+    cbz     w9, 65f
+    adr     x9, c_w_rest2
+    sub     x25, x9, x20
+    mov     x26, #7
+65: bl      c_global
     mov     w1, w0
     mov     w0, #OP_GETG
     bl      c_op16
     OP      OP_SWAP
+    ldr     w9, [sp, #32 + 16 + 892]
+    cbz     w9, 67f
+    ucvtf   d0, w9
+    fmov    x0, d0
+    bl      c_const
+    mov     w9, #1
+    str     w9, [sp, #20]
 67: ldr     w9, [sp, #16]
     ldr     w10, [sp, #32 + 16 + 80]
     cmp     w9, w10
@@ -3789,10 +3858,14 @@ c_pattern:
 68: OP      OP_CALL
     ldr     w0, [sp, #16]
     add     w0, w0, #1
+    ldr     w9, [sp, #20]
+    add     w0, w0, w9
     bl      c_byte
     ldp     x25, x26, [sp], #32
     b       69f
 c_w_rest: .ascii "__rest"
+c_w_rest2: .ascii "__rest2"
+c_w_rkeep: .ascii "__rkeep"
     .balign 4
 66: ldr     w9, [sp, #16 + 20]
     cbnz    w9, 64f
@@ -3921,8 +3994,14 @@ c_class:
     b.ne    1f
     ldr     w9, [sp, #8]
     cbz     w9, 0f
+    ldr     w9, [x29, #F_DECLKIND]      // [by Opus] a class declaration is let-like: it belongs to the block it is in
+    str     w9, [sp, #32]
+    mov     w9, #1
+    str     w9, [x29, #F_DECLKIND]
     bl      c_declref
     str     w0, [sp, #16]
+    ldr     w9, [sp, #32]
+    str     w9, [x29, #F_DECLKIND]
 0:  bl      next_word
 1:  ISK     12, 2f
     bl      next_word
