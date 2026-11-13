@@ -332,3 +332,47 @@ getPrototypeOf:function(o){return Object.getPrototypeOf(o)},setPrototypeOf:funct
 getOwnPropertyDescriptor:function(o,k){return Object.getOwnPropertyDescriptor(o,k)},isExtensible:function(){return true},preventExtensions:function(){return true}};
 function Proxy(t,h){if(typeof t==='function'){var f=function(){return h.apply?h.apply(t,this,arguments):t.apply(this,arguments)};Object.setPrototypeOf(f,t);return f}
 return __n(67)(function(){var k=__n(68)();return h.get?h.get(t,k,this):t[k]},function(v){var k=__n(68)();if(h.set)h.set(t,k,v,this);else t[k]=v})}
+// [by Opus] Typed arrays and DataView, stage 1 in the language: an ArrayBuffer keeps its bytes in an array (_b); a view is an
+// array whose prototype is its kind's. A Uint8Array/Int8Array over a whole buffer from its start shares the bytes; any other
+// view is a copy made when it is created (writes through it do not reach the buffer), and writes by index are not wrapped to the
+// kind (only set(), fill() and construction convert). DataView reads and writes the buffer's bytes for real.
+(function(){
+function f32(v){if(v!==v||v===0||!isFinite(v))return v;var a=Math.abs(v),e=Math.floor(Math.log(a)/Math.LN2);if(Math.pow(2,e)>a)e--;if(Math.pow(2,e+1)<=a)e++;if(e>127)return v<0?-Infinity:Infinity;if(e<-149)return v<0?-0:0;var s=e<-126?Math.pow(2,-149):Math.pow(2,e-23),q=a/s,r=Math.floor(q),d=q-r;if(d>0.5||(d===0.5&&r%2))r++;r*=s;return v<0?-r:r}
+if(!Math.fround)Math.fround=function(v){return f32(+v)};
+function enc(v,sz,fl){var b=[],i;if(!fl){v=Math.floor(+v)||0;var m=Math.pow(2,8*sz);v=((v%m)+m)%m;for(i=0;i<sz;i++){b.push(v%256);v=Math.floor(v/256)}return b}
+ v=+v;var eb=sz===4?8:11,mb=sz===4?23:52,bias=(1<<(eb-1))-1,s=v<0||(v===0&&1/v<0)?1:0,e,m;v=Math.abs(v);
+ if(v!==v){e=(1<<eb)-1;m=Math.pow(2,mb-1)}else if(v===Infinity){e=(1<<eb)-1;m=0}else if(v===0){e=0;m=0}else{if(sz===4)v=f32(v);e=Math.floor(Math.log(v)/Math.LN2);if(Math.pow(2,e)>v)e--;if(Math.pow(2,e+1)<=v)e++;
+  if(e+bias<=0){m=Math.round(v/Math.pow(2,1-bias-mb));e=0}else{m=Math.round((v/Math.pow(2,e)-1)*Math.pow(2,mb));e+=bias;if(m>=Math.pow(2,mb)){m=0;e++}}}
+ for(i=0;i<sz;i++){var k=8*i;if(k+8<=mb){b.push(m%256);m=Math.floor(m/256)}else break}
+ var rest=mb-8*i,bits=(s*Math.pow(2,eb)+e)*Math.pow(2,rest)+m;for(;i<sz;i++){b.push(bits%256);bits=Math.floor(bits/256)}return b}
+function dec(b,sz,fl,sg){var i,v=0;if(!fl){for(i=sz-1;i>=0;i--)v=v*256+b[i];if(sg&&v>=Math.pow(2,8*sz-1))v-=Math.pow(2,8*sz);return v}
+ var eb=sz===4?8:11,mb=sz===4?23:52,bias=(1<<(eb-1))-1;var lo=0,hi=0;for(i=3;i>=0;i--)lo=lo*256+b[i];if(sz===8)for(i=7;i>=4;i--)hi=hi*256+b[i];else{hi=lo;lo=0}var hb=sz===8?20:23,m=(hi%Math.pow(2,hb))*(sz===8?4294967296:1)+lo,rest=Math.floor(hi/Math.pow(2,hb)),e=rest%Math.pow(2,eb),s=rest>=Math.pow(2,eb)?-1:1;
+ if(e===(1<<eb)-1)return m?NaN:s*Infinity;if(e===0)return s*m*Math.pow(2,1-bias-mb);return s*(1+m/Math.pow(2,mb))*Math.pow(2,e-bias)}
+function ArrayBuffer(n){if(!(this instanceof ArrayBuffer))throw new TypeError("Constructor ArrayBuffer requires 'new'");n=Math.max(0,Math.floor(+n)||0);var b=[];for(var i=0;i<n;i++)b.push(0);this._b=b;this.byteLength=n}
+ArrayBuffer.prototype.slice=function(s,e){var n=this.byteLength;s=s===undefined?0:s<0?Math.max(n+s,0):Math.min(s,n);e=e===undefined?n:e<0?Math.max(n+e,0):Math.min(e,n);var r=new ArrayBuffer(0);r._b=this._b.slice(s,Math.max(s,e));r.byteLength=r._b.length;return r};
+ArrayBuffer.isView=function(v){return !!(v&&v.__sz)};globalThis.ArrayBuffer=ArrayBuffer;
+var kinds=[['Int8Array',1,0,1],['Uint8Array',1,0,0],['Uint8ClampedArray',1,0,2],['Int16Array',2,0,1],['Uint16Array',2,0,0],['Int32Array',4,0,1],['Uint32Array',4,0,0],['Float32Array',4,1,0],['Float64Array',8,1,0]];
+var TA=function TypedArray(){};TA.prototype=Object.create(Array.prototype);
+kinds.forEach(function(k){var name=k[0],sz=k[1],fl=k[2],sg=k[3];
+ var cv=fl?(sz===4?function(v){return f32(+v)}:function(v){return +v}):sg===2?function(v){v=+v;return v!==v?0:v<0?0:v>255?255:Math.round(v)}:function(v){return dec(enc(v,sz,0),sz,0,sg)};
+ var C=function(a,o,l){if(!(this instanceof C))throw new TypeError("Constructor "+name+" requires 'new'");var r=[],i,n,buf=null;
+  if(a instanceof ArrayBuffer){o=o===undefined?0:o|0;if(o%sz)throw new RangeError('start offset of '+name+' should be a multiple of '+sz);n=l===undefined?Math.floor((a.byteLength-o)/sz):l>>>0;
+   if(sz===1&&o===0&&n===a.byteLength&&!sg){r=a._b}else for(i=0;i<n;i++)r.push(dec(a._b.slice(o+i*sz,o+i*sz+sz),sz,fl,sg));buf=a}
+  else if(a!==null&&typeof a==='object'){var src=Array.from(a);for(i=0;i<src.length;i++)r.push(cv(src[i]))}
+  else{n=Math.max(0,Math.floor(+a)||0);for(i=0;i<n;i++)r.push(0)}
+  Object.setPrototypeOf(r,C.prototype);r._buf=buf;r._off=o||0;return r};
+ C.prototype=Object.create(TA.prototype);C.prototype.constructor=C;C.BYTES_PER_ELEMENT=C.prototype.BYTES_PER_ELEMENT=C.prototype.__sz=sz;
+ Object.defineProperty(C.prototype,'buffer',{get:function(){if(!this._buf){var b=new ArrayBuffer(0),i,t=[];for(i=0;i<this.length;i++)t=t.concat(enc(this[i],sz,fl));b._b=t;b.byteLength=t.length;this._buf=b}return this._buf}});
+ Object.defineProperty(C.prototype,'byteLength',{get:function(){return this.length*sz}});Object.defineProperty(C.prototype,'byteOffset',{get:function(){return this._off||0}});
+ C.prototype.set=function(s,off){off=off|0;s=Array.from(s);if(off+s.length>this.length)throw new RangeError('offset is out of bounds');for(var i=0;i<s.length;i++)this[off+i]=cv(s[i])};
+ C.prototype.subarray=function(s,e){return new C(Array.prototype.slice.call(this,s,e))};C.prototype.slice=function(s,e){return new C(Array.prototype.slice.call(this,s,e))};
+ C.prototype.map=function(f,t){var r=new C(this.length);for(var i=0;i<this.length;i++)r[i]=cv(f.call(t,this[i],i,this));return r};
+ C.prototype.filter=function(f,t){return new C(Array.prototype.filter.call(this,f,t))};
+ C.prototype.fill=function(v,s,e){return Array.prototype.fill.call(this,cv(v),s,e)};C.prototype.toString=function(){return Array.prototype.join.call(this,',')};
+ C.from=function(a,f,t){var r=Array.from(a,f,t);return new C(r)};C.of=function(){return new C(Array.prototype.slice.call(arguments))};
+ globalThis[name]=C});
+function DataView(b,o,l){if(!(b instanceof ArrayBuffer))throw new TypeError('First argument to DataView constructor must be an ArrayBuffer');this.buffer=b;this.byteOffset=o|0;this.byteLength=l===undefined?b.byteLength-this.byteOffset:l>>>0}
+[['Int8',1,0,1],['Uint8',1,0,0],['Int16',2,0,1],['Uint16',2,0,0],['Int32',4,0,1],['Uint32',4,0,0],['Float32',4,1,0],['Float64',8,1,0]].forEach(function(k){var sz=k[1],fl=k[2],sg=k[3];
+ DataView.prototype['get'+k[0]]=function(p,le){p=p|0;if(p<0||p+sz>this.byteLength)throw new RangeError('Offset is outside the bounds of the DataView');var b=this.buffer._b.slice(this.byteOffset+p,this.byteOffset+p+sz);if(!le)b.reverse();return dec(b,sz,fl,sg)};
+ DataView.prototype['set'+k[0]]=function(p,v,le){p=p|0;if(p<0||p+sz>this.byteLength)throw new RangeError('Offset is outside the bounds of the DataView');var b=enc(v,sz,fl);if(!le)b.reverse();for(var i=0;i<sz;i++)this.buffer._b[this.byteOffset+p+i]=b[i]}});
+globalThis.DataView=DataView})();

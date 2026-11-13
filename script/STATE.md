@@ -762,3 +762,9 @@ checks/programs/name-escapes.js; 58 of 58. GITHUB: EVERY MODULE TRANSLATES now. 
 typed arrays at all in the engine: ArrayBuffer, Uint8Array.., DataView), after which a webpack runtime fails 300 times
 ('call' of undefined, line 4 col 156, probably from timers); 'illegal invocation' at line 138 col 160598.
 NEXT: typed arrays and DataView (engine, machine code: a byte block kind; element get/set by type), then recheck GitHub.
+Unit 42 [by Opus], stage 1: typed arrays and DataView in prelude.js (comment above the code states the limits: views other
+than a whole-buffer Uint8/Int8 are copies; index writes are not wrapped to the kind; no BigInt64 kinds); IEEE encode/decode
+written in the language (exact 64-bit decode in two 32-bit halves); Math.fround if missing. checks/programs/typed-arrays.js;
+59 of 59. Machine-code typed arrays (a byte block kind with typed element get/set) are the proper stage 2.
+GitHub after it: 'set' of undefined (line 4 col 1018), then 'call' of undefined x300 (line 4 col 156), 'illegal
+invocation' (line 138 col 160598).
