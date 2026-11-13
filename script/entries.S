@@ -8,6 +8,12 @@
     stp     x27, x28, [sp, #80]
     stp     d8, d9, [sp, #96]
     mov     x19, x0
+    ldr     w9, [x19]                   // a world: where the collector stops looking (gc.S)
+    cmp     w9, #6
+    b.ne    1000f
+    mov     x9, sp
+    str     x9, [x19, #W_NBASE]
+1000:
     .endm
     .macro  LEAVE
     ldp     x19, x20, [sp, #16]

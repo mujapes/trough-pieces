@@ -48,6 +48,7 @@
     .equ W_K_TOPRIM, 504                // the key Symbol.toPrimitive ("\001Symbol.toPrimitive")
     .equ W_K_VALUEOF, 496               // the text "valueOf"
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
+    .equ W_LAST, 584                    // where the newest block made at the top starts (0: the newest came from the free list)
     .equ W_GENFN3, 576                  // the prelude's driver of an async generator (OP_GENSNAP 2)
     .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function
     .equ W_WANT, 544                    // not 0: the program asks its host for something: one more than where the request begins in what it has printed
@@ -78,7 +79,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #66
+    mov     x12, #74
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -86,7 +87,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #592                   // the header: 592 bytes (576 to 591: W_GENFN3, and 8 free)
+    mov     x11, #656                   // the header: 656 bytes (576: W_GENFN3, 584 free, 592-655 the collector's, gc.S)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]
@@ -111,6 +112,24 @@ w_begin:
     str     x11, [x19, #W_SP]
     add     x11, x11, x12
     str     x11, [x19, #W_STACK_END]
+    str     x11, [x19, #W_HEAP0]        // the collector's room at the heap's end: start bits, marks, the mark stack, a 64th each
+    sub     x10, x9, x11
+    lsr     x10, x10, #6
+    add     x10, x10, #16
+    and     x10, x10, #-8
+    sub     x9, x9, x10
+    str     x9, [x19, #W_MSTK]
+    lsr     x12, x10, #3
+    str     x12, [x19, #W_MSCAP]
+    sub     x9, x9, x10
+    str     x9, [x19, #W_MARKS]
+    sub     x9, x9, x10
+    str     x9, [x19, #W_BITS]
+    add     x12, x19, x9
+    lsl     x13, x10, #1
+2:  str     xzr, [x12], #8
+    subs    x13, x13, #8
+    b.hi    2b
     stp     x11, x9, [x19, #W_HEAP]
     mov     x0, #1
     ret
@@ -124,11 +143,84 @@ w_alloc:
     ldp     x9, x10, [x19, #W_HEAP]
     add     x0, x9, x0
     cmp     x0, x10
-    b.hi    1f
+    b.hi    w_slow
     str     x0, [x19, #W_HEAP]
+    str     x9, [x19, #W_LAST]
+    stp     x11, x12, [sp, #-16]!       // its start bit
+    ldr     x10, [x19, #W_HEAP0]
+    sub     x10, x9, x10
+    lsr     x10, x10, #3
+    ldr     x11, [x19, #W_BITS]
+    add     x11, x19, x11
+    lsr     x0, x10, #6
+    ldr     x12, [x11, x0, lsl #3]
+    mov     x0, #1
+    lsl     x0, x0, x10
+    orr     x12, x12, x0
+    lsr     x10, x10, #6
+    str     x12, [x11, x10, lsl #3]
+    ldp     x11, x12, [sp], #16
     mov     x0, x9
     ret
-1:  mov     x0, #0
+// w_slow: no room at the top: a free block that fits; else a collection, then the top again, then a free block again.
+// Every register is kept on the processor's stack, where the collector sees them as roots.
+w_slow:
+    sub     x0, x0, x9
+    cmp     x0, #8
+    mov     x9, #8
+    csel    x0, x0, x9, hs
+    sub     sp, sp, #256
+    stp     x0, x1, [sp]
+    stp     x2, x3, [sp, #16]
+    stp     x4, x5, [sp, #32]
+    stp     x6, x7, [sp, #48]
+    stp     x8, x11, [sp, #64]
+    stp     x12, x13, [sp, #80]
+    stp     x14, x15, [sp, #96]
+    stp     x16, x17, [sp, #112]
+    stp     x18, x20, [sp, #128]
+    stp     x21, x22, [sp, #144]
+    stp     x23, x24, [sp, #160]
+    stp     x25, x26, [sp, #176]
+    stp     x27, x28, [sp, #192]
+    stp     x29, x30, [sp, #208]
+    bl      g_fit
+    str     xzr, [x19, #W_LAST]
+    cbnz    x0, 8f
+    bl      gc_collect
+    ldr     x0, [sp]
+    ldp     x9, x10, [x19, #W_HEAP]
+    add     x11, x9, x0
+    cmp     x11, x10
+    b.hi    7f
+    str     x11, [x19, #W_HEAP]
+    str     x9, [x19, #W_LAST]
+    str     x9, [sp, #240]
+    ldr     x10, [x19, #W_HEAP0]
+    sub     x0, x9, x10
+    lsr     x0, x0, #3
+    ldr     x1, [x19, #W_BITS]
+    bl      g_setbit
+    ldr     x0, [sp, #240]
+    b       8f
+7:  ldr     x0, [sp]
+    bl      g_fit
+    str     xzr, [x19, #W_LAST]
+8:  ldr     x1, [sp, #8]
+    ldp     x2, x3, [sp, #16]
+    ldp     x4, x5, [sp, #32]
+    ldp     x6, x7, [sp, #48]
+    ldp     x8, x11, [sp, #64]
+    ldp     x12, x13, [sp, #80]
+    ldp     x14, x15, [sp, #96]
+    ldp     x16, x17, [sp, #112]
+    ldp     x18, x20, [sp, #128]
+    ldp     x21, x22, [sp, #144]
+    ldp     x23, x24, [sp, #160]
+    ldp     x25, x26, [sp, #176]
+    ldp     x27, x28, [sp, #192]
+    ldp     x29, x30, [sp, #208]
+    add     sp, sp, #256
     ret
 // w_string: a string value holding the x1 bytes at x0 -> x0 the value, or 0 if the world is full. A string in the heap is its
 // length (8 bytes), then its bytes. Uses x9-x13.

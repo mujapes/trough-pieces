@@ -461,7 +461,15 @@ c_strconst:
     b.eq    2b
 4:  add     x11, x11, #1
     b       1b
-3:  str     x2, [x19, #W_HEAP]
+3:  ldr     x9, [x19, #W_LAST]          // the string just made is undone (its start bit too), if it is the newest at the top
+    cmp     x9, x2
+    b.ne    31f
+    stp     x0, x11, [sp, #-16]!
+    mov     x0, x2
+    mov     x1, x2
+    bl      w_cut
+    ldp     x0, x11, [sp], #16
+31:
     mov     w1, w11
     mov     w0, #OP_CONST
     bl      c_op16
@@ -2297,10 +2305,18 @@ c_string:
 8:  add     x5, x1, #8
     sub     x5, x2, x5
     str     x5, [x1]
-    add     x5, x5, #15                 // the room the escapes did not need goes back
+    add     x5, x5, #15                 // the room the escapes did not need goes back (when the block is the newest at the top)
     and     x5, x5, #-8
     add     x5, x0, x5
-    str     x5, [x19, #W_HEAP]
+    ldr     x9, [x19, #W_LAST]
+    cmp     x9, x0
+    b.ne    80f
+    stp     x0, x1, [sp, #-16]!
+    mov     x1, x5
+    mov     x0, x5
+    bl      w_cut
+    ldp     x0, x1, [sp], #16
+80:
     ldr     x5, [x1]                    // so far it is UTF-8; with anything past ASCII in it, it is made again as units
     add     x6, x1, #8                  // (w_text) and moved down over the first copy
     mov     x7, #0
@@ -2309,13 +2325,21 @@ c_string:
     ldrb    w8, [x6, x7]
     add     x7, x7, #1
     tbz     w8, #7, 81b
-    str     x0, [sp, #8]
+    ldr     x9, [x19, #W_LAST]          // (bit 63: the first copy is not the newest at the top, so the second is not moved down)
+    cmp     x9, x0
+    cset    x9, ne
+    orr     x9, x0, x9, lsl #63
+    str     x9, [sp, #8]
     mov     x0, x6
     mov     x1, x5
     bl      w_text
     cbz     x0, c_full
     and     x0, x0, #0xffffffffffff
     ldr     x1, [sp, #8]
+    tbnz    x1, #63, 89f
+    ldr     x9, [x19, #W_LAST]          // moved down only if both copies were made at the top, one after the other
+    cmp     x9, x0
+    b.ne    89f
     ldr     x9, [x19, #W_HEAP]
     sub     x9, x9, x0
     add     x2, x19, x0
@@ -2328,7 +2352,11 @@ c_string:
     add     x4, x4, #8
     b       82b
 83: add     x9, x1, x9
-    str     x9, [x19, #W_HEAP]
+    stp     x0, x1, [sp, #-16]!
+    add     x0, x1, #8
+    mov     x1, x9
+    bl      w_cut
+    ldp     x0, x1, [sp], #16
     mov     x0, x1
 89: orr     x0, x0, #(T_STRING << 48)
     ldr     x30, [sp], #16

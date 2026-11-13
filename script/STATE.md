@@ -607,3 +607,15 @@ delegated handler with the right target (e.target.closest works). Checked: a spa
 "the world is full"). host: a full world now marks the page dead once (its scripts stop, the page stays); ticks every 200 ms;
 TROUGH_KEEP_PAGE=file saves the drawn copy and says how many elements are clickable. NEXT: the garbage collector (plan at the
 end of intent.md).
+
+**Thirty-sixth unit [by Opus]: the garbage collector (2026-11-13).** `gc.S` (new, included after world.S), as planned at the end
+of intent.md: conservative, non-moving mark-sweep. No block heads: a start bitmap (one bit per 8 heap bytes) gives each block's
+extent; a mark bitmap; a mark stack (overflow: flag and rescan). World header 656 bytes (592-655: W_NBASE, W_HEAP0, W_BITS,
+W_MARKS, W_MSTK, W_MSCAP, W_FREE, W_GCS; 584: W_LAST, the newest block made at the top). w_alloc: bump (sets the start bit),
+else w_slow: every register saved on the processor's stack (roots), free list first fit (zeroed, split), else collect, then
+bump, then fit. Roots: header, constants, globals, value stack, processor stack from sp to W_NBASE (set by ENTER for worlds).
+A word counts as its low 48 bits and as an address. Sweep coalesces unmarked runs; a run at the top lowers the top. The
+translator's three hand-made heap moves (c_strconst undo, string literal trim, units copy-down) now go through w_cut and only
+when their block is W_LAST. Checked: 47 of 47 in the normal and the smallest (1 MB) world; a 100000-object loop in a 1.2 MB
+world ran with 27 collections, right output; Wikipedia on the live screen 100 s with no full world (before: full within a
+minute); bbc.com/news 58 run, 2 failed (unchanged).

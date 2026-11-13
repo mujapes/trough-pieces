@@ -11,6 +11,7 @@
     .global error
     .global clock
     .include "script/world.S"
+    .include "script/gc.S"
     .include "script/lex.S"
     .include "script/tokens.S"
     .include "script/values.S"
