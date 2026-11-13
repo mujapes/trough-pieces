@@ -122,7 +122,48 @@ m_totext:                               // [by Opus] where text is wanted: toStr
     b       0f
 m_toprim:                               // (for +: first the object's own '@@toPrimitive', which a Date has; then as for a number)
     mov     x7, #2
-0:  sub     x21, x21, #1
+0:  cbz     x7, 10f                     // [by Opus] a BigInt under an arithmetic or compare instruction: the prelude's
+    ldr     x9, [x19, #W_BIGPROTO]      // __bigop(op, left, right) answers in place of the instruction (call kind 5)
+    cbz     x9, 10f
+    ldr     x10, [x19, #W_BIGFN]
+    cbz     x10, 10f
+    and     x6, x5, #0xffffffffffff
+    add     x6, x19, x6
+    ldr     x6, [x6, #8]
+    cmp     x6, x9
+    b.ne    10f
+    ldrb    w6, [x21, #-1]
+    sub     w9, w6, #10
+    cmp     w9, #5
+    b.ls    12f
+    sub     w9, w6, #21
+    cmp     w9, #5
+    b.ls    12f
+    sub     w9, w6, #29
+    cmp     w9, #5
+    b.ls    12f
+    cmp     w6, #16
+    ccmp    w6, #17, #4, ne
+    ccmp    w6, #19, #4, ne
+    b.ne    10f
+    sub     x12, x22, #8                // one value
+    ldr     x14, [x22, #-8]
+    VAL     x15, T_UNDEF
+    b       13f
+12: sub     x12, x22, #16
+    ldp     x14, x15, [x22, #-16]
+13: VAL     x11, T_UNDEF
+    PUSH    x10
+    mov     x1, x22
+    scvtf   d0, w6
+    fmov    x9, d0
+    PUSH    x9
+    PUSH    x14
+    PUSH    x15
+    mov     x0, #3
+    mov     x13, #5
+    b       m_call
+10: sub     x21, x21, #1
     and     x6, x5, #0xffffffffffff
     ldr     x6, [x19, x6]
     cmp     x6, #3
@@ -432,6 +473,8 @@ n_bigproto:
     ldr     x1, [sp, #24]
     ldr     x0, [x1]
     str     x0, [x19, #W_BIGPROTO]
+    ldr     x0, [x1, #8]
+    str     x0, [x19, #W_BIGFN]
     b       n_undef
 n_defval:
     NIN

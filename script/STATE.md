@@ -930,3 +930,9 @@ Unit 61 [by Opus]: typeof answers "bigint" for objects whose prototype is BigInt
 native 74 n_bigproto from the prelude; header now 848 bytes). String(bigint) exact. Still: operators lossy (valueOf), console.log
 shows an object not 5n. Operator plan: in m_toprim/m_tonum, a BigInt operand on an arithmetic or compare instruction calls a
 prelude __bigop(op, a, b) on the decimal texts instead of converting. 80 of 80.
+Unit 62 [by Opus]: BigInt operators exact. lib.S m_toprim/m_tonum: an object whose prototype is W_BIGPROTO under ops 10-15,
+21-26, 29-34 (two values) or 16/17/19 (one) calls the prelude's __bigop(op, left, right) as call kind 5 (answer replaces the
+operands, instruction skipped). W_BIGFN 840 (n 74's second argument). __bigop: sign + base-1e7 limbs; + - * / % **, & | ^ via
+24-bit two's-complement chunks, << >>, comparisons (mixed with numbers by Number), "x"+5n text, mixing throws TypeError.
+Number(bigint) exact-ish. bigint-ops.js; 81 of 81. Not yet: ++/-- on a BigInt (adds number 1: TypeError), === between two
+BigInts with the same value (identity), console.log shows an object, BigInt64 arrays, asIntN/asUintN.

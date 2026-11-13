@@ -57,6 +57,7 @@
     .equ W_TRAIL, 672                   // and the places, 16 at most, each line * 2^32 + column; the first where it was made
     .equ W_TEXTNO, 800
     .equ W_BIGPROTO, 832                // [by Opus] BigInt.prototype, as a value (typeof answers bigint for its objects; not a root: BigInt holds it)
+    .equ W_BIGFN, 840                   // [by Opus] the prelude's __bigop (not a root: a global holds it)
     .equ W_STRESS, 808                  // [by Opus] collection stress (set by a host for finding faults): collect every this many bytes
     .equ W_STRESS_END, 816              //   and the heap's real end (W_HEAP_END is kept just above the top meanwhile)
                                         // W_TEXTNO: how many texts have been translated (c_compile, c_fragment): a place's line

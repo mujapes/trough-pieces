@@ -31,7 +31,7 @@ function __rxu(p){var H=function(c){var s=c.toString(16).toUpperCase();while(s.l
 // The library's half that is written in the language (see lib.S). __n(k): the built-in routine numbered k.
 __n(-7);
 var __symobj;function Object(v){if(v===undefined||v===null)return {};if(typeof v==='symbol')return __symobj(v);return v}function Array(n){var a=[],i;if(arguments.length===1&&typeof n==='number'){if(n!==(n>>>0))throw new RangeError('Invalid array length');for(i=0;i<n;i++)a.push(undefined)}else for(i=0;i<arguments.length;i++)a.push(arguments[i]);return a}function Function(){var a=[],i,n=arguments.length;for(i=0;i<n-1;i++)a.push(''+arguments[i]);return __n(69)('(function anonymous('+a.join(',')+'\n) {\n'+(n?''+arguments[n-1]:'')+'\n})')}function String(x){var v=!arguments.length?'':typeof x==='symbol'?'Symbol('+Symbol.__desc(x)+')':(x!==null&&(typeof x==='object'||typeof x==='function'||typeof x==='bigint'))?String.__ts(x):''+x;if(this instanceof String){if(String.__w)__n(65)(this,String.__w);__n(73)(this,'_pv',v);__n(72)(this,'_pv');__n(73)(this,'length',v.length);__n(72)(this,'length');for(var i=0;i<v.length;i++)this[i]=v.charAt(i);return this}return v}
-function Number(x){var v=arguments.length?+x:0;if(this instanceof Number){__n(73)(this,'_pv',v);__n(72)(this,'_pv');return this}return v}function Boolean(x){var v=!!x;if(this instanceof Boolean){__n(73)(this,'_pv',v);__n(72)(this,'_pv');return this}return v}
+function Number(x){var v=arguments.length?(typeof x==='bigint'?+x._s:+x):0;if(this instanceof Number){__n(73)(this,'_pv',v);__n(72)(this,'_pv');return this}return v}function Boolean(x){var v=!!x;if(this instanceof Boolean){__n(73)(this,'_pv',v);__n(72)(this,'_pv');return this}return v}
 __n(-1,Object.prototype);__n(-2,Array.prototype);__n(-3,Function.prototype);__n(-4,String.prototype);__n(-5,Number.prototype);__n(-6,Boolean.prototype);
 var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),exp:__n(20),log:__n(21),log2:__n(22),log10:__n(23),random:__n(24),sin:__n(25),cos:__n(26),tan:__n(27),atan:__n(31),atan2:__n(32),asin:__n(33),acos:__n(34),expm1:__n(35),log1p:__n(36),sinh:__n(37),cosh:__n(38),tanh:__n(39),cbrt:__n(40),hypot:__n(41),asinh:__n(43),acosh:__n(44),atanh:__n(45),fround:__n(46),clz32:__n(47),imul:__n(48),pow:function(a,b){return a**b},
 PI:3.141592653589793,E:2.718281828459045,LN2:0.6931471805599453,LN10:2.302585092994046,LOG2E:1.4426950408889634,LOG10E:0.4342944819032518,SQRT2:1.4142135623730951,SQRT1_2:0.7071067811865476};
@@ -419,7 +419,42 @@ globalThis.DataView=DataView})();
  if(s==='-0')s='0';Object.defineProperty(o,'_s',{value:s});return o}
  B.prototype.toString=function(r){if(r===undefined||r===10)return this._s;return Number(this._s).toString(r)};
  B.prototype.toLocaleString=function(){return this._s};B.prototype.valueOf=function(){return Number(this._s)};B.prototype.toJSON=undefined;
- B.asIntN=function(n,v){return v};B.asUintN=function(n,v){return v};globalThis.BigInt=B;__n(74)(B.prototype)})();
+ B.asIntN=function(n,v){return v};B.asUintN=function(n,v){return v};globalThis.BigInt=B;})();
+(function(){var B=globalThis.BigInt,E=1e7;
+function P(x){var s=x._s,n=s.charAt(0)==='-',d=n?s.slice(1):s,m=[],i;for(i=d.length;i>0;i-=7)m.push(+d.slice(Math.max(0,i-7),i));return T({n:n,m:m})}
+function T(a){var m=a.m;while(m.length&&m[m.length-1]===0)m.pop();if(!m.length)a.n=false;return a}
+function S(a){var m=a.m,i,s;if(!m.length)return '0';s=''+m[m.length-1];for(i=m.length-2;i>=0;i--)s+=(''+(m[i]+E)).slice(1);return (a.n?'-':'')+s}
+function R(a){return B(S(a))}
+function cm(a,b){if(a.length!==b.length)return a.length<b.length?-1:1;for(var i=a.length-1;i>=0;i--)if(a[i]!==b[i])return a[i]<b[i]?-1:1;return 0}
+function ad(a,b){var r=[],c=0,i;for(i=0;i<Math.max(a.length,b.length)||c;i++){c+=(a[i]||0)+(b[i]||0);r.push(c%E);c=Math.floor(c/E)}return r}
+function sb(a,b){var r=[],c=0,i;for(i=0;i<a.length;i++){c+=a[i]-(b[i]||0);if(c<0){r.push(c+E);c=-1}else{r.push(c);c=0}}return r}
+function ml(a,b){var r=[],i,j,c,t;for(i=0;i<a.length+b.length;i++)r.push(0);for(i=0;i<a.length;i++){c=0;for(j=0;j<b.length||c;j++){t=(r[i+j]||0)+a[i]*(b[j]||0)+c;c=Math.floor(t/E);r[i+j]=t-c*E}}return T({m:r}).m}
+function sm(a,k){return ml(a,k?[k]:[])}
+function dv(a,b){var q=[],r=[],i,lo,hi,md;for(i=a.length-1;i>=0;i--){r.unshift(a[i]);r=T({m:r}).m;lo=0;hi=E-1;while(lo<hi){md=Math.ceil((lo+hi)/2);if(cm(sm(b,md),r)<=0)lo=md;else hi=md-1}q.unshift(lo);if(lo)r=T({m:sb(r,sm(b,lo))}).m}return [T({m:q}).m,r]}
+function add(a,b){if(a.n===b.n)return {n:a.n,m:ad(a.m,b.m)};var c=cm(a.m,b.m);if(!c)return {n:false,m:[]};return c>0?T({n:a.n,m:sb(a.m,b.m)}):T({n:b.n,m:sb(b.m,a.m)})}
+function neg(a){return T({n:!a.n,m:a.m})}
+function cmpv(a,b){if(a.n!==b.n)return a.n?-1:1;var c=cm(a.m,b.m);return a.n?-c:c}
+function divmod(a,b){if(!b.m.length)throw new RangeError('Division by zero');var d=dv(a.m,b.m);return [T({n:a.n!==b.n,m:d[0]}),T({n:a.n,m:d[1]})]}
+var TWO24=[16777216];
+function bits(a,w){var m=a.m,c=[],d;if(a.n)m=sb(m,[1]);m=T({m:m.slice()}).m;while(m.length){d=dv(m,TWO24);c.push(+S({m:d[1]})||0);m=d[0]}while(c.length<w)c.push(0);if(a.n)for(var i=0;i<c.length;i++)c[i]=16777215-c[i];return c}
+function unbits(c,n){var i,m=[];if(n)c=c.map(function(x){return 16777215-x});for(i=c.length-1;i>=0;i--)m=ad(sm(m,16777216),c[i]?[c[i]%E,Math.floor(c[i]/E)]:[]);m=T({m:m}).m;if(n)m=ad(m,[1]);return T({n:n,m:m})}
+function bw(a,b,f){var w=Math.max(a.m.length,b.m.length)+2,x=bits(a,w),y=bits(b,w),r=[],i;for(i=0;i<w;i++)r.push(f(x[i],y[i])&16777215);var n=!!f(a.n?1:0,b.n?1:0);return unbits(r,n)}
+function pw2(k){var r=[1];while(k>=20){r=sm(r,1048576);k-=20}return sm(r,Math.pow(2,k))}
+function shl(a,k){if(k<0)return shr(a,-k);return T({n:a.n,m:ml(a.m,pw2(k))})}
+function shr(a,k){if(k<0)return shl(a,-k);var d=divmod(a,{n:false,m:pw2(k)});if(a.n&&d[1].m.length)d[0]=add(d[0],{n:true,m:[1]});return d[0]}
+var mix='Cannot mix BigInt and other types, use explicit conversions';
+globalThis.__bigop=function(op,x,y){var bx=x instanceof B,by=y instanceof B;
+ if(op===16)return R(neg(P(x)));if(op===19)return R(add(neg(P(x)),{n:true,m:[1]}));if(op===17)throw new TypeError('Cannot convert a BigInt value to a number');
+ if(op===10&&(typeof x==='string'||typeof y==='string'||(!bx&&typeof x==='object'&&x!==null)||(!by&&typeof y==='object'&&y!==null)))return String(x)+String(y);
+ if(op>=21&&op<=26){if(bx&&by){var c=cmpv(P(x),P(y));return op===21?c<0:op===22?c>0:op===23?c<=0:op===24?c>=0:op===25?c===0:c!==0}
+  var u=bx?Number(x._s):x,v=by?Number(y._s):y;if(op===25)return u==v;if(op===26)return u!=v;return op===21?u<v:op===22?u>v:op===23?u<=v:u>=v}
+ if(!bx||!by)throw new TypeError(mix);var a=P(x),b=P(y),r;
+ switch(op){case 10:r=add(a,b);break;case 11:r=add(a,neg(b));break;case 12:r=T({n:a.n!==b.n,m:ml(a.m,b.m)});break;case 13:r=divmod(a,b)[0];break;case 14:r=divmod(a,b)[1];break;
+ case 15:if(b.n)throw new RangeError('Exponent must be non-negative');var e=+S(b);r={n:false,m:[1]};while(e>0){if(e%2)r=T({n:r.n!==a.n,m:ml(r.m,a.m)});a={n:false,m:ml(a.m,a.m)};e=Math.floor(e/2)}break;
+ case 29:r=bw(a,b,function(p,q){return p&q});break;case 30:r=bw(a,b,function(p,q){return p|q});break;case 31:r=bw(a,b,function(p,q){return p^q});break;
+ case 32:r=shl(a,+S(b));break;case 33:r=shr(a,+S(b));break;case 34:throw new TypeError('BigInts have no unsigned right shift, use >> instead');default:throw new TypeError(mix)}
+ return R(r)}})();
+__n(74)(BigInt.prototype,__bigop);
 if(!Object.getOwnPropertyDescriptors)Object.getOwnPropertyDescriptors=function(o){var r={},k=Object.getOwnPropertyNames(o),i;for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i]);if(Object.getOwnPropertySymbols){k=Object.getOwnPropertySymbols(o);for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i])}return r};
 
 (function(){var S=String.prototype,W=Object.create(S),k=Object.getOwnPropertyNames(S);k.forEach(function(m){var f=S[m];if(typeof f==='function'&&m!=='constructor'&&m!=='toString'&&m!=='valueOf')W[m]=function(){return f.apply(this._pv,arguments)};__n(72)(W,m)});String.__w=W})();
