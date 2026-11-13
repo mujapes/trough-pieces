@@ -961,3 +961,16 @@ Unit 69 [by Opus]: new Function and eval cache by text (prelude: Function.__c an
 a repeat of new Function returns a fresh wrapper over the cached function). eval-cache.js (20000 evals); 84 of 84. NPR at
 300 MB still fills the instruction area ("program is too big" x309): the texts must differ, or something else compiles a lot;
 TROUGH_TICKS shows "code X of Y" to find what. Low priority: at the default 96 MB NPR stops earlier (23/2).
+Unit 70 [by Opus]: new sites tried: MDN 6/0, NYT 8/1, Stack Overflow 403 (blocked), old.reddit (login page) 22/3 -> 27/4 with
+more running. Fixed: lex.S templates: a pattern inside ${ } (after an operator) is skipped like a string (its quotes broke the
+template); document.js: data: module URLs decoded in place (__dataurl), event classes (UIEvent, MouseEvent, KeyboardEvent ...
+as callable functions over Event; classes broke NPR: "Cannot call a class as a function"), Text/Comment/CDATASection/
+ProcessingInstruction, CustomElementRegistry (customElements's class), Window (own prototype between window and its old one,
+with the event methods), NodeFilter + createTreeWalker/createNodeIterator over ELEMENTS only. prelude: getOwnPropertyNames no
+longer calls the page's Object.keys (recursion), Function.prototype.apply takes array-likes, Array.prototype.push works on
+array-likes (wrapper: a cost on every push; native generic push would be better), RegExp.$1-$9/lastMatch/leftContext/
+rightContext (getters over RegExp.__last). regex-statics.js; 85 of 85.
+NOT ENABLED: DOMParser and document.implementation.createHTMLDocument (code kept as __DOMParser): with them jQuery's parseHTML
+and VisualEditor take paths our fake document breaks, and Wikipedia stalled past 280 s. A real detached document (host side) is
+needed first. Sites: Wikipedia 8/0, GitHub 5/0, Guardian 31/0, BBC 62/0, NPR 23/2, HN 1/0, reddit 27/4.
+LESSON: sweep Wikipedia after every document.js change; three regressions here came from adding globals pages feature-test.

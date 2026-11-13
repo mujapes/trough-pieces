@@ -360,10 +360,27 @@ w_template:                             // a template: to the closing backtick; 
     cmp     w0, #39
     b.eq    4f
     cmp     w0, #'`'
-    b.ne    31f
+    b.ne    32f
     str     x2, [sp, #-16]!
     mov     w2, #0
     b       1b
+32: cmp     w0, #'/'                    // [by Opus] a pattern inside ${ }, if what comes before is not a value: skipped
+    b.ne    31f                         // like a string (its quotes and braces are not the template's)
+    sub     x9, x22, #2
+33: ldrb    w10, [x20, x9]
+    cmp     w10, #' '
+    b.hi    34f
+    subs    x9, x9, #1
+    b.hi    33b
+34: adr     x11, 36f
+35: ldrb    w12, [x11], #1
+    cbz     w12, 1b
+    cmp     w12, w10
+    b.ne    35b
+    mov     w3, #'/'
+    b       1b
+36: .asciz  "(,=:[!&|?{};+-*%<>~^"
+    .balign 4
 31: cmp     w0, #'{'
     cinc    w2, w2, eq
     cmp     w0, #'}'
