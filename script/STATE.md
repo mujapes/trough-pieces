@@ -892,3 +892,8 @@ TROUGH_BADCALL=1 prints it, the collection count and the object's first 12 words
 runs 5/0 at 72, 84, 90, 94, 96, 98, 102 MB: the fault no longer shows (layout-sensitive). Not fixed, only not seen: when
 "an object is not a function" appears anywhere, rerun with TROUGH_BADCALL=1 and read the words (kind word should be 1).
 Sites: Wikipedia Moon 8/0, HN 1/0, Guardian 18/1 (unchanged).
+Unit 55 [by Opus]: Guardian 18/1 -> 29/0. (1) host/browse.c: a tree question ('d') no longer counts as a turn of the 200000
+(big pages walk parents hundreds of thousands of times; "stopped after too many steps" was that), capped at 50M questions.
+(2) prelude.js: Array forEach/map/filter/some/every/find/findIndex take thisArg (they ignored it; IntersectionObserver polyfill).
+thisarg.js; 75 of 75. Sites: Wikipedia 8/0, HN 1/0, GitHub 5/0, Guardian 29/0.
+NEXT candidates: BBC, NPR (old notes say the sites' own faults); BigInt stage 2 (typeof, literals, operators); the collector fault.

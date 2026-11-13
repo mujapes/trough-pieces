@@ -153,11 +153,12 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
         return; }
     free(source); s->ran++;
     { const char *all = getenv("TROUGH_KEEP_ALL"); if (all && text) { char path[600]; snprintf(path, sizeof path, "%s/ran-%d-t%d.js", all, s->ran, (int)(*(uint64_t *)(s->world + 800) & 255)); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } } }   /* every script, for finding where a run-time error really was */
+    long long asks = 0;
     for (int turn = 0; turn < 200000; turn++) {
         long long r = run(s->world, 0, 0, 20000000, table), t = text_of(s->out, qw, 1, 0, table); size_t bytes = t < 0 ? 0 : (size_t)(t & 0xffffffff), want = t < 0 ? 0 : (size_t)(t >> 32); const uint8_t *o = s->out + 64;
         size_t said = want ? want - 1 : bytes; if (said) fprintf(stderr, "console: %.*s", (int)said, o);
         if (want) { const uint8_t *q = o + want - 1; size_t qn = bytes - (want - 1); const char *a = ""; size_t an = 0;
-            if (qn && q[0] == 'd') { long long got = tree_ask(s, q + 1, qn - 1); if (got < 0) { memcpy(s->answer + 64, "\x01" "E", 2); got = 2; } resize(s->answer, (size_t)got); text_of(s->answer, qw, 2, 0, table); continue; }
+            if (qn && q[0] == 'd') { if (++asks < 50000000) turn--;   /* [by Opus] a question to the tree is not a turn of running: big pages ask hundreds of thousands */ long long got = tree_ask(s, q + 1, qn - 1); if (got < 0) { memcpy(s->answer + 64, "\x01" "E", 2); got = 2; } resize(s->answer, (size_t)got); text_of(s->answer, qw, 2, 0, table); continue; }
             else if (qn && q[0] == 'T') { size_t k = qn - 1 < sizeof s->title - 1 ? qn - 1 : sizeof s->title - 1; memcpy(s->title, q + 1, k); s->title[k] = 0; }
             else if (qn && q[0] == 'l') { a = address; an = strlen(a); }
             else if (qn > 1 && (q[0] == 'f' || q[0] == 'M')) {   /* f: the page asks for an address (GET only): "1" and the body, or "0" and why not; 16 a page at most.
