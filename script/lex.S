@@ -285,11 +285,120 @@ w_punct:
     b.ls    6f
     mov     w28, #1                     // after punctuation a slash begins a pattern, except after ) and ]
     cmp     w2, #36
-    b.eq    5f
+    b.eq    7f
     cmp     w2, #38
     b.ne    6f
 5:  mov     w28, #0
 6:  ret
+7:  mov     w28, #0                     // [by Opus] ) then /: a pattern if the brackets were if/for/while/with's
+    stp     x7, x8, [sp, #-32]!
+    stp     x9, x10, [sp, #16]
+    mov     x5, x22                     // the next character that is not a space
+71: cmp     x5, x21
+    b.hs    79f
+    ldrb    w6, [x20, x5]
+    cmp     w6, #' '
+    b.eq    72f
+    cmp     w6, #9
+    b.eq    72f
+    cmp     w6, #10
+    b.eq    72f
+    cmp     w6, #13
+    b.ne    73f
+72: add     x5, x5, #1
+    b       71b
+73: cmp     w6, #'/'
+    b.ne    79f
+    sub     x5, x22, #2                 // back to the ( that this ) closes (strings in between are not understood)
+    mov     x7, #1
+74: tbnz    x5, #63, 79f
+    ldrb    w6, [x20, x5]
+    cmp     w6, #')'
+    cinc    x7, x7, eq
+    cmp     w6, #'('
+    b.ne    75f
+    subs    x7, x7, #1
+    b.eq    76f
+75: sub     x5, x5, #1
+    b       74b
+76: sub     x5, x5, #1                  // the word before it
+    tbnz    x5, #63, 79f
+    ldrb    w6, [x20, x5]
+    cmp     w6, #' '
+    b.eq    76b
+    cmp     w6, #10
+    b.eq    76b
+    cmp     w6, #9
+    b.eq    76b
+    add     x8, x5, #1                  // its end
+77: tbnz    x5, #63, 78f
+    ldrb    w6, [x20, x5]
+    sub     w9, w6, #'a'
+    cmp     w9, #25
+    b.hi    78f
+    sub     x5, x5, #1
+    b       77b
+78: tbnz    x5, #63, 781f               // the character before the word must not continue a name or be a dot
+    ldrb    w6, [x20, x5]
+    cmp     w6, #'.'
+    b.eq    79f
+    cmp     w6, #'$'
+    b.eq    79f
+    cmp     w6, #'_'
+    b.eq    79f
+    sub     w9, w6, #'0'
+    cmp     w9, #9
+    b.ls    79f
+    orr     w9, w6, #0x20
+    sub     w9, w9, #'a'
+    cmp     w9, #25
+    b.ls    79f
+781: add    x5, x5, #1                  // the word: x5 to x8
+    sub     x9, x8, x5
+    ldrb    w6, [x20, x5]
+    cmp     x9, #2
+    b.ne    782f
+    cmp     w6, #'i'                    // if
+    b.ne    79f
+    add     x10, x5, #1
+    ldrb    w6, [x20, x10]
+    cmp     w6, #'f'
+    b.eq    790f
+    b       79f
+782: cmp    x9, #3
+    b.ne    783f
+    cmp     w6, #'f'                    // for
+    b.ne    79f
+    add     x10, x5, #1
+    ldrb    w6, [x20, x10]
+    cmp     w6, #'o'
+    b.ne    79f
+    add     x10, x5, #2
+    ldrb    w6, [x20, x10]
+    cmp     w6, #'r'
+    b.eq    790f
+    b       79f
+783: cmp    x9, #4
+    b.ne    784f
+    ldr     w10, [x20, x5]              // with
+    ldr     w9, =0x68746977
+    cmp     w10, w9
+    b.eq    790f
+    b       79f
+784: cmp    x9, #5
+    b.ne    79f
+    ldr     w10, [x20, x5]              // while
+    ldr     w9, =0x6c696877
+    cmp     w10, w9
+    b.ne    79f
+    add     x10, x5, #4
+    ldrb    w6, [x20, x10]
+    cmp     w6, #'e'
+    b.ne    79f
+790: mov    w28, #1
+79: ldp     x9, x10, [sp, #16]
+    ldp     x7, x8, [sp], #32
+    ret
 3:  add     x1, x1, x3
     add     x1, x1, #1
     add     w2, w2, #1

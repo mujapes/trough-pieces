@@ -1010,3 +1010,11 @@ a script element whose src is set to one gets that text instead (setAttribute), 
 module calls in a 2200-byte buffer: long data: modules (Reddit's polyfill loaders) were cut, giving empty SyntaxErrors. Now a
 heap buffer sized to the URL. Profiling GitHub after unit 75: most samples outside the engine (network/TLS), so engine speed
 is no longer its limit. Wikipedia 11/0, NPR 23/2 (world full at 96 MB + one TypeError), HN 1/0.
+Unit 77 [by Opus]: wider site sweep (NYT 8/1, MDN 6/0, YouTube 42/3, Amazon 0 scripts, CNN 2/1, DuckDuckGo 28/1, Apple 15/300).
+Apple 15/300 -> 16/1: (1) prelude: Array flat, flatMap, at, findLast, findLastIndex, toSorted, toReversed, with, copyWithin;
+String at, localeCompare (code-unit order: DEVIATION, no locale); Object.hasOwn, Object.groupBy. (2) document.js:
+structuredClone (plain data, Map/Set/Date/RegExp, cycles), more reflected string attributes (hreflang, rel, target, ...).
+(3) lex.S w_punct: after `)` a `/` begins a pattern when the brackets were if/for/while/with's (found by scanning back to the
+matching `(` only when a slash follows; strings in between are not understood). es2022-array.js, regex-after-paren.js;
+89 of 89. Wikipedia 11/0, GitHub 5/0. NPR's TypeError is inside its obfuscated bot-detection script: skipped.
+NEXT: Apple's last, YouTube 3, DuckDuckGo 1, CNN 1, NYT 1, Amazon (0 scripts run: why?).
