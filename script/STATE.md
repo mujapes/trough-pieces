@@ -1038,3 +1038,10 @@ f=function(){for(;;){}};;){...break e}) ended with s_done clearing the label mea
 ddmin with node --check). label-fn-head.js; 91 of 91. DuckDuckGo 29/0. (2) document.js: canvas getContext('2d') returns a
 context that draws nothing (measureText, getImageData, gradients ...), toDataURL/toBlob, Event.initCustomEvent. YouTube 43/1
 (left: the 2200-alternative entity pattern, unit 79). Wikipedia 11/0, GitHub 5/0.
+Unit 81 [by Opus]: document.js __sel: candidates are checked by node number through a light probe ({__n, getAttribute})
+and only matches are wrapped (__w caches every wrapped node for good, so querySelectorAll('div[x]') on a 6 MB page filled
+the world); querySelector stops at its first match. CNN 2/1 -> 13/3, NYT world-full moved later (22/3), Wikipedia 11/0,
+GitHub 5/0. NOTE ON COUNTS: the headless host runs the page's timers only up to 3 s past the REAL elapsed time
+(browse.c: wake > ms + 3000), so a faster load runs fewer late timers: Guardian 31/0 -> 20/0 here only because it loaded in
+8.8 s instead of 17.6 s (same scripts otherwise). Sweeps should compare with a fixed virtual window: next fix in browse.c.
+LESSON: document.js may be joined; never put // comments inside a line of code there (removed one).

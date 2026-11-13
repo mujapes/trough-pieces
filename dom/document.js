@@ -26,10 +26,10 @@ function __is(e,r){if(r.tag&&__d('n'+e.__n)!=r.tag)return false;if(r.id&&e.getAt
  return true}
 function __chain(e,ch){var i=ch.length-2,p=e.parentNode;while(i>=0){while(p&&p.nodeType==1&&!__is(p,ch[i]))p=p.parentNode;if(!p||p.nodeType!=1)return false;p=p.parentNode;i--}return true}
 function __split(s){var t=s.replace(/\s*[>+]\s*/g,' ').trim();return t?t.split(/\s+/).map(__cmp):null}
-function __sel(root,s){var out=[],seen={},parts=String(s).split(',');
+function __sel(root,s,one){var out=[],seen={},parts=String(s).split(',');one=one&&parts.length==1;
  for(var j=0;j<parts.length;j++){var ch=__split(parts[j]);if(!ch)continue;var last=ch[ch.length-1];
-  var c=__list(__d('q'+root.__n+' '+(last.id?'#'+last.id:last.cls.length?'.'+last.cls[0]:last.tag||'*')));
-  for(var i=0;i<c.length;i++){var e=c[i];if(!seen[e.__n]&&__is(e,last)&&__chain(e,ch)){seen[e.__n]=1;out.push(e)}}}
+  var q=__d('q'+root.__n+' '+(last.id?'#'+last.id:last.cls.length?'.'+last.cls[0]:last.tag||'*')),c=q?q.split(' '):[];
+  var pr=__sel.p||(__sel.p={__n:0,getAttribute:Element.prototype.getAttribute});for(var i=0;i<c.length;i++){pr.__n=+c[i];if(seen[pr.__n]||!__is(pr,last))continue;var e=__w(c[i]);if(e&&__chain(e,ch)){seen[e.__n]=1;out.push(e);if(one)break}}}
  out.item=function(i){return this[i]||null};return out}
 class Node extends EventTarget{
  constructor(n,k){super();this.__n=n;this.nodeType=k}
@@ -69,7 +69,7 @@ class Node extends EventTarget{
  getElementsByTagName(t){return __list(__d('q'+this.__n+' '+t))}
  getElementsByClassName(c){return __sel(this,'.'+String(c).trim().split(/\s+/).join('.'))}
  querySelectorAll(s){return __sel(this,s)}
- querySelector(s){return __sel(this,s)[0]||null}
+ querySelector(s){return __sel(this,s,1)[0]||null}
 }
 class Element extends Node{
  constructor(n){if(n===undefined&&__upg){var p=__upg;__upg=null;return p}var made=n===undefined;if(made)n=+__d('c div');super(n,1);if(made)__nodes[n]=this}
