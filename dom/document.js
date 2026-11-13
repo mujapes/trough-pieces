@@ -130,6 +130,7 @@ class Element extends Node{
 var HTMLElement=Element;function NodeList(){}NodeList.prototype=Array.prototype;function HTMLCollection(){}HTMLCollection.prototype=Array.prototype;var HTMLDivElement=Element,HTMLAnchorElement=Element,HTMLImageElement=Element,HTMLInputElement=Element,HTMLFormElement=Element,HTMLScriptElement=Element,HTMLIFrameElement=Element,HTMLButtonElement=Element,SVGElement=Element;
 class Document extends Node{
  constructor(n){super(n,9);this.readyState='loading';this.cookie='';this.referrer='';this.hidden=false;this.visibilityState='visible';this.compatMode='CSS1Compat'}
+ get implementation(){return {hasFeature:function(){return true},createHTMLDocument:function(){return document}}}
  getElementById(i){return __w(__d('i '+i))}
  createElement(t){return __w(__d('c '+t))}
  createElementNS(ns,t){return __w(__d('c '+t))}

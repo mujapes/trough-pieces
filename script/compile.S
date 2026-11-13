@@ -168,6 +168,63 @@ c_compile:
 c_out:
     ldp     x29, x30, [sp], #224
     ret
+// c_fragment [by Opus]: while a program runs (from the built-in __compile), the text at x20, x21 bytes long, which must be one
+// function expression in parentheses, is translated after the instructions already there; nothing runs. x0 is where the
+// value stack is free from (names are kept there while translating) -> x0 the function's plan (its constant), or -1 with
+// the error in W_ERR. The world's state, program place and handler are the caller's to keep (c_fail sets the state to 3).
+c_fragment:
+    stp     x29, x30, [sp, #-224]!
+    mov     x29, sp
+    mov     x9, #1
+    stp     xzr, x9, [x29, #F_PA]
+    str     xzr, [x29, #F_PS]
+    stp     xzr, xzr, [x29, #F_FPEND]
+    str     xzr, [x29, #F_PEND]
+    mov     x9, #-1
+    stp     x9, xzr, [x29, #F_CONSTPOS]
+    str     xzr, [x29, #F_DECLKIND]
+    stp     xzr, xzr, [x29, #F_LABEL]
+    stp     x20, x21, [x29, #104]
+    str     xzr, [x29, #F_TRY]
+    str     xzr, [x29, #F_LOOP]
+    str     xzr, [x29, #88]
+    ldr     x9, [x19, #W_CODE]
+    add     x9, x19, x9
+    str     x9, [x29, #F_CODE]
+    ldr     x9, [x19, #W_CODE_CAP]
+    ldr     x10, [x19, #W_CODE_LEN]
+    stp     x10, x9, [x29, #F_LEN]
+    str     x10, [x29, #168]
+    mov     x9, #-1
+    stp     x9, xzr, [x29, #F_LV]
+    str     xzr, [x29, #F_FUNC]
+    ldr     x10, [x19, #W_STACK_END]
+    add     x10, x19, x10
+    stp     x0, x10, [x29, #F_NTOP]
+    mov     x22, #0
+    mov     w28, #1
+    bl      next_word
+    bl      c_stmt
+    cbnz    w23, 8f                     // more than the one expression
+    ldr     x9, [x29, #F_LEN]
+    cmp     x9, #4
+    b.lo    8f
+    ldr     x10, [x29, #F_CODE]
+    add     x10, x10, x9
+    ldurb   w11, [x10, #-4]
+    cmp     w11, #OP_CLOSURE
+    b.ne    8f
+    ldurb   w11, [x10, #-3]
+    ldurb   w12, [x10, #-2]
+    orr     w11, w11, w12, lsl #8
+    str     x9, [x19, #W_CODE_LEN]
+    ldr     x10, [x19, #W_CONST]
+    add     x10, x19, x10
+    ldr     x0, [x10, x11, lsl #3]
+    b       c_out
+8:  adr     x0, c_m_unexpected
+    mov     x1, #(c_m_notyet - c_m_unexpected)
+    b       c_fail
 // c_native_in: the opening lines can name the maker of built-in functions, `__n` (a global, made the first time);
 // c_native_out: nothing after them can: its name becomes the empty one.
 c_native_in:
@@ -1568,7 +1625,12 @@ c_scan_block:
 54: mov     w7, #1
     b       8f
 55: cbnz    w5, 8f
-    cmp     w24, #18                    // in, of: the list is over
+    cmp     w24, #31                    // [by Opus] a keyword only a statement can begin with (return, if, for, ...): the list
+    b.hi    57f                         //   ended at the line before without a semicolon. Else `var n=1` NEWLINE `return f(),D`
+    ldr     w9, =0xc6a14063             //   took D for one more declared name (Guardian's polyfills, 2026-11-13)
+    lsr     w9, w9, w24
+    tbnz    w9, #0, 56f
+57: cmp     w24, #18                    // in, of: the list is over
     b.eq    56f
     cmp     w24, #37
     b.ne    8f

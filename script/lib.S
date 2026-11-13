@@ -994,6 +994,65 @@ n_lower:
 9:  orr     x0, x0, #(T_STRING << 48)
     NOUT
     .balign 4
+// 69 __compile [by Opus]: (text) the text, one function expression in parentheses, is translated now, while the program runs,
+// after the instructions already there -> the function, whose scope is the global one (as `new Function` makes). A text that
+// does not translate throws its SyntaxError. The translator uses x20-x28 for itself: they are the machine's, kept here.
+n_compile:
+    NIN
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1]
+    bl      v_text
+    cbz     x0, n_full
+    and     x9, x0, #0xffffffffffff
+    add     x9, x19, x9
+    ldr     x10, [x9], #8
+    tbnz    x10, #32, 8f                // text with units beyond one byte: not taken yet
+    and     x10, x10, #0xffffffff
+    stp     x19, x20, [sp, #-96]!
+    stp     x21, x22, [sp, #16]
+    stp     x23, x24, [sp, #32]
+    stp     x25, x26, [sp, #48]
+    stp     x27, x28, [sp, #64]
+    ldr     w11, [x19, #W_STATE]
+    str     x11, [sp, #80]
+    add     x0, x22, #64                // names kept above the values in use
+    mov     x20, x9
+    mov     x21, x10
+    bl      c_fragment
+    ldr     x11, [sp, #80]
+    str     w11, [x19, #W_STATE]
+    ldp     x21, x22, [sp, #16]
+    ldp     x23, x24, [sp, #32]
+    ldp     x25, x26, [sp, #48]
+    ldp     x27, x28, [sp, #64]
+    ldp     x19, x20, [sp], #96
+    cmn     x0, #1
+    b.eq    7f
+    mov     x4, x0
+    mov     x0, #64
+    mov     x1, #1
+    bl      o_make
+    cbz     x0, n_full
+    add     x9, x19, x0
+    and     x1, x4, #0xffffffffffff
+    stp     x1, xzr, [x9, #F_PLAN]
+    VAL     x10, T_UNDEF
+    str     x10, [x9, #F_THIS]
+    mov     x16, #(T_OBJECT << 48)
+    orr     x0, x0, x16
+    NOUT
+7:  ldr     x0, [x19, #W_ERR]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    ldr     x1, [x0], #8
+    and     x1, x1, #0xffffffff
+    b       n_fail
+8:  adr     x0, n_m_wide
+    mov     x1, #(n_m_wide_end - n_m_wide)
+    b       n_fail
+n_m_wide:   .ascii "SyntaxError: new Function with text beyond one byte per unit is not made yet"
+n_m_wide_end:
+    .balign 4
 n_table:
     .word   n_maker - n_table, n_floor - n_table, n_ceil - n_table, n_abs - n_table, n_sqrt - n_table, n_round - n_table
     .word   n_trunc - n_table, n_sign - n_table, n_min - n_table, n_max - n_table, n_push - n_table, n_pop - n_table
@@ -1008,6 +1067,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .word   n_proxy - n_table, n_pkey - n_table
-    .equ    N_COUNT, 69
+    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table
+    .equ    N_COUNT, 70
     .ltorg

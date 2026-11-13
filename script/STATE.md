@@ -688,3 +688,18 @@ now its polyfill bundle (ran-8.js, sent because our user agent is unknown) reads
 undefined at line 157 although nothing in the bundle shadows it: NEXT, find why (the bundle runs inside (function(self){..})
 (window); a polyfill may redefine something on window). Also open: Guardian 'g' of undefined (line 1, column 42258); GitHub
 runs 0 scripts (modules, probably); NPR 299 JSON errors.
+
+**Fortieth unit [by Opus], begun (2026-11-13): run-time `new Function` / `Function(...)`.** Found: Guardian's polyfill bundle
+runs `new Function("return function Document() {}")()`, and our `Function` is an empty prelude stub, so it returns an object and
+the bundle fails later (the "document undefined" report was this). Plan: a built-in `__compile(text)` that calls a variant of
+c_compile mid-run: code appended at W_CODE_LEN, names scratch (F_NTOP) above the live value stack (max(W_SP, x22)), no
+W_HANDLER/W_STATE/W_PC changes, no jobs epilogue; text wrapped as `function anonymous(ARGS\n) {\nBODY\n}` and translated with
+c_function (kind 0), whose OP_CLOSURE constant is then made a function with the global scope (as i_closure does, x28 = 0).
+Save x19-x30 around it; errors become SyntaxError. Then prelude `Function` uses it. Not started in code.
+Live screen (same day): the page world on Wikipedia filled after a while (cause not found; host now reopens a full page once a
+minute). Suspect each tick's two `__mark` loads (code appended, never freed) and __mark's allocation.
+Done in the same unit [by Opus]: `__compile` (lib.S n_compile, #69) over `c_fragment` (compile.S); prelude `Function` uses it
+(one-byte text only). The Guardian's real fault was elsewhere: c_scan_block kept a `var` list open across a line break, so
+`var n=1` NEWLINE `return f(),D` declared D as a local; a statement-only keyword (mask 0xc6a14063) now closes the list.
+dom: document.implementation. Guardian 15 scripts, 1 failed (ran-9 'g'). host: TROUGH_SWAP=dir runs dir/swap-N.js in place of
+script N (probe a live page's script). 50 of 50 programs (checks/programs/runtime-function.js).
