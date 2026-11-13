@@ -459,3 +459,4 @@ __n(74)(BigInt.prototype,__bigop);
 if(!Object.getOwnPropertyDescriptors)Object.getOwnPropertyDescriptors=function(o){var r={},k=Object.getOwnPropertyNames(o),i;for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i]);if(Object.getOwnPropertySymbols){k=Object.getOwnPropertySymbols(o);for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i])}return r};
 
 (function(){var S=String.prototype,W=Object.create(S),k=Object.getOwnPropertyNames(S);k.forEach(function(m){var f=S[m];if(typeof f==='function'&&m!=='constructor'&&m!=='toString'&&m!=='valueOf')W[m]=function(){return f.apply(this._pv,arguments)};__n(72)(W,m)});String.__w=W})();
+function eval(c){if(typeof c!=='string')return c;var f;try{f=new Function('return ('+c+'\n)')}catch(e){f=new Function(c)}return f()}

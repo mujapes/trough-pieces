@@ -951,3 +951,9 @@ positions, not heap values) are safe. Errors: message, cause and stack are non-e
 via __n(73)/__n(72); machine.S m_raise hides the message of the machine's own errors); TypeError etc. have .name and a hidden
 prototype constructor. errors-real.js; 83 of 83. Still: Symbol.hasInstance.
 Unit 67 [by Opus]: site sweep after units 58-66: Wikipedia 8/0, HN 1/0, GitHub 5/0, Guardian 31/0, BBC 62/0, NPR 23/3. document.js: iframe contentWindow/contentDocument (a small separate window, not loaded). NPR 23/3 -> 23/2 (Boomerang fixed; left: world full at 96 MB, the bot check).
+Unit 68 [by Opus]: NPR's "world full" at 96 MB is plain need: at 300 MB it runs 30 scripts and then calls eval/atob hundreds of
+times. Added: global eval (prelude: new Function of 'return (code)', else of the statements; indirect-eval scope, completion
+value of statements lost), atob/btoa and el.attributes.getNamedItem (document.js). NEW LIMIT FOUND: every eval/new Function
+compiles into the instruction area for good, so a page that evals in a loop fills it ("the program is too big" x310 at 300 MB).
+Needs: reclaim a fragment's instructions when its function is collected, or cache by source text (cheap first step: a Map from
+text to the compiled function). Default 96 MB NPR unchanged 23/2. 83 of 83.
