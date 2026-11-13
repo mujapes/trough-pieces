@@ -334,3 +334,11 @@ Not made: looping over a generator (`for..of`, spread) still collects everything
 generator's final answer; async generators and `for await`; `await` at the top of a script; a catch-all in a generator also
 catches the marker of `return()`; a generator's own `prototype`; the hidden fields `_h _r _s _d` show in `for..in`.
 Next: appending loads (several scripts, one world); a page's <script> elements from host/browse.c; lazy loops; shapes; the fuzz job.
+**Fifteenth unit: loads append.** A `load` into a world whose program has ended (state 2) or stopped on an error (3) adds its
+instructions after the old ones (compile.S, c_compile: frame 168 is where this script begins; the prelude is translated the
+first time only). Globals, constants, functions, classes, the job queue and timers carry over; a script that throws or does not
+translate leaves the world usable for the next. Seen: `checks/append/t.py` (five scripts, one world; its expected output is the
+six lines it prints: one 3 / timer / two 6 2,3 page 8 / three later 6 function 7,9,12 / async in three 12 / five 12 later 12).
+Not made: instructions are never given back, so a page that loads thousands of scripts fills the code room; a top-level
+`let` named again by a later script is not refused.
+Next: a page's <script> elements from host/browse.c with a small document object; lazy loops over generators; shapes; fuzz job.

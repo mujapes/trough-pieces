@@ -85,6 +85,13 @@ c_compile:
     str     x9, [x29, #F_CODE]
     ldr     x9, [x19, #W_CODE_CAP]
     stp     xzr, x9, [x29, #F_LEN]
+    mov     x10, #0                     // a world whose program has ended (or stopped on an error) is added to: the new
+    ldr     w11, [x19, #W_STATE]        //   instructions follow the old, which stay where they are, so every function
+    cmp     w11, #2                     //   made before can still be called; globals and constants are shared.
+    b.lo    0f                          //   168: where this script's instructions begin
+    ldr     x10, [x19, #W_CODE_LEN]
+0:  str     x10, [x29, #F_LEN]
+    str     x10, [x29, #168]
     mov     x9, #-1
     stp     x9, xzr, [x29, #F_LV]
     str     xzr, [x29, #F_FUNC]
@@ -95,6 +102,8 @@ c_compile:
     stp     x9, x10, [x29, #F_NTOP]
     mov     w0, #OP_JMP                 // first to the end, where the declared functions are made; then back here
     bl      c_jump
+    ldr     x9, [x29, #168]             // (the library's opening lines are translated the first time only)
+    cbnz    x9, 40f
     bl      c_native_in
     adr     x20, c_prelude              // first the few lines of the language that make the error classes
     mov     x21, #(c_prelude_end - c_prelude)
@@ -105,7 +114,7 @@ c_compile:
     bl      c_stmt
     b       3b
 4:  bl      c_native_out
-    ldp     x20, x21, [x29, #104]
+40: ldp     x20, x21, [x29, #104]
     mov     x22, #0
     mov     w28, #1
     bl      next_word
@@ -126,19 +135,22 @@ c_compile:
     bl      c_byte
     OP      OP_POP
     OP      OP_HALT
-    mov     x0, #1
+    ldr     x0, [x29, #168]
+    add     x0, x0, #1
     bl      c_patch
     ldr     x0, [x19, #W_STACK_END]
     add     x0, x19, x0
     bl      c_hoist
     mov     w0, #OP_JMP
-    mov     x1, #5
+    ldr     x1, [x29, #168]
+    add     x1, x1, #5
     bl      c_jump_to
     stp     xzr, xzr, [x19, #W_FP]
     str     xzr, [x19, #W_ENV]
     ldr     x9, [x29, #F_LEN]
     str     x9, [x19, #W_CODE_LEN]
-    str     xzr, [x19, #W_PC]
+    ldr     x9, [x29, #168]
+    str     x9, [x19, #W_PC]
     ldr     x9, [x19, #W_STACK]
     str     x9, [x19, #W_SP]
     mov     w9, #1
