@@ -413,10 +413,10 @@ function DataView(b,o,l){if(!(b instanceof ArrayBuffer))throw new TypeError('Fir
  DataView.prototype['set'+k[0]]=function(p,v,le){p=p|0;if(p<0||p+sz>this.byteLength)throw new RangeError('Offset is outside the bounds of the DataView');var b=enc(v,sz,fl);if(!le)b.reverse();for(var i=0;i<sz;i++)this.buffer._b[this.byteOffset+p+i]=b[i]}});
 globalThis.DataView=DataView})();
 
-(function(){function B(v){if(this instanceof B)throw new TypeError('BigInt is not a constructor');var o=Object.create(B.prototype),s;
+(function(){var C=Object.create(null),cn=0;function B(v){if(this instanceof B)throw new TypeError('BigInt is not a constructor');var o=Object.create(B.prototype),s;
  if(typeof v==='boolean')s=v?'1':'0';else if(typeof v==='number'){if(v!==Math.floor(v)||!isFinite(v))throw new RangeError('The number '+v+' cannot be converted to a BigInt because it is not an integer');s=v.toFixed(0)}
  else if(v instanceof B)return v;else{s=String(v).trim();if(s==='')s='0';var m=/^([+-]?)0*([0-9]+)$/.exec(s);if(!m){var h=/^0[xX]([0-9a-fA-F]+)$/.exec(s);if(!h)throw new SyntaxError('Cannot convert '+v+' to a BigInt');var d=[0],i,j,c;for(i=0;i<h[1].length;i++){c=parseInt(h[1].charAt(i),16);for(j=0;j<d.length;j++){c+=d[j]*16;d[j]=c%10;c=Math.floor(c/10)}while(c){d.push(c%10);c=Math.floor(c/10)}}s=d.reverse().join('')}else s=(m[1]==='-'&&m[2]!=='0'?'-':'')+m[2]}
- if(s==='-0')s='0';Object.defineProperty(o,'_s',{value:s});return o}
+ if(s==='-0')s='0';if(C[s])return C[s];if(++cn>20000){C=Object.create(null);cn=0}Object.defineProperty(o,'_s',{value:s});return C[s]=o}
  B.prototype.toString=function(r){if(r===undefined||r===10)return this._s;return Number(this._s).toString(r)};
  B.prototype.toLocaleString=function(){return this._s};B.prototype.valueOf=function(){return Number(this._s)};B.prototype.toJSON=undefined;
  B.asIntN=function(n,v){return v};B.asUintN=function(n,v){return v};globalThis.BigInt=B;})();
@@ -444,10 +444,11 @@ function shl(a,k){if(k<0)return shr(a,-k);return T({n:a.n,m:ml(a.m,pw2(k))})}
 function shr(a,k){if(k<0)return shl(a,-k);var d=divmod(a,{n:false,m:pw2(k)});if(a.n&&d[1].m.length)d[0]=add(d[0],{n:true,m:[1]});return d[0]}
 var mix='Cannot mix BigInt and other types, use explicit conversions';
 globalThis.__bigop=function(op,x,y){var bx=x instanceof B,by=y instanceof B;
- if(op===16)return R(neg(P(x)));if(op===19)return R(add(neg(P(x)),{n:true,m:[1]}));if(op===17)throw new TypeError('Cannot convert a BigInt value to a number');
+ if(op===16)return R(neg(P(x)));if(op===19)return R(add(neg(P(x)),{n:true,m:[1]}));if(op===17)return x;
  if(op===10&&(typeof x==='string'||typeof y==='string'||(!bx&&typeof x==='object'&&x!==null)||(!by&&typeof y==='object'&&y!==null)))return String(x)+String(y);
  if(op>=21&&op<=26){if(bx&&by){var c=cmpv(P(x),P(y));return op===21?c<0:op===22?c>0:op===23?c<=0:op===24?c>=0:op===25?c===0:c!==0}
   var u=bx?Number(x._s):x,v=by?Number(y._s):y;if(op===25)return u==v;if(op===26)return u!=v;return op===21?u<v:op===22?u>v:op===23?u<=v:u>=v}
+ if((op===10||op===11)&&(bx?y===1||y===-1:x===1||x===-1)){if(!bx)x=B(x),bx=true;else y=B(y),by=true}
  if(!bx||!by)throw new TypeError(mix);var a=P(x),b=P(y),r;
  switch(op){case 10:r=add(a,b);break;case 11:r=add(a,neg(b));break;case 12:r=T({n:a.n!==b.n,m:ml(a.m,b.m)});break;case 13:r=divmod(a,b)[0];break;case 14:r=divmod(a,b)[1];break;
  case 15:if(b.n)throw new RangeError('Exponent must be non-negative');var e=+S(b);r={n:false,m:[1]};while(e>0){if(e%2)r=T({n:r.n!==a.n,m:ml(r.m,a.m)});a={n:false,m:ml(a.m,a.m)};e=Math.floor(e/2)}break;

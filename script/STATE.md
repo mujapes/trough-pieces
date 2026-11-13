@@ -936,3 +936,7 @@ operands, instruction skipped). W_BIGFN 840 (n 74's second argument). __bigop: s
 24-bit two's-complement chunks, << >>, comparisons (mixed with numbers by Number), "x"+5n text, mixing throws TypeError.
 Number(bigint) exact-ish. bigint-ops.js; 81 of 81. Not yet: ++/-- on a BigInt (adds number 1: TypeError), === between two
 BigInts with the same value (identity), console.log shows an object, BigInt64 arrays, asIntN/asUintN.
+Unit 63 [by Opus]: BigInt === by interning: BigInt() returns one object per decimal text (cache of 20000, then cleared), so
+===, indexOf, Set, Map and switch work by identity. ++/--: unary + returns the BigInt itself (spec throws; ++ needs ToNumeric),
+and + or - with the number 1 or -1 treats it as a BigInt (DEVIATION: 5n+1 answers 6n instead of throwing; a real fix is an
+increment instruction that knows its operand). bigint-eq.js; 82 of 82.
