@@ -640,3 +640,8 @@ construct traps; `in`, delete and Object.keys on a proxy see an empty object. ch
 promoted. bbc.com/news: the Piano SDK now passes its feature test and runs on, then a timer repeats "Cannot read properties of
 undefined (reading 'push')" at ran-9.js column 493195 (`this.events.push` in addHandler; `this` may be a proxy from its DI
 container). NEXT: find that (TROUGH_KEEP_ALL=/tmp/ka keeps every script).
+BBC follow-up [by Opus]: the failing call is `pn.addHandler("logout",...)` from a setTimeout in ran-9 (Piano); `this.events` is
+missing, so `pn` holds addHandler without the instance's fields. pn is filled from a DI container (`pn.X=pn.container.resolve`,
+and q.resolve wrapped in a function Proxy whose unregistered tokens resolve to a get-everything Proxy). Not found yet how
+addHandler reaches pn; parked as low value (paywall only; the page's content is unaffected). Suspects: for..in over an instance
+(m_keylist), the function-proxy wrapper losing the target's own properties (q.resolve.x).
