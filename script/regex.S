@@ -25,7 +25,11 @@
     .equ RX_MARK, 18                    // + which mark: a repeat's turn begins here
     .equ RX_CHKADV, 19                  // + which mark: the turn must have taken something, or the repeat would never end
     .equ RX_CLEAR, 20                   // + first group, + past the last: they forget what they matched (a repeat's new turn)
-    .equ RX_MAXW, 16384                 // the longest program, in words
+    .equ RX_CSET0, 21                   // + which mark: a counted repeat's count starts at 0
+    .equ RX_CLOOP, 22                   // + mark, least, most, distance past the repeat: another turn, if the count allows
+    .equ RX_CLOOPL, 23                  // the same, lazy
+    .equ RX_CINC, 24                    // + which mark: one more turn done
+    .equ RX_MAXW, 32768                 // the longest program, in words
     .equ W_RXSTACK, 464                 // the block of places to come back to (one, kept and reused; 0: not yet)
     .equ W_RXSIZE, 472                  // its size in bytes
 // The matcher. x1 the next instruction, x2 the text, x3 its units, x4 where we are, x5 whether the text is wide, x6 the
@@ -88,6 +92,7 @@ rx_tab:
     .word   rx_split - rx_tab, rx_splitj - rx_tab, rx_jmp - rx_tab, rx_save - rx_tab, rx_bol - rx_tab, rx_eol - rx_tab
     .word   rx_wordb - rx_tab, rx_nwordb - rx_tab, rx_backref - rx_tab, rx_look - rx_tab, rx_nlook - rx_tab
     .word   rx_match - rx_tab, rx_mark - rx_tab, rx_chkadv - rx_tab, rx_clear - rx_tab
+    .word   rx_cset0 - rx_tab, rx_cloop - rx_tab, rx_cloopl - rx_tab, rx_cinc - rx_tab
 rx_match:
     mov     w0, #1
     ldr     x30, [sp], #16
@@ -208,6 +213,47 @@ rx_chkadv:
     ldr     x11, [x12, #-8]
     cmp     x11, x4
     b.eq    rx_fail
+    b       rx_next
+rx_cset0:
+    mov     x13, #0
+    b       1f
+rx_cinc:
+    mov     x13, #1
+1:  ldrh    w12, [x1], #2
+    sub     x12, x7, x12, lsl #3
+    sub     x12, x12, #8
+    ldr     x11, [x12]
+    orr     x0, x12, #1
+    RXPUSH  x0, x11
+    ldr     x11, [x12]
+    add     x11, x11, #1
+    cmp     x13, #0
+    csel    x11, x11, xzr, ne           // one more, or (starting) 0
+    str     x11, [x12]
+    b       rx_next
+rx_cloop:
+    mov     x13, #0
+    b       1f
+rx_cloopl:
+    mov     x13, #1
+1:  ldrh    w12, [x1], #2
+    sub     x11, x7, x12, lsl #3
+    ldr     x11, [x11, #-8]             // the count
+    ldrh    w14, [x1], #2
+    ldrh    w15, [x1], #2
+    ldrsh   x12, [x1], #2
+    add     x12, x1, x12, lsl #1        // past the repeat
+    cmp     x11, x14
+    b.lo    rx_next
+    cmp     x11, x15
+    b.lo    2f
+    mov     x1, x12
+    b       rx_next
+2:  cbnz    x13, 3f
+    RXPUSH  x12, x4
+    b       rx_next
+3:  RXPUSH  x1, x4
+    mov     x1, x12
     b       rx_next
 rx_clear:
     ldrh    w12, [x1], #2
@@ -570,7 +616,7 @@ n_rxcompile:
     and     x23, x23, #1
     and     x21, x21, #0xffffffff
     mov     x22, #0
-    sub     sp, sp, #36864
+    sub     sp, sp, #69632
     mov     x24, sp
     mov     x25, #4
     mov     x26, #1
@@ -1055,7 +1101,33 @@ rxc_term:
     add     x14, x14, #1
     b       57b
 58: mov     x25, x9
-    mov     x10, x15
+    cmn     x16, #1                     // a large counted repeat {n,m} counts its turns instead of being written out
+    b.eq    581f
+    add     x14, x4, #2
+    mul     x14, x14, x16
+    cmp     x14, #1024
+    b.ls    581f
+    RXEI    RX_CSET0
+    RXE     w27
+    mov     x12, x25                    // the top of the loop
+    mov     w9, #RX_CLOOP
+    add     w9, w9, w17
+    RXE     w9
+    RXE     w27
+    RXE     w15
+    RXE     w16
+    add     x10, x4, #4
+    RXE     w10
+    bl      rxc_copy
+    RXEI    RX_CINC
+    RXE     w27
+    RXEI    RX_JMP
+    add     x10, x25, #1
+    sub     x10, x12, x10
+    RXE     w10
+    add     x27, x27, #1
+    b       69f
+581: mov    x10, x15
 60: cbz     x10, 61f
     bl      rxc_copy
     sub     x10, x10, #1
