@@ -198,7 +198,7 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
     uint8_t *first = malloc(n + 3); if (!first) exit(4); memcpy(first, "H1 ", 3); memcpy(first + 3, d, n);
     if (entry("dom.asm", "begin")(s.tree, 0, 0, 0, table) < 0 || tree_ask(&s, first, n + 3) < 0) { free(first); free(opening); free(s.tree); free(s.req); free(s.answer); return body; } free(first);
     s.world = block(6, (getenv("TROUGH_WORLD_MB") ? (unsigned)atoi(getenv("TROUGH_WORLD_MB")) : 96u) << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table); { const char *st = getenv("TROUGH_GC_STRESS"); if (st && atol(st) > 0) { uint64_t *w = (uint64_t *)s.world; w[808/8] = (uint64_t)atol(st); w[816/8] = w[216/8]; w[216/8] = w[208/8] + w[808/8] < w[216/8] ? w[208/8] + w[808/8] : w[216/8]; } }   /* [by Opus] collect every N bytes, for finding collector faults */
-    struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000, fire_ms = ms;
     entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
     run_script(&s, opening + 64, length(opening), address); free(opening); if (s.failed) s.dead = 1; s.ran = 0;
     /* the script elements are asked for again after each round: a script may have added more (loaders do). When a round finds none new, the page has loaded. */
@@ -221,9 +221,9 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
             else { long long tx = tree_askf(&s, "t", node, ""); if (tx > 0) { uint8_t *copy = malloc((size_t)tx); if (!copy) exit(4); memcpy(copy, s.answer + 64, (size_t)tx); run_script(&s, copy, (size_t)tx, address); free(copy); } } }
         free(list); if (fresh) continue; if (!modules) { modules = 1; continue; }
         if (fired) {   /* the page is loaded: its timers run, each at its own time (the clock is moved to it, three seconds ahead at most), and what they add is run above */
-            long long wake = entry("script.asm", "clock")(s.world, 0, 0, 0, table); if (wake < 0 || wake > ms + 3000 || pumps++ >= 300) break;
+            long long wake = entry("script.asm", "clock")(s.world, 0, 0, 0, table); if (wake < 0 || wake > fire_ms + 5000 || pumps++ >= 300) break;   /* [by Opus] 5 s of page time after the load event, however long loading took */
             entry("script.asm", "clock")(s.world, 0, 0, zone | (wake & 0xffffffffffffll), table); int kept = s.ran; run_script(&s, 0, 0, address); s.ran = kept; continue; }
-        fired = 1; tree_ask(&s, (const uint8_t *)"C0", 2); int before = s.ran; if (!s.dead) run_script(&s, (const uint8_t *)"__fire()", 8, address); s.ran = before; }
+        fired = 1; { struct timeval fv; gettimeofday(&fv, 0); fire_ms = (long long)fv.tv_sec * 1000 + fv.tv_usec / 1000; } tree_ask(&s, (const uint8_t *)"C0", 2); int before = s.ran; if (!s.dead) run_script(&s, (const uint8_t *)"__fire()", 8, address); s.ran = before; }
     free(seen);
     long long pn = tree_ask(&s, (const uint8_t *)"h1", 2); uint8_t *fresh = body; if (pn >= 0) { fresh = text_block((const char *)s.answer + 64, (size_t)pn); free(body); }
     *ran = s.ran; *failed = s.failed; if (keep && !s.dead) { *keep = malloc(sizeof s); if (*keep) { **keep = s; (*keep)->zone = zone; uint8_t *m = scripts_page(*keep, address); if (m) { free(fresh); fresh = m; } return fresh; } }
