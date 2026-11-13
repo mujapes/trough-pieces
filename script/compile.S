@@ -1629,9 +1629,25 @@ c_scan_block:
 510: cmp     w24, #28
     b.eq    52f
     cmp     w24, #33
-    b.eq    52f
+    b.eq    511f
     cmp     w24, #4
     b.ne    53f
+511: cmp    w1, #1                      // [by Opus] a let or const inside an inner block is that block's, declared when it is read;
+    b.ne    8f                          // so is one in a for statement's head (the text before it, past spaces, is a bracket)
+    mov     x9, x25
+512: cbz    x9, 52f
+    sub     x9, x9, #1
+    ldrb    w10, [x20, x9]
+    cmp     w10, #' '
+    b.eq    512b
+    cmp     w10, #'\n'
+    b.eq    512b
+    cmp     w10, #'\t'
+    b.eq    512b
+    cmp     w10, #'\r'
+    b.eq    512b
+    cmp     w10, #'('
+    b.eq    8f
 52: mov     w4, #2
     mov     w5, #0
     b       8f

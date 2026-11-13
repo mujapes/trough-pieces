@@ -768,3 +768,10 @@ written in the language (exact 64-bit decode in two 32-bit halves); Math.fround 
 59 of 59. Machine-code typed arrays (a byte block kind with typed element get/set) are the proper stage 2.
 GitHub after it: 'set' of undefined (line 4 col 1018), then 'call' of undefined x300 (line 4 col 156), 'illegal
 invocation' (line 138 col 160598).
+Unit 43 [by Opus]: block scoping in c_scan_block. A let/const inside an inner block, or in a for statement's head (the text
+before it is a bracket), is no longer taken as the whole function's variable (it hid outer variables of the same name: GitHub
+4u's `for(let a of ..)` made `a` local to addFile). checks/programs/let-shadow.js; 60 of 60. Wikipedia 8/0, Guardian 18/1.
+OPEN, seen today: BBC news 58 run / 299 failed, 298 of them "'push' of undefined" at line 1 col 493195 repeating (timers?);
+same with the engine as pushed before this unit, so it came earlier (modules? typed arrays? document.js?): bisect next.
+GitHub: 'not a function' line 4 col 64207; 'call' of undefined x300 (wp-runtime: a webpack module id missing); 'illegal
+invocation' line 138 col 160598. Runtime errors in modules do not name the module (add it like the translation errors).

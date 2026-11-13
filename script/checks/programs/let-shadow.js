@@ -1,0 +1,7 @@
+function mk(){let t=new Map,n=new Map;return {add(e){if(e.k){let t=n.get(1);t||n.set(1,t=new Map),t.set(2,e)}t.set(e.name,e)},get:e=>t.get(e)}} var r=mk();r.add({k:1,name:"a"});console.log(r.get("a").name); function h(){let a=[];for(let i=0;i<3;i++){let j=i*2;a.push(()=>j)}return a.map(f=>f()).join()} console.log(h())
+function mk(){let t=1;return function(e){{let t=2}return t}} console.log(mk()(1))
+function mk(){var t=1;return function(e){if(e){let t=2}return t}} console.log(mk()(1))
+var t=1;function g(e){if(e){let t=2}return t} console.log(g(1))
+function mk(){let t=1;return function(e){if(e){const t=2}return t}} console.log(mk()(1))
+function mk(){let t=1;return function(e){let q;if(e){let t=2}return t}} console.log(mk()(1))
+var a=new Map;function f(e){if(e)for(let a of [1,2]);a.set(1,2);return a.size} console.log(f(1)); function g(){var s=0;for(let i=0;i<3;i++)s+=i;for(const k in {x:1})s+=k;return s} console.log(g()); function h(){let q=[];for(let i=0;i<2;i++)q.push(()=>i);return q.map(f=>f()).join()} console.log(h())
