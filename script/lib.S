@@ -1006,9 +1006,37 @@ n_compile:
     and     x9, x0, #0xffffffffffff
     add     x9, x19, x9
     ldr     x10, [x9], #8
-    tbnz    x10, #32, 8f                // text with units beyond one byte: not taken yet
+    mov     x12, #0                     // [by Opus] text past ASCII is made UTF-8 first (the reader reads UTF-8), in a block kept at 88
+    lsr     x2, x10, #32
     and     x10, x10, #0xffffffff
-    stp     x19, x20, [sp, #-96]!
+    cbnz    x2, 2f
+    mov     x3, #0
+1:  cmp     x3, x10
+    b.hs    3f
+    ldrb    w4, [x9, x3]
+    add     x3, x3, #1
+    cmp     w4, #0x80
+    b.lo    1b
+2:  stp     x9, x10, [sp, #-16]!
+    add     x0, x10, x10, lsl #1
+    add     x0, x0, #8
+    bl      w_alloc
+    ldp     x1, x11, [sp], #16
+    cbz     x0, n_full
+    mov     x12, x0
+    ldr     x2, [x1, #-8]
+    lsr     x2, x2, #32
+    mov     x0, x1
+    mov     x1, x11
+    add     x11, x11, x11, lsl #1
+    add     x9, x19, x12
+    mov     x10, #0
+    str     x12, [sp, #-16]!
+    bl      w_enc
+    ldr     x12, [sp], #16
+    add     x9, x19, x12
+3:  stp     x19, x20, [sp, #-96]!
+    str     x12, [sp, #88]
     stp     x21, x22, [sp, #16]
     stp     x23, x24, [sp, #32]
     stp     x25, x26, [sp, #48]

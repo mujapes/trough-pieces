@@ -741,3 +741,9 @@ last read becomes DELP/DELE, a chain that gave up gives true; checks/programs/de
 with a 200 MB world. 53 of 53. GitHub now: f18 module needs `new Function` over two-byte text (n_compile: one-byte only);
 landing-pages fills the 32 MB world. NEXT: two-byte text for __compile; a bigger page world (or gc during translation);
 'length' of undefined at line 4 col 86259.
+Unit 41, stage 2d [by Opus]: __compile takes any text (lib.S n_compile makes text past ASCII UTF-8 first with strings.S
+w_enc, split out of w_outs; this also fixes one-byte text with Latin-1 characters, which was read as broken UTF-8);
+c_pattern keeps up to 200 keys before an object rest (was 32; frame 224 + 672); page world 96 MB (browse.c).
+checks/programs function-wide.js, rest-many-keys.js; 55 of 55. GitHub: primer-react and react-core translate; now f18 and k0
+hit "not made yet" (find with checks/runhuge.py on the module wrapped in `function __m(__exports){..}`; fetch with python
+urllib, no curl here). Module error line numbers are wrong (always 210, 11): fix c_fragment's line counting.

@@ -3529,7 +3529,8 @@ c_hidden:
 // 2 worked out and on the stack), 24 an object pattern?, 28 which item, 32 the name constant, 36 the rest?, 40 the number,
 // 48 and 56 jumps, 64 and 72 a short name's word.
 c_pattern:
-    stp     x30, x0, [sp, #-224]!           // (from 80: how many keys an object pattern has named, -1 if one was not a plain name; from 84: which constants)
+    sub     sp, sp, #672
+    stp     x30, x0, [sp, #-224]!           // (from 80: how many keys an object pattern has named, -1 if one was not a plain name; from 84: which constants, 200 at most [by Opus: was 32])
     str     wzr, [sp, #80]
     DEEPER
     cmp     w24, #33
@@ -3698,7 +3699,7 @@ c_pattern:
     tbnz    w10, #31, 53f
     ldr     w9, [sp, #20]
     cmp     w9, #0
-    mov     w11, #32
+    mov     w11, #200
     ccmp    w10, w11, #2, eq
     b.lo    54f
     mov     w10, #-1
@@ -3729,6 +3730,7 @@ c_pattern:
     NOLV
     SHALLOWER
     ldr     x30, [sp], #224
+    add     sp, sp, #672
     ret
 60: str     x30, [sp, #-16]!            // the item is fetched: a copy of the value (it lies under what the target put down)
     ldr     w9, [sp, #16 + 20]

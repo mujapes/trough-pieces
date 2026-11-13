@@ -154,6 +154,14 @@ w_outs:
     ldp     x9, x10, [x19, #W_OUT]
     ldr     x11, [x19, #W_OUT_CAP]
     add     x9, x19, x9
+    str     x30, [sp, #-16]!
+    bl      w_enc
+    ldr     x30, [sp], #16
+    str     x10, [x19, #W_OUT_LEN]
+    ret
+// w_enc [by Opus]: the x1 units at x0 (two bytes each if x2 is not 0) as UTF-8 at x9 + x10, up to x9 + x11 -> x10 how far.
+// Uses x0-x12 as w_outs did.
+w_enc:
     mov     x3, #0
 1:  cmp     x3, x1
     b.hs    8f
@@ -228,5 +236,4 @@ w_outs:
     strb    w5, [x12, #3]
     add     x10, x10, #4
     b       1b
-8:  str     x10, [x19, #W_OUT_LEN]
-    ret
+8:  ret
