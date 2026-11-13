@@ -4,3 +4,4 @@ async function* h(){for await (const z of g()) yield z*10}
 for await (let y of [Promise.resolve(5),6]) s.push(y);
 for await (const w of h()) s.push(w);
 console.log(s.join(','))})();
+function f(){function* h(){let z=4;yield z}async function* k(){const q=1;yield q}console.log(typeof h,h().next().value,typeof k)}f()

@@ -1427,6 +1427,10 @@ c_scan_block:
     mov     w7, #0
     cmp     w4, #2                      // a name was awaited and something else came
     b.lo    10f
+    cmp     w23, #K_PUNCT               // (function* name: the star is not that something)
+    mov     w9, #45
+    ccmp    w24, w9, #0, eq
+    b.eq    10f
     cmp     w23, #K_KEYWORD             // static, async, await, of, get, set are names here
     b.ne    102f
     sub     w9, w24, #34

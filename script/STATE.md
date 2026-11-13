@@ -567,4 +567,12 @@ c_await_op. prelude.js: __aiter (Symbol.asyncIterator, else a wrapper over the s
 __adone, __aval. 47 of 47 (`forawait.js`).
 FOUND (older, not fixed): a generator (function*, any kind) made INSIDE another function, whose body has let/const, comes out
 undefined: `function f(){var h=function*(){const z=4};console.log(typeof h)}f()` prints undefined. Plain and async functions
-are fine; top level is fine. Look at c_function/c_kept with a block-scoped body (c_block_in record, F_FUNC flags). Next unit.
+are fine; top level is fine. Narrowed (unit 31 probes): only a DECLARATION `function* h(){let z}` inside f; the expression form
+`var h=function*(){const z}` works, and `var z` inside works. `var h; function* h(){let z}` still leaves h undefined, and a
+pre-scan change (skip the star) did not help, so the scan declares h; the hoisted store (c_hoist: CLOSURE + c_store of
+c_function's [sp,#96]) or the constant it makes is what goes wrong. Next: check what c_hoist writes for this case.
+
+**Thirty-first unit [by Opus]: declared generators inside functions (2026-11-13).** Cause: c_scan_block's "a name was awaited
+and something else came" reset the declaration state at the `*` of `function* h`, so h was never declared in the outer
+function ahead of time, and declaring it late collided with h's own variables. Fix: the star does not count there.
+`function f(){function* h(){let z}...}` now works. 47 of 47 (case added to forawait.js).
