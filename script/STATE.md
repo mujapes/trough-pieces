@@ -787,3 +787,11 @@ NPR [by Opus]: its 299 "Unexpected token in JSON" are one JSON.parse of a JSONP 
 lookup) repeated by a timer; the column is the calling script's, not the text's. Low value (the site's own fallback).
 NEXT (older list): the live screen's page world filling on Wikipedia (measure headless: run scripts_tick in a loop and watch
 W_HEAP / code length); Proxy has/deleteProperty/ownKeys; e.stack (a call trail) so run-time errors can be found.
+Proxy [by Opus]: ownKeys (Object.keys, getOwnPropertyNames, Reflect.ownKeys), has and deleteProperty (through Reflect only;
+`in` and `delete` do not reach traps) for objects made by Proxy (a Map __proxies; Object.keys pays one size check when no
+proxy exists). checks/programs/proxy-traps.js; 62 of 62.
+Live world [by Opus]: browse.c TROUGH_TICKS=N runs N live ticks after a one-shot load (200 ms apart, every fifth forced as a
+tap does) and prints heap top/end and code length every 25. Wikipedia Moon: heap top is AT its end from tick 0 (the load alone
+reaches 96 MB once, the collector reuses after that); code grows 14 bytes a tick (no danger); 100 ticks about 1 s each, not
+slowing, not dead. The earlier "filling" was not reproduced in 100 ticks; a 1500-tick run hit the 600 s limit. Next look:
+the collector's live total (sum the free list) per tick, and why loading the page needs 96 MB.

@@ -331,7 +331,11 @@ ownKeys:function(o){return Object.getOwnPropertyNames(o)},defineProperty:functio
 getPrototypeOf:function(o){return Object.getPrototypeOf(o)},setPrototypeOf:function(o,p){Object.setPrototypeOf(o,p);return true},
 getOwnPropertyDescriptor:function(o,k){return Object.getOwnPropertyDescriptor(o,k)},isExtensible:function(){return true},preventExtensions:function(){return true}};
 function Proxy(t,h){if(typeof t==='function'){var f=function(){return h.apply?h.apply(t,this,arguments):t.apply(this,arguments)};Object.setPrototypeOf(f,t);return f}
-return __n(67)(function(){var k=__n(68)();return h.get?h.get(t,k,this):t[k]},function(v){var k=__n(68)();if(h.set)h.set(t,k,v,this);else t[k]=v})}
+var p=__n(67)(function(){var k=__n(68)();return h.get?h.get(t,k,this):t[k]},function(v){var k=__n(68)();if(h.set)h.set(t,k,v,this);else t[k]=v});__proxies.set(p,[t,h]);return p}
+// [by Opus] ownKeys, getOwnPropertyDescriptor and has (through Reflect.has) for proxies made above; `in` and delete do not reach the traps yet
+var __proxies=new Map;(function(){var k=Object.keys,pk=function(o){if(!__proxies.size)return null;var e=__proxies.get(o);if(!e)return null;return e[1].ownKeys?e[1].ownKeys(e[0]).filter(function(x){return typeof x==='string'&&x.charAt(0)!=='\x01'}):k(e[0])};
+Object.keys=function(o){var r=pk(o);return r||k(o)};var gn=Object.getOwnPropertyNames;Object.getOwnPropertyNames=function(o){return pk(o)||gn(o)};
+if(typeof Reflect==='object'){var rh=Reflect.has,rd=Reflect.deleteProperty,ro=Reflect.ownKeys;Reflect.has=function(o,x){var e=__proxies.get(o);if(e&&e[1].has)return !!e[1].has(e[0],x);return rh?rh(o,x):x in o};Reflect.deleteProperty=function(o,x){var e=__proxies.get(o);if(e&&e[1].deleteProperty)return !!e[1].deleteProperty(e[0],x);return rd?rd(o,x):delete o[x]};Reflect.ownKeys=function(o){var e=__proxies.get(o);if(e)return e[1].ownKeys?e[1].ownKeys(e[0]):ro(e[0]);return ro(o)}}})();
 // [by Opus] Typed arrays and DataView, stage 1 in the language: an ArrayBuffer keeps its bytes in an array (_b); a view is an
 // array whose prototype is its kind's. A Uint8Array/Int8Array over a whole buffer from its start shares the bytes; any other
 // view is a copy made when it is created (writes through it do not reach the buffer), and writes by index are not wrapped to the

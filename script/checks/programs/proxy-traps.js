@@ -1,0 +1,1 @@
+var p=new Proxy({a:1,b:2},{ownKeys:function(t){return ["b"]},has:function(t,k){return k==="z"},deleteProperty:function(t,k){return false}});console.log(Object.keys(p).join(),Reflect.has(p,"z"),Reflect.has(p,"a"),Reflect.deleteProperty(p,"a"),Reflect.ownKeys(p).join(),Object.keys({x:1}).join(), p.a)
