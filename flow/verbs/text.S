@@ -15,6 +15,12 @@
     .equ T_LASTY, 24                    //        the finger's last row (f32)
     .equ T_LEN, 32                      //        text length
     .equ T_TEXT, 4096                   //        the text, at most 16384 bytes
+    .equ T_DOWNY, 28                    //        where the finger went down (f32)
+    .equ T_MOVED, 40                    //        how far it has moved since (f32)
+    .equ T_TLEN, 48                     //        typed so far
+    .equ T_TYPED, 2048                  //        the line being typed, at most 1000
+    .equ C_DLSYM, 80
+    .equ C_ACT, 88
     .equ GW, 24
     .equ GH, 48
     .equ LINE, 56
@@ -63,13 +69,43 @@ text:
     add     x9, x23, x9, lsl #4
     add     w21, w21, #1
     ldr     w10, [x9]
+    cmp     w10, #2
+    b.eq    key
     cmp     w10, #1
     b.ne    3b
     ldr     w10, [x9, #4]
     and     w10, w10, #0xff
     ldr     s0, [x9, #12]
-    cmp     w10, #2
+    cbnz    w10, 41f
+    str     s0, [x20, #T_DOWNY]         // down: nothing moved yet
+    str     wzr, [x20, #T_MOVED]
+    b       4f
+41: cmp     w10, #1
+    b.ne    42f
+    ldr     s1, [x20, #T_MOVED]         // up: a tap if it hardly moved: the keyboard comes up
+    fmov    s2, #20.0
+    fcmp    s1, s2
+    b.ge    4f
+    stp     x9, x23, [sp, #96]
+    mov     x0, #0
+    adr     x1, showname
+    ldr     x9, [x19, #C_DLSYM]
+    blr     x9
+    cbz     x0, 43f
+    mov     x9, x0
+    ldr     x0, [x19, #C_ACT]
+    mov     w1, #2                      // SHOW_FORCED
+    blr     x9
+43: ldp     x9, x23, [sp, #96]
+    ldr     s0, [x9, #12]
+    b       4f
+42: cmp     w10, #2
     b.ne    4f
+    ldr     s1, [x20, #T_LASTY]
+    fabd    s1, s1, s0
+    ldr     s2, [x20, #T_MOVED]
+    fadd    s2, s2, s1
+    str     s2, [x20, #T_MOVED]
     ldr     s1, [x20, #T_LASTY]         // moved: the target moves by the finger's distance
     fsub    s1, s1, s0
     fcvt    d1, s1
@@ -81,6 +117,74 @@ text:
 4:  str     s0, [x20, #T_LASTY]
     b       3b
 5:  str     w21, [x20, #T_SEEN]
+    b       51f
+// key: a key pressed (x9 the event): a letter, digit or mark joins the line; delete takes one off; enter sends the line
+key:
+    ldr     w10, [x9, #4]
+    cbnz    w10, 3b                     // only presses
+    ldr     w10, [x9, #8]
+    ldr     w11, [x9, #12]
+    ldr     x12, [x20, #T_TLEN]
+    cmp     w10, #67
+    b.ne    1f
+    cbz     x12, 3b
+    sub     x12, x12, #1
+    str     x12, [x20, #T_TLEN]
+    b       3b
+1:  cmp     w10, #66
+    b.eq    send
+    mov     w13, #0
+    sub     w14, w10, #29               // a-z
+    cmp     w14, #25
+    b.hi    2f
+    add     w13, w14, #'a'
+    tst     w11, #1                     // shift
+    b.eq    9f
+    sub     w13, w13, #32
+    b       9f
+2:  sub     w14, w10, #7                // 0-9
+    cmp     w14, #9
+    b.hi    4f
+    add     w13, w14, #'0'
+    b       9f
+4:  adr     x14, marks                  // others by table: keycode, character
+5:  ldrb    w15, [x14], #2
+    cbz     w15, 3b
+    cmp     w15, w10
+    b.ne    5b
+    ldrb    w13, [x14, #-1]
+9:  cmp     x12, #1000
+    b.hs    3b
+    add     x14, x20, #T_TYPED
+    strb    w13, [x14, x12]
+    add     x12, x12, #1
+    str     x12, [x20, #T_TLEN]
+    b       3b
+send:
+    stp     x9, x23, [sp, #96]
+    add     x14, x20, #T_TYPED
+    mov     w13, #10
+    strb    w13, [x14, x12]
+    mov     x0, #-100
+    adr     x1, opath
+    mov     x2, #0x441                  // write, create, append
+    mov     x3, #0x1b6
+    mov     x8, #56
+    svc     #0
+    tbnz    x0, #63, 1f
+    mov     x15, x0
+    add     x1, x20, #T_TYPED
+    ldr     x2, [x20, #T_TLEN]
+    add     x2, x2, #1
+    mov     x8, #64
+    svc     #0
+    mov     x0, x15
+    mov     x8, #57
+    svc     #0
+1:  str     xzr, [x20, #T_TLEN]
+    ldp     x9, x23, [sp, #96]
+    b       3b
+51:
     ldp     d0, d1, [x20, #T_VAL]       // 3. the glide: a third of the way each frame
     fsub    d2, d1, d0
     fmov    d3, #3.0
@@ -172,13 +276,78 @@ text:
     b       83b
 84: add     x23, x23, #1
     b       8b
-9:  ldp     x27, x28, [sp, #80]
+9:  sub     x6, x27, #110           // the typed line: "> " then the text then a bar, at the bottom
+    mov     x23, #0
+    adr     x10, prompt
+    ldrb    w0, [x10]
+    bl      glyph_at
+    mov     x23, #1
+    mov     w0, #' '
+    bl      glyph_at
+    ldr     x22, [x20, #T_TLEN]
+    mov     x21, #0
+91: cmp     x21, x22
+    b.hs    92f
+    add     x10, x20, #T_TYPED
+    ldrb    w0, [x10, x21]
+    add     x21, x21, #1
+    add     x23, x23, #1
+    bl      glyph_at
+    b       91b
+92: add     x23, x23, #1
+    mov     w0, #'_'
+    bl      glyph_at
+    ldp     x27, x28, [sp, #80]
     ldp     x25, x26, [sp, #64]
     ldp     x23, x24, [sp, #48]
     ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
     ldp     x29, x30, [sp], #112
     ret
+// glyph_at(w0 character, x6 top row, x23 column): one character, light, with the screen in x25-x28. Uses x0-x5, x10-x17.
+glyph_at:
+    sub     w0, w0, #32
+    cmp     w0, #94
+    b.hi    9f
+    mov     x10, #GW
+    mov     x13, #24
+    madd    x13, x23, x10, x13
+    add     x12, x13, #GW
+    cmp     x12, x28
+    b.gt    9f
+    adr     x14, font
+    mov     x10, #(GH * 3)
+    madd    x14, x0, x10, x14
+    mov     w15, #0xffc0
+    movk    w15, #0xff80, lsl #16
+    mov     x16, #0
+1:  cmp     x16, #GH
+    b.hs    9f
+    add     x17, x6, x16
+    cmp     x17, x27
+    b.ge    9f
+    ldrb    w1, [x14]
+    ldrb    w2, [x14, #1]
+    ldrb    w3, [x14, #2]
+    orr     w1, w1, w2, lsl #8
+    orr     w1, w1, w3, lsl #16
+    madd    x2, x17, x26, x13
+    add     x2, x25, x2, lsl #2
+    mov     x3, #0
+2:  cbz     w1, 3f
+    tbz     w1, #0, 4f
+    str     w15, [x2, x3, lsl #2]
+4:  lsr     w1, w1, #1
+    add     x3, x3, #1
+    b       2b
+3:  add     x14, x14, #3
+    add     x16, x16, #1
+    b       1b
+9:  ret
+showname: .asciz "ANativeActivity_showSoftInput"
+opath: .asciz "/sdcard/Android/media/t.flow/typed.txt"
+prompt: .ascii "> "
+marks: .byte 62, ' ', 56, '.', 55, ',', 76, '/', 69, '-', 70, '=', 74, ';', 75, 39, 77, '@', 0, 0
 tpath: .asciz "/sdcard/Android/media/t.flow/text.txt"
     .balign 4
 font: .incbin "font24x48.bin"
