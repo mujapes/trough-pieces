@@ -254,6 +254,23 @@ class AbortSignal extends EventTarget{constructor(){super();this.aborted=false;t
  static any(l){var c=new AbortController();for(var s of l){if(s.aborted){c.abort(s.reason);break}s.addEventListener('abort',function(){c.abort(this.reason)})}return c.signal}}
 class AbortController{constructor(){this.signal=new AbortSignal()}
  abort(r){var s=this.signal;if(s.aborted)return;s.aborted=true;s.reason=r===undefined?new Error('AbortError'):r;var e=new Event('abort');if(s.onabort)s.onabort(e);s.dispatchEvent(e)}}
+/* MessageChannel / MessagePort [by Opus]: a message posted on one port arrives on the other at a later turn */
+class MessagePort extends EventTarget{constructor(){super();this.onmessage=null;this.__o=null}
+ postMessage(d){var o=this.__o;setTimeout(function(){if(!o)return;var e=new Event('message');e.data=d;e.ports=[];if(o.onmessage)o.onmessage(e);o.dispatchEvent(e)},0)}
+ start(){} close(){this.__o=null}}
+class MessageChannel{constructor(){this.port1=new MessagePort();this.port2=new MessagePort();this.port1.__o=this.port2;this.port2.__o=this.port1}}
+/* Range [by Opus]: positions kept; contents made through a fragment; no layout (rects are empty) */
+class Range{constructor(){this.startContainer=this.endContainer=document;this.startOffset=this.endOffset=0;this.collapsed=true;this.commonAncestorContainer=document}
+ setStart(n,o){this.startContainer=n;this.startOffset=o;this.__c()} setEnd(n,o){this.endContainer=n;this.endOffset=o;this.__c()}
+ setStartBefore(n){this.setStart(n.parentNode,0)} setStartAfter(n){this.setStart(n.parentNode,0)} setEndBefore(n){this.setEnd(n.parentNode,0)} setEndAfter(n){this.setEnd(n.parentNode,0)}
+ selectNode(n){this.startContainer=this.endContainer=n.parentNode||n;this.__n=n;this.collapsed=false} selectNodeContents(n){this.startContainer=this.endContainer=n;this.__n=null;this.__in=n;this.collapsed=false}
+ collapse(t){this.collapsed=true} __c(){this.collapsed=this.startContainer===this.endContainer&&this.startOffset===this.endOffset;this.commonAncestorContainer=this.startContainer}
+ createContextualFragment(h){var t=document.createElement('template');t.innerHTML=h;var f=document.createDocumentFragment();var c=t.content||t;while(c.firstChild)f.appendChild(c.firstChild);return f}
+ cloneContents(){return document.createDocumentFragment()} extractContents(){return document.createDocumentFragment()} deleteContents(){}
+ insertNode(n){var c=this.startContainer;if(c&&c.insertBefore)c.insertBefore(n,c.childNodes?c.childNodes[this.startOffset]||null:null)}
+ surroundContents(n){} cloneRange(){var r=new Range();Object.assign(r,this);return r} detach(){}
+ getBoundingClientRect(){return {left:0,top:0,right:0,bottom:0,width:0,height:0,x:0,y:0}} getClientRects(){return []} toString(){return ''}}
+document.createRange=function(){return new Range()};
 /* custom elements [by Opus]: an element whose tag has a defined class gets that class's prototype and runs its constructor
    on itself (Element's constructor answers with the element being upgraded; super() takes it over as this) */
 var __upg=null;function __upgrade(e,n){var c=customElements._d[n];if(!c||e.__up)return;e.__up=1;Object.setPrototypeOf(e,c.prototype);__upg=e;try{new c()}catch(x){console.log('custom element '+n+': '+x)}__upg=null}

@@ -1067,3 +1067,11 @@ i_getek ~843, i_spread ~1043, i_tail ~1078 (a_from copies: convert), i_apply ~11
 machine.S i_yield/m_resume ~1720-1744, lib.S n_pop and n_join (+ any other native reading A_ITEMS: 9 sites). `in` (i_in
 ~1244: index < length -> also not a hole), m_keylist's index enumeration (skip holes), prelude forEach/map/filter/some/every/
 reduce skip `!(i in this)`. Test: Array(3) holes, [1,,3], delete, map/forEach/join/JSON/spread/for-of/for-in/keys.
+Unit 84 [by Opus]: ARRAY HOLES done as planned above (UNHOLE macro in world.S; a_from converts; i_in and m_keylist skip holes;
+delete/length growth/a_set gaps store T_HOLE; elisions emit a T_HOLE constant via c_const; prelude Array(n) is a.length=n,
+forEach/map/filter/reduce/some/every/concat skip holes with `(v=this[i])!==undefined||i in this`). Not done: hasOwnProperty on
+array items (still false), slice/indexOf-includes keep spec hole nuances loosely. array-holes.js; 93 of 93.
+document.js: MessageChannel/MessagePort, Range + document.createRange. YouTube then reaches t39 37638:249 ("reading 'replace'
+of undefined") and the HOST SEGFAULTS in compile.S name lookup (~line 893, ldrb [x6,x9] with x6 = x20 + a bad name offset):
+a translator crash on some text YouTube now compiles (new Function / a later script). NEXT: find that text (TROUGH_KEEP_ALL
+or a printf of each compiled text's length in browse.c), ddmin it, fix the translator.

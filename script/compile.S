@@ -3403,7 +3403,8 @@ c_array:
     b.ne    21f
     cmp     w24, #40
     b.ne    21f
-    OP      OP_UNDEF
+    mov     x0, #(T_HOLE << 48)         // [by Opus] a hole: read as undefined, not `in` the array
+    bl      c_const
     b       41f
 21: ISP     1, 4f                       // ...v: from the first of these on, the array is made and items are added to it
     ldr     w9, [sp, #12]

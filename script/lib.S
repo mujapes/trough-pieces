@@ -263,6 +263,7 @@ m_fapply:
 1:  cmp     x8, x5
     b.hs    9f
     ldr     x9, [x7, x8, lsl #3]
+    UNHOLE  x9, x16
     str     x9, [x1, x8, lsl #3]
     add     x8, x8, #1
     b       1b
@@ -807,6 +808,7 @@ n_pop:
     ldr     x11, [x9, #A_ITEMS]
     add     x11, x19, x11
     ldr     x0, [x11, x10, lsl #3]
+    UNHOLE  x0, x16
     NOUT
 // 49 join. m_native has seen that `this` is an array with no object in it. Two passes: a copy of the array has each item
 // made text (0 for undefined and null) while the units are counted, then one string of that size is filled.

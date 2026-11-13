@@ -244,7 +244,7 @@ a_set:
 4:  ldr     w3, [x0, #A_LEN]
     ldr     x6, [x0, #A_ITEMS]
     add     x6, x19, x6
-    VAL     x7, T_UNDEF
+    VAL     x7, T_HOLE 
 5:  cmp     x3, x1
     b.hs    6f
     str     x7, [x6, x3, lsl #3]
@@ -529,7 +529,7 @@ m_setprop:
     str     w1, [x0, #A_LEN]
     b       9f
 3:  sub     x1, x1, #1
-    VAL     x2, T_UNDEF
+    VAL     x2, T_HOLE 
     bl      a_set
     cbz     x0, 8f
     b       9f
@@ -841,6 +841,7 @@ i_getek:
     ldr     x6, [x6, #A_ITEMS]
     add     x6, x19, x6
     ldr     x0, [x6, x2, lsl #3]
+    UNHOLE  x0, x16
     b       8f
 3:  mov     w5, #T_STRING
     cmp     w4, w5
@@ -1041,6 +1042,7 @@ i_spread:                               // array, array or string -> array, each
     ldr     x5, [x5, #A_ITEMS]
     add     x5, x19, x5
     ldr     x2, [x5, x3, lsl #3]
+    UNHOLE  x2, x16
     and     x0, x0, #0xffffffffffff
     add     x0, x19, x0
     ldr     w1, [x0, #A_LEN]
@@ -1098,6 +1100,7 @@ i_apply:                                // + 8 bits: which call. The array on to
 1:  cmp     x6, x4
     b.hs    2f
     ldr     x7, [x5, x6, lsl #3]
+    UNHOLE  x7, x16
     str     x7, [x22], #8
     add     x6, x6, #1
     b       1b
@@ -1139,6 +1142,7 @@ a_from:
     add     x7, x19, x0
     mov     x3, #0
 1:  ldr     x9, [x8, x3, lsl #3]
+    UNHOLE  x9, x16
     str     x9, [x7, x3, lsl #3]
     add     x3, x3, #1
     cmp     x3, x5
@@ -1182,6 +1186,7 @@ a_text:
     add     x1, x19, x1
     ldr     x2, [sp, #24]
     ldr     x0, [x1, x2, lsl #3]
+    UNHOLE  x0, x16
     add     x2, x2, #1
     str     x2, [sp, #24]
     lsr     x3, x0, #48
@@ -1243,7 +1248,15 @@ i_in:                                   // key, object -> is it a property of th
     b.ne    5f
     ldr     w7, [x6, #A_LEN]
     cmp     x2, x7
-    cset    w0, lo
+    b.hs    41f
+    ldr     x6, [x6, #A_ITEMS]          // [by Opus] an empty place (hole) is not in the array
+    add     x6, x19, x6
+    ldr     x7, [x6, x2, lsl #3]
+    mov     x16, #(T_HOLE << 48)
+    cmp     x7, x16
+    cset    w0, ne
+    b       8f
+41: mov     w0, #0
     b       8f
 5:  ldr     x0, [x22, #-16]
     bl      v_text
@@ -1308,7 +1321,7 @@ i_dele:                                 // object, key -> true (an array's item 
     b.hs    8f
     ldr     x6, [x6, #A_ITEMS]
     add     x6, x19, x6
-    VAL     x7, T_UNDEF
+    VAL     x7, T_HOLE 
     str     x7, [x6, x2, lsl #3]
     b       8f
 5:  ldr     x0, [x22, #-8]
@@ -1356,9 +1369,16 @@ m_keylist:
     ldr     x2, [sp, #32]
     cmp     x2, x1
     b.hs    2f
-    ucvtf   d0, x2
     add     x2, x2, #1
     str     x2, [sp, #32]
+    sub     x2, x2, #1
+    ldr     x3, [x0, #A_ITEMS]          // [by Opus] empty places (holes) have no key
+    add     x3, x19, x3
+    ldr     x3, [x3, x2, lsl #3]
+    mov     x16, #(T_HOLE << 48)
+    cmp     x3, x16
+    b.eq    1b
+    ucvtf   d0, x2
     bl      num_text
     cbz     x0, 9f
     ldr     x1, [sp, #16]
@@ -1534,6 +1554,7 @@ i_fornext:                              // + 32 bits: how far to jump when there
 1:  ldr     x0, [x0, #A_ITEMS]
     add     x0, x19, x0
     ldr     x0, [x0, x3, lsl #3]
+    UNHOLE  x0, x16
     add     x3, x3, #1
     ucvtf   d0, x3
     str     d0, [x22, #-8]

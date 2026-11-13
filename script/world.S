@@ -79,6 +79,13 @@
     .equ T_OBJECT, 0xfffd
     .equ T_HOLE, 0xffff                 // only ever a global's value: nothing has declared it or stored to it yet
     .equ T_ACC, 0xfffe                  // only ever a property's value: where its getter and setter are (two values)
+// UNHOLE: an array's empty place (T_HOLE) read as undefined. Uses \t and the flags. [by Opus]
+    .macro  UNHOLE reg, t
+    mov     \t, #(T_HOLE << 48)
+    cmp     \reg, \t
+    mov     \t, #(T_UNDEF << 48)
+    csel    \reg, \t, \reg, eq
+    .endm
 // VAL: a tagged value with no payload -> \reg
     .macro  VAL reg, tag
     mov     \reg, #(\tag << 48)
