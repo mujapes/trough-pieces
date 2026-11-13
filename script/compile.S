@@ -1391,7 +1391,7 @@ c_scan_block:
     stp     wzr, w9, [sp, #16]
     str     xzr, [x29, #88]
 1:  bl      next_word
-    cbz     w23, 9f
+100: cbz    w23, 9f
     bl      c_scan_meth
     ldp     w1, w2, [sp]
     ldp     w3, w4, [sp, #8]
@@ -1399,6 +1399,14 @@ c_scan_block:
     mov     w7, #0
     cmp     w4, #2                      // a name was awaited and something else came
     b.lo    10f
+    cmp     w23, #K_KEYWORD             // static, async, await, of, get, set are names here
+    b.ne    102f
+    sub     w9, w24, #34
+    cmp     w9, #5
+    b.hi    102f
+    mov     w23, #K_NAME
+102:
+
     cmp     w23, #K_NAME
     b.eq    10f
     cmp     w4, #2
@@ -1483,7 +1491,22 @@ c_scan_block:
     mov     w4, #3
     b       8f
 51: cbnz    w2, 8f
-    cmp     w24, #28
+    cmp     w24, #2                     // catch (name): the name is a variable of this function, known before its blocks are met
+    b.ne    510f
+    stp     w1, w2, [sp]
+    stp     w3, w4, [sp, #8]
+    stp     w5, w7, [sp, #16]
+    bl      next_word
+    cmp     w23, #K_PUNCT
+    b.ne    100b
+    cmp     w24, #35
+    b.ne    100b
+    bl      next_word
+    cmp     w23, #K_NAME
+    b.ne    100b
+    bl      c_declare
+    b       1b
+510: cmp     w24, #28
     b.eq    52f
     cmp     w24, #33
     b.eq    52f
@@ -1630,6 +1653,13 @@ c_function:
     bl      next_word
     ldr     w9, [sp, #8]
 10:
+    cmp     w23, #K_KEYWORD             // static, async, await, of, get, set are names here
+    b.ne    101f
+    sub     w10, w24, #34
+    cmp     w10, #5
+    b.hi    101f
+    mov     w23, #K_NAME
+101:
     cmp     w23, #K_NAME
     b.ne    1f
     stp     x25, x26, [sp, #80]
@@ -1684,6 +1714,13 @@ c_function:
     bl      c_skip_pattern
     b       35f
 341:
+    cmp     w23, #K_KEYWORD             // static, async, await, of, get, set are names here
+    b.ne    342f
+    sub     w10, w24, #34
+    cmp     w10, #5
+    b.hi    342f
+    mov     w23, #K_NAME
+342:
     cmp     w23, #K_NAME
     b.ne    c_unexpected
     bl      c_declare
@@ -2510,8 +2547,11 @@ c_unary:
     ldr     x30, [sp], #32
     ret
 // c_postfix: x++ and x-- (the old value, as a number, is the result)
+// Kept: 8 how many arguments, 12 the calling instruction, 16 how many ?. are open and 24 to 64 their ways out (six at most),
+// 72 to 88 c_guard's own.
 c_postfix:
-    stp     x30, xzr, [sp, #-16]!
+    stp     x30, xzr, [sp, #-96]!
+    str     xzr, [sp, #16]
     ISK     20, 10f
     bl      c_new
     b       2f
@@ -2519,7 +2559,7 @@ c_postfix:
 2:  ISP     35, 20f                     // f(a, b): any number of times; o.m(a) and o[k](a) are calls on o
     bl      c_method
     str     w0, [sp, #12]
-    bl      next_word
+23: bl      next_word
     bl      c_args
     tbnz    w0, #31, 21f
     str     w0, [sp, #8]
@@ -2537,7 +2577,32 @@ c_postfix:
     b       2b
 20: bl      c_member                    // o.name and o[key]
     cbnz    w0, 2b
-5:  cmp     w23, #K_PUNCT
+    ISP     19, 5f                      // a?.b, a?.[k], a?.(x): if a is null or undefined the whole rest of the chain is undefined
+    bl      next_word
+    ISP     35, 24f
+    bl      c_method                    // a call: with o.m?.(x) the object lies under the function, and goes too if there is no function
+    str     w0, [sp, #12]
+    cmp     w0, #OP_CALLM
+    cset    w0, eq
+    bl      c_guard
+    b       23b
+24: mov     w0, #0
+    bl      c_guard
+    ISP     37, 25f
+    b       2b                          // [key]: taken as any other
+25: bl      c_member_q
+    b       2b
+5:  ldr     x9, [sp, #16]               // the chain is over: every ?. that gave up lands here, undefined on the stack
+    cbz     x9, 50f
+51: sub     x9, x9, #1
+    str     x9, [sp, #16]
+    add     x10, sp, #24
+    ldr     x0, [x10, x9, lsl #3]
+    bl      c_patch
+    ldr     x9, [sp, #16]
+    cbnz    x9, 51b
+    NOLV
+50: cmp     w23, #K_PUNCT
     b.ne    9f
     cmp     w24, #20
     b.eq    1f
@@ -2578,7 +2643,32 @@ c_postfix:
     bl      c_store
     OP      OP_POP
     bl      next_word
-9:  ldr     x30, [sp], #16
+9:  ldr     x30, [sp], #96
+    ret
+// c_guard: after ?. : the value on the stack is tested; null or undefined leaves the chain with undefined (w0 not 0: an object
+// lies under it and goes too). Works in c_postfix's own frame.
+c_guard:
+    str     x30, [sp, #72]
+    str     w0, [sp, #80]
+    mov     w0, #OP_JNK
+    bl      c_jump
+    str     x0, [sp, #88]
+    ldr     w0, [sp, #80]
+    cbz     w0, 1f
+    OP      OP_POP
+1:  OP      OP_UNDEF
+    mov     w0, #OP_JMP
+    bl      c_jump
+    ldr     x9, [sp, #16]
+    cmp     x9, #6
+    b.hs    c_toobig
+    add     x10, sp, #24
+    str     x0, [x10, x9, lsl #3]
+    add     x9, x9, #1
+    str     x9, [sp, #16]
+    ldr     x0, [sp, #88]
+    bl      c_patch
+    ldr     x30, [sp, #72]
     ret
 // c_method: a call is about to be written: if what was just read is a property, the object stays under the function to be
 // its `this` -> w0 the calling instruction to use
@@ -2625,9 +2715,12 @@ c_member:
     b.eq    2f
 9:  mov     w0, #0
     ret
+c_member_q:                             // the name itself is the current word (after ?.)
+    str     x30, [sp, #-16]!
+    b       10f
 1:  str     x30, [sp, #-16]!
     bl      next_word
-    cmp     w23, #K_NAME
+10: cmp     w23, #K_NAME
     b.eq    11f
     cmp     w23, #K_KEYWORD
     b.ne    c_unexpected
@@ -2737,8 +2830,25 @@ c_object:
     cmp     w24, #34
     b.eq    9f
     cmp     w24, #37
-    b.ne    c_notyet                    // spread: to come
+    b.eq    19f
+    cmp     w24, #1                     // ...value: its own properties are copied in (the prelude's __spread(object, value) -> object)
+    b.ne    c_unexpected
+    adr     x9, c_w_spread
+    sub     x25, x9, x20
+    mov     x26, #8
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    OP      OP_SWAP
     bl      next_word
+    bl      c_assign
+    OP      OP_CALL
+    mov     w0, #2
+    bl      c_byte
+    b       7f
+c_w_spread: .ascii "__spread"
+19: bl      next_word
     bl      c_assign
     EXPECT  38
     EXPECT  54
@@ -2792,7 +2902,10 @@ c_object:
     b       6f
 51: ldr     w9, [sp, #32]               // the name alone: the variable of that name
     cmp     w9, #K_NAME
-    b.ne    c_notyet                    // (get and set: to come)
+    b.eq    511f
+    cmp     w9, #K_KEYWORD              // get, set, of and the like alone are variables' names too
+    b.ne    c_notyet
+511:
     cmp     w23, #K_PUNCT
     b.ne    c_notyet
     stp     x25, x26, [sp, #40]

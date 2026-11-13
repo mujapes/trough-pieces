@@ -137,7 +137,9 @@ static long long tree_askf(scripts *s, const char *what, int node, const char *r
 static void run_script(scripts *s, const uint8_t *text, size_t n, const char *address) {
     entry5 load = entry("script.asm", "load"), run = entry("script.asm", "run"), text_of = entry("script.asm", "text"), error = entry("script.asm", "error");
     uint8_t *source = text_block((const char *)text, n); at(41, source); int16_t qs[1] = {41}, qw[2] = {40, 1};
-    if (load(s->world, qs, 1, 0, table) < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); free(source); s->failed++; return; }
+    if (load(s->world, qs, 1, 0, table) < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); free(source); s->failed++;
+        const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }   /* for finding what the engine lacks */
+        return; }
     free(source); s->ran++;
     for (int turn = 0; turn < 200000; turn++) {
         long long r = run(s->world, 0, 0, 20000000, table), t = text_of(s->out, qw, 1, 0, table); size_t bytes = t < 0 ? 0 : (size_t)(t & 0xffffffff), want = t < 0 ? 0 : (size_t)(t >> 32); const uint8_t *o = s->out + 64;

@@ -426,3 +426,18 @@ defined on globalThis, escape/unescape, URL and URLSearchParams, XMLHttpRequest 
 Next: the two SyntaxErrors on old.reddit.com (fetch the script, cut around the column); then timers after load and a tap on the
 live screen reaching dispatchEvent with a redraw from the tree; XMLHttpRequest/fetch through the host; lazy loops; shapes; fuzz.
 The map (MAP.md) has NOT been regenerated since unit 17: line numbers in objects.S, lib.S are off by the lines added here.
+
+**Twenty-first unit: constructs real sites stopped on (2026-11-13).** Found by keeping each script that fails to translate
+(`TROUGH_KEEP_FAILED=<dir> out/browse ...` writes failed-N.js there) and cutting around the reported column. Made, all in
+compile.S: (1) optional chaining `a?.b`, `a?.[k]`, `a?.(x)`, `o.m?.(x)` (c_postfix: after `?.` c_guard writes JNK over
+"UNDEF; JMP end-of-chain"; six `?.` at most in one chain) - it was not in the engine at all; (2) a `catch (e)` inside a block
+whose let/const an inner function uses (the advance scan c_scan_block now declares catch names in the function); (3) static,
+async, await, of, get, set as names of functions and parameters, and alone in an object (`{get, set}`); (4) object spread
+`{...a, b: 1}` (a call of the prelude's `__spread`, which is Object.assign). 44 of 44 programs (`optional.js` holds all four).
+Real pages now, scripts run / failed: www.wikipedia.org 4/0, news.ycombinator.com and lite.cnn.com clean, github.com 0 failed,
+the en.wikipedia.org article 6 run (see the last line of the session for its count), old.reddit.com 15/6, www.bbc.com/news 42
+failed. Known next stops: old.reddit.com `await` after a comma inside what should be an async function
+(`n.isEvaluating=!0,await Promise.resolve();let t=await Promise.all` at line 2 column 4523 of its loader: find which kind of
+function that is) and dynamic `import(x)`; bbc.com: six "Unexpected token" kinds, not looked at (run with TROUGH_KEEP_FAILED).
+Next: those stops, in the order that unblocks most scripts; regenerate MAP.md; then timers after load, a tap reaching
+dispatchEvent with a redraw from the tree; XMLHttpRequest/fetch through the host.

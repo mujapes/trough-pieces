@@ -279,3 +279,4 @@ decodeURIComponent=function(s){return dec(s,'')};decodeURI=function(s){return de
 })();
 String.fromCodePoint=function(){var r='';for(var i=0;i<arguments.length;i++){var c=+arguments[i];if(!(c>=0&&c<=0x10ffff)||c!==Math.floor(c))throw new RangeError('Invalid code point '+arguments[i]);r+=c<0x10000?String.fromCharCode(c):String.fromCharCode(0xd800+((c-0x10000)>>10),0xdc00+((c-0x10000)&1023))}return r};
 String.prototype.codePointAt=function(i){i=i|0;var s=String(this);if(i<0||i>=s.length)return undefined;var c=s.charCodeAt(i);if(c>=0xd800&&c<0xdc00&&i+1<s.length){var d=s.charCodeAt(i+1);if(d>=0xdc00&&d<0xe000)return 0x10000+((c-0xd800)<<10)+(d-0xdc00)}return c};
+var __spread=Object.assign;
