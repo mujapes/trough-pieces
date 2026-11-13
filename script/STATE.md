@@ -1048,7 +1048,7 @@ LESSON: document.js may be joined; never put // comments inside a line of code t
 Unit 82 [by Opus]: host/browse.c: timers after the load event run up to 5 s of page time after it (fire_ms), not 3 s past
 the page's start. The Guardian 31 -> 20 drop after unit 81 is NOT timing (old document.js still gives 31 with this host):
 the only semantic difference is that old __sel threw on an empty id in the node list (__w('') -> null -> e.__n) and new
-skips it; some Guardian path depends on that. Unresolved. NYT: world fills even at 200 MB (296 s). Found so far with
+skips it; some Guardian path depends on that. (Checked after: old code plus only a null guard still gives 31, so it is not the empty id either; variant with lazy wrapping and no early stop gives 20. Unresolved.) NYT: world fills even at 200 MB (296 s). Found so far with
 TROUGH_SWAP + `__trail()` inside a catch (gives the raise trail; decode text=v>>44, line=(v>>24)&0xfffff, col=v&0xffffff):
 the APS ad library's init throws "reading 'status' of undefined" (t38 3:14553, q(t,e) given undefined), then its error
 logger grows a queue; the real filler not yet found. Low value (ad code); parked.
