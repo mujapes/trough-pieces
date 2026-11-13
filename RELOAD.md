@@ -78,3 +78,11 @@ Stages, in order:
    (world layout version + migrate), document.js changes applied by re-running only it. Seen at once on the background.
 3. Trial with a health entry (missing item 1) and pre-swap block kept until settled (missing item 2).
 4. Trough's own screen parts move to pieces drawn through the host, so UI changes land the same way, not through d8.
+
+## Direction change 2026-11-13 (user a4748baf): fluid, not "hot reload" [by Opus]
+User: rethink from the ground up; a constant stream of memory written by the model and run in real time; new kinds of
+software made by models; be bold. My reading, said aloud: one living memory, not files/builds/restarts. The model appends
+function versions to an executable stream; the runner takes each newest version at its next call (reload take/back is the
+switch); state lives in blocks that outlast code; safety is instant per-function undo (each write keeps the one before; a
+fault rolls back that function) instead of heavy pre-checks. Caution kept: the undo. Next: design note `pieces/live/intent.md`
+(stream format = reload records; a writer the model calls directly; the screen host as first consumer, so edits show at once).
