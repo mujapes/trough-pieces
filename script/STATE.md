@@ -957,3 +957,7 @@ value of statements lost), atob/btoa and el.attributes.getNamedItem (document.js
 compiles into the instruction area for good, so a page that evals in a loop fills it ("the program is too big" x310 at 300 MB).
 Needs: reclaim a fragment's instructions when its function is collected, or cache by source text (cheap first step: a Map from
 text to the compiled function). Default 96 MB NPR unchanged 23/2. 83 of 83.
+Unit 69 [by Opus]: new Function and eval cache by text (prelude: Function.__c and __evc, 5000 entries each, then cleared;
+a repeat of new Function returns a fresh wrapper over the cached function). eval-cache.js (20000 evals); 84 of 84. NPR at
+300 MB still fills the instruction area ("program is too big" x309): the texts must differ, or something else compiles a lot;
+TROUGH_TICKS shows "code X of Y" to find what. Low priority: at the default 96 MB NPR stops earlier (23/2).
