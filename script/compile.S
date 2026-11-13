@@ -4602,12 +4602,101 @@ s_import:
     b.eq    s_expr
     cmp     w1, #56
     b.eq    s_expr
-1:  bl      next_word
-2:  cbz     w23, c_unexpected
+1:  LEXSAVE                             // the module first: __import("x") on the stack, then each name taken from it
+2:  bl      next_word
+    cbz     w23, c_unexpected
     cmp     w23, #K_STRING
-    b.eq    4b
+    b.ne    2b
+    adr     x9, c_w_module
+    sub     x25, x9, x20
+    mov     x26, #8
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    LEXBACK
+    LEXSAVE
+2:  bl      next_word
+    cmp     w23, #K_STRING
+    b.ne    2b
+    bl      c_string
+    bl      c_strconst
+    LEXBACK
+    OP      OP_CALL
+    mov     w0, #1
+    bl      c_byte
+    str     wzr, [sp, #8]               // 1 while inside { }
     bl      next_word
-    b       2b
+3:  cbz     w23, c_unexpected
+    cmp     w23, #K_STRING
+    b.eq    9f
+    cmp     w23, #K_PUNCT
+    b.ne    5f
+    cmp     w24, #33
+    b.ne    31f
+    mov     w9, #1
+    str     w9, [sp, #8]
+    b       4f
+31: cmp     w24, #34
+    b.ne    32f
+    str     wzr, [sp, #8]
+    b       4f
+32: cmp     w24, #45                    // * as name: the whole module
+    b.ne    4f
+    bl      next_word
+    bl      next_word
+    OP      OP_DUP
+    b       7f
+4:  bl      next_word
+    b       3b
+5:  ldr     w9, [sp, #8]
+    cbnz    w9, 6f
+    cmp     w23, #K_NAME                // from, or the default's name
+    b.ne    51f
+    cmp     x26, #4
+    b.ne    51f
+    ldr     w9, [x20, x25]
+    movz    w10, #0x7266
+    movk    w10, #0x6d6f, lsl #16
+    cmp     w9, w10
+    b.eq    4b
+51: OP      OP_DUP
+    adr     x0, c_w_default
+    mov     x1, #7
+    bl      w_string
+    cbz     x0, c_full
+    bl      c_keyconst
+    b       61f
+6:  OP      OP_DUP                      // { name [as local] }
+    bl      c_wordconst
+61: mov     w1, w0
+    mov     w0, #OP_GETP
+    bl      c_op16
+    LEXSAVE
+    bl      next_word
+    cmp     w23, #K_NAME
+    b.ne    62f
+    cmp     x26, #2
+    b.ne    62f
+    ldrh    w9, [x20, x25]
+    mov     w10, #0x7361                // "as"
+    cmp     w9, w10
+    b.ne    62f
+    add     sp, sp, #64
+    bl      next_word
+    b       7f
+62: LEXBACK
+7:  bl      c_declref
+    bl      c_store
+    OP      OP_POP
+    b       4b
+9:  OP      OP_POP
+    bl      next_word
+    bl      c_semi
+    b       s_done
+c_w_module:  .ascii "__module"
+c_w_default: .ascii "default"
+    .balign 4
 s_forw:                                 // a for statement is read inside a block of its own, for the let of its head
     ldr     w9, [x29, #F_FORIN]
     cbz     w9, 1f

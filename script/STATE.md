@@ -722,3 +722,9 @@ and `import.` stay expressions) and `export` (default, declarations, `{..} [from
 lexes as a name keeping its `#` (private names work as ordinary properties; not yet private, `#x in o` not made).
 checks/programs/private-names.js; 51 of 51. GitHub: all scripts translate, 5 run, 3 fail at run time on unbound imports
 (`import * as e from "react"`, resolved through its importmap). NEXT: stage 2, bindings and loading as planned above.
+Unit 41, stage 2a [by Opus]: `import d, {a as x, b} from "m"`, `import * as ns`, `import "m"` translate to
+`__module("m")` (one call per statement) with each name copied out (var-like, not live; default from `.default`). The prelude
+has no `__module` yet (dynamic `import()` keeps the separate `__import`). NEXT: exports (a module body run with an exports
+record; `export` declarations, default and lists put their names in it) and `__module` in dom/document.js: importmap, resolve
+against the importing module, fetch through __host('f'..) (the 16-request cap must not count modules), translate once with
+__compile, cache by address.
