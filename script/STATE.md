@@ -735,3 +735,9 @@ cache by final address, import.meta.url while a module runs, `__import` for impo
 request (no 16 cap, 300 modules) answering "1address\n text"; module scripts with src run as `__module("src")`.
 GitHub: modules load and run; now fails on `URL` missing and 'C' of undefined (line 4 col 4830). 51 of 51.
 NEXT: URL class in document.js; the 'C' failure; `export *`; live bindings are copies (circular imports see partial records).
+Unit 41, stage 2c [by Opus]: URL and URLSearchParams in dom/document.js (checks/programs/url.js matches node); module
+translation errors name the module; `delete a?.b` / `delete a?.[k]` (compile.S: F_DEL at frame 216, c_postfix frame 112, the
+last read becomes DELP/DELE, a chain that gave up gives true; checks/programs/delete-optional.js). checks/runhuge.py = runbig
+with a 200 MB world. 53 of 53. GitHub now: f18 module needs `new Function` over two-byte text (n_compile: one-byte only);
+landing-pages fills the 32 MB world. NEXT: two-byte text for __compile; a bigger page world (or gc during translation);
+'length' of undefined at line 4 col 86259.

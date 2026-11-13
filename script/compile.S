@@ -25,6 +25,7 @@
     .equ F_PA, 192                      // how far the text has been counted in lines, then (200) the line there and (208) where it starts
     .equ F_PL, 200
     .equ F_PS, 208
+    .equ F_DEL, 216                     // 32 bits [by Opus]: 1 while the operand of delete is read (its chain may hold ?.), 2 once that chain made the removal
     .equ F_PEND, 160                    // what the next function translated is to be: 64 a generator, 128 an async function (0: neither)
     .equ R_PARENT, 0
     .equ R_NAMES, 8                     // its names (parameters first), and how many
@@ -75,6 +76,7 @@
 c_compile:
     stp     x29, x30, [sp, #-224]!
     mov     x29, sp
+    str     wzr, [x29, #F_DEL]
     mov     x9, #1
     stp     xzr, x9, [x29, #F_PA]
     str     xzr, [x29, #F_PS]
@@ -175,6 +177,7 @@ c_out:
 c_fragment:
     stp     x29, x30, [sp, #-224]!
     mov     x29, sp
+    str     wzr, [x29, #F_DEL]
     mov     x9, #1
     stp     xzr, x9, [x29, #F_PA]
     str     xzr, [x29, #F_PS]
@@ -2721,8 +2724,16 @@ c_unary:
 52: cmp     w24, #8
     b.ne    50f
     bl      next_word                   // delete o.name, delete o[key]: the read just written becomes the removal
+    mov     w9, #1
+    str     w9, [x29, #F_DEL]
     bl      c_unary
-    bl      c_lvalue
+    ldr     w9, [x29, #F_DEL]
+    str     wzr, [x29, #F_DEL]
+    cmp     w9, #2
+    b.ne    55f
+    NOLV
+    b       9f
+55: bl      c_lvalue
     ldr     x9, [x29, #F_LV]
     str     x9, [x29, #F_LEN]
     and     w9, w0, #0xff
@@ -2772,8 +2783,11 @@ c_unary:
 // Kept: 8 how many arguments, 12 the calling instruction, 16 how many ?. are open and 24 to 64 their ways out (six at most),
 // 72 to 88 c_guard's own.
 c_postfix:
-    stp     x30, xzr, [sp, #-96]!
+    stp     x30, xzr, [sp, #-112]!
     str     xzr, [sp, #16]
+    ldr     w9, [x29, #F_DEL]           // 96: this chain is delete's operand
+    str     w9, [sp, #96]
+    str     wzr, [x29, #F_DEL]
     ISK     20, 10f
     bl      c_new
     b       2f
@@ -2823,6 +2837,41 @@ c_postfix:
     b       2b
 5:  ldr     x9, [sp, #16]               // the chain is over: every ?. that gave up lands here, undefined on the stack
     cbz     x9, 50f
+    ldr     w10, [sp, #96]
+    cbz     w10, 51f
+    bl      c_lvalue                    // delete a?.b: the last read becomes the removal; a chain that gave up gives true
+    ldr     x9, [x29, #F_LV]
+    str     x9, [x29, #F_LEN]
+    and     w9, w0, #0xff
+    cmp     w9, #OP_GETE
+    b.eq    52f
+    cmp     w9, #OP_GETP
+    b.ne    c_notyet
+    and     w0, w0, #0xffffff00
+    mov     w9, #OP_DELP
+    orr     w0, w0, w9
+    bl      c_raw
+    b       53f
+52: OP      OP_DELE
+53: mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #104]
+    ldr     x9, [sp, #16]
+54: sub     x9, x9, #1
+    str     x9, [sp, #16]
+    add     x10, sp, #24
+    ldr     x0, [x10, x9, lsl #3]
+    bl      c_patch
+    ldr     x9, [sp, #16]
+    cbnz    x9, 54b
+    OP      OP_POP
+    OP      OP_TRUE
+    ldr     x0, [sp, #104]
+    bl      c_patch
+    mov     w9, #2
+    str     w9, [x29, #F_DEL]
+    NOLV
+    b       9f
 51: sub     x9, x9, #1
     str     x9, [sp, #16]
     add     x10, sp, #24
@@ -2872,7 +2921,7 @@ c_postfix:
     bl      c_store
     OP      OP_POP
     bl      next_word
-9:  ldr     x30, [sp], #96
+9:  ldr     x30, [sp], #112
     ret
 // c_guard: after ?. : the value on the stack is tested; null or undefined leaves the chain with undefined (w0 not 0: an object
 // lies under it and goes too). Works in c_postfix's own frame.
