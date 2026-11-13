@@ -920,3 +920,7 @@ instructions RX_CSET0 21, RX_CLOOP 22 / RX_CLOOPL 23 (mark, least, most, distanc
 slot, set and raised with undo entries so backtracking restores it. RX_MAXW 16384 -> 32768 (program stack 69632 bytes).
 regex-counted.js; 79 of 79. NPR 23/4 -> 23/3 (regex error gone; left: document of undefined, bot check, world full). Not yet: {n,} with large n is still
 written out n times.
+Unit 59 [by Opus]: 123n literals compile to BigInt("123") (compile.S c_bigint; hex works; still objects, typeof "object",
+operators lossy past 2^53). String(object) now asks @@toPrimitive('string'), then toString, then valueOf (prelude String.__ts;
+it went through ''+x, valueOf first). NOT fixed: template literals `${o}` still add (valueOf first); needs a to-text instruction
+rather than a String call per value. bigint-lit.js; 80 of 80.
