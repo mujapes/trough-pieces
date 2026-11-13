@@ -918,5 +918,5 @@ instruction), 'document' of undefined, an obfuscated bot check, world full once.
 Unit 58 [by Opus]: regex counted repeats count instead of being written out when {n,m} would take over 1024 words: new
 instructions RX_CSET0 21, RX_CLOOP 22 / RX_CLOOPL 23 (mark, least, most, distance past), RX_CINC 24; the count lives in a mark
 slot, set and raised with undo entries so backtracking restores it. RX_MAXW 16384 -> 32768 (program stack 69632 bytes).
-regex-counted.js; 79 of 79. NPR's "too large" pattern now compiles (site rerun not done yet). Not yet: {n,} with large n is still
+regex-counted.js; 79 of 79. NPR 23/4 -> 23/3 (regex error gone; left: document of undefined, bot check, world full). Not yet: {n,} with large n is still
 written out n times.
