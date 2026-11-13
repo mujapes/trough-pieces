@@ -780,3 +780,10 @@ the known paywall `addHandler` with `this` undefined (ran-9.js), repeated by tim
 body runs now say "(running URL)" (dom/document.js __module). GitHub: illegal invocation (running core-..js) and not a
 function (running landing-pages-..js); their line/column do not match those files (the throw site is elsewhere, perhaps in
 code the module called): errors need a call trail (e.stack) to be findable. Parked GitHub here for the older list.
+Side bug (first output byte losing bit 5, "Function"): no longer reproduces with today's engine (/tmp/fj/a.js printed
+"Function" early in this session, "function" now); cause not identified (today's changes near output: w_outs split into
+w_enc). Kept as checks/programs/first-byte.js to catch a return.
+NPR [by Opus]: its 299 "Unexpected token in JSON" are one JSON.parse of a JSONP reply (`jsonFeed({...});`, 80 bytes, a geo
+lookup) repeated by a timer; the column is the calling script's, not the text's. Low value (the site's own fallback).
+NEXT (older list): the live screen's page world filling on Wikipedia (measure headless: run scripts_tick in a loop and watch
+W_HEAP / code length); Proxy has/deleteProperty/ownKeys; e.stack (a call trail) so run-time errors can be found.
