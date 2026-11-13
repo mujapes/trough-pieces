@@ -349,6 +349,8 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
                      (trough-flow) is reached by morphing, a share of the way each turn of this loop */
             if (scroll != fl_seen) { fl->p[0] = fl->p[1] = (double)scroll; }
             if (fl->n && entry("flow", "step")((void *)fl, 0, 0, 3000, table)) { long long limit = tall + BAR > (long long)H ? tall + BAR - H : 0; long long y = (long long)fl->p[0]; scroll = y < 0 ? 0 : y > limit ? limit : y; dirty = 1; }
+            if (fl->n < 2) { fl->p[2] = fl->p[3] = size_px; fl->n = 2; }   /* value 1: the text size, in dots */
+            { int sz = (int)(fl->p[2] + 0.5); if (sz >= 8 && sz <= 64 && sz != size_px) { size_px = sz; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; dirty = 1; } }
             fl_seen = scroll; }
         if (!dirty && !fresh) usleep(4000); } }
 int main(int argc, char **argv) {
