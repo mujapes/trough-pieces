@@ -45,6 +45,9 @@
     .equ W_JWIDE, 416                   // JSON.parse: 1 if the text it is reading has two bytes a unit
     .equ W_ITERFN, 424                  // the prelude's function that turns anything loopable into an array (0: not yet)
     .equ W_FALLBACK, 432                // three functions of the prelude: join, indexOf, slice in the language, for what built-ins 49-51 do not take
+    .equ W_CONST_LO, 864                // [by Opus] how many constants below 65536 (names must be there; others go above once it is 3/4 full)
+    .equ W_NAMEK, 872                   // [by Opus] the compiler is making a name's constant (it must be below 65536)
+    .equ W_LASTCL, 856                  // [by Opus] the compiler: where in its function's instructions the last closure was put (c_fragment)
     .equ W_PUSHFB, 848                  // [by Opus] the prelude's push for a `this` that is not an array (not a root: Array.__pushfb holds it)
     .equ W_K_TOPRIM, 504                // the key Symbol.toPrimitive ("\001Symbol.toPrimitive")
     .equ W_K_VALUEOF, 496               // the text "valueOf"
@@ -98,7 +101,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #856                   // [by Opus] 848 W_PUSHFB. 832 W_BIGPROTO, 840 spare. 824 W_BADCALL, 808 W_STRESS, 816 W_STRESS_END. The header: 808 bytes (800 W_TEXTNO, 576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
+    mov     x11, #880                   // [by Opus] 864 W_CONST_LO, 872 W_NAMEK, 856 W_LASTCL, 848 W_PUSHFB. 832 W_BIGPROTO, 840 spare. 824 W_BADCALL, 808 W_STRESS, 816 W_STRESS_END. The header: 808 bytes (800 W_TEXTNO, 576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]

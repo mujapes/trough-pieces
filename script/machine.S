@@ -100,7 +100,9 @@
     .equ OP_LINE, 96                    // + 32 bits line, 32 bits column: where in the text the statement that follows began (kept for an error)
     .equ OP_SUPERTHIS, 97               // [by Opus] after super(..): the answer, if an object, becomes this call's `this` (stays on the stack)
     .equ OP_TOTEXT, 98                  // [by Opus] value -> the same, but an object becomes a primitive by toString first (a template's value)
-    .equ OP_COUNT, 99
+    .equ OP_CONSTW, 99                  // [by Opus] + 24 bits: which constant (past the first 65536)
+    .equ OP_CLOSUREW, 100               // [by Opus] + 24 bits: a closure whose plan is a constant past the first 65536
+    .equ OP_COUNT, 101
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -620,9 +622,14 @@ s_function_end:
     .macro  U16 reg
     ldrh    \reg, [x21], #2
     .endm
+i_constw:
+    ldrh    w0, [x21], #2
+    ldrb    w1, [x21], #1
+    orr     w0, w0, w1, lsl #16
+    b       1f
 i_const:
     U16     w0
-    ldr     x0, [x23, x0, lsl #3]
+1:  ldr     x0, [x23, x0, lsl #3]
     PUSH    x0
     NEXT
 i_undef:
@@ -1412,9 +1419,14 @@ i_setup:
     ldr     x1, [x22, #-8]
     str     x1, [x2]
     NEXT
+i_closurew:
+    ldrh    w0, [x21], #2
+    ldrb    w1, [x21], #1
+    orr     w0, w0, w1, lsl #16
+    b       1f
 i_closure:
     U16     w0
-    ldr     x1, [x23, x0, lsl #3]
+1:  ldr     x1, [x23, x0, lsl #3]
     mov     x4, x1
     mov     x0, #64
     mov     x1, #1
@@ -1814,5 +1826,5 @@ m_table:
     .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
     .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table, i_getgq - m_table
     .word   i_scope - m_table, i_unscope - m_table, i_copyscope - m_table, i_constget - m_table, i_consterr - m_table
-    .word   i_gensnap - m_table, i_yield - m_table, i_line - m_table, i_superthis - m_table, i_totext - m_table
+    .word   i_gensnap - m_table, i_yield - m_table, i_line - m_table, i_superthis - m_table, i_totext - m_table, i_constw - m_table, i_closurew - m_table
     .ltorg

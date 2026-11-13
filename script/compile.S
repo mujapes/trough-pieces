@@ -220,12 +220,25 @@ c_fragment:
     b.lo    8f
     ldr     x10, [x29, #F_CODE]
     add     x10, x10, x9
+    ldr     x12, [x19, #W_LASTCL]       // [by Opus] the last closure put, short (4 from the end) or wide (5)
+    sub     x13, x9, x12
+    cmp     x13, #4
+    b.eq    5f
+    cmp     x13, #5
+    b.ne    8f
     ldurb   w11, [x10, #-4]
+    ldurb   w12, [x10, #-3]
+    orr     w11, w11, w12, lsl #8
+    ldurb   w12, [x10, #-2]
+    orr     w11, w11, w12, lsl #16
+    b       6f
+5:  ldurb   w11, [x10, #-4]
     cmp     w11, #OP_CLOSURE
     b.ne    8f
     ldurb   w11, [x10, #-3]
     ldurb   w12, [x10, #-2]
     orr     w11, w11, w12, lsl #8
+6:
     str     x9, [x19, #W_CODE_LEN]
     ldr     x10, [x19, #W_CONST]
     add     x10, x19, x10
@@ -402,7 +415,34 @@ c_byte:
 c_op16:
     mov     x15, x30
     mov     w13, w1
+    cmp     w0, #OP_CLOSURE             // [by Opus] where the last closure goes (W_LASTCL, for c_fragment)
+    b.ne    2f
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [x19, #W_LASTCL]
+2:
+    cmp     w1, #0x10, lsl #12          // [by Opus] a constant past the first 65536: the wide form, 24 bits
+    b.lo    1f
+    cmp     w0, #OP_CONST               // any other instruction cannot take it
+    b.eq    3f
+    cmp     w0, #OP_CLOSURE
+    b.ne    c_toobig
+3:
+    cmp     w0, #OP_CONST
+    mov     w9, #OP_CONSTW
+    csel    w0, w9, w0, eq
+    cmp     w0, #OP_CLOSURE
+    mov     w9, #OP_CLOSUREW
+    csel    w0, w9, w0, eq
     bl      c_byte
+    and     w0, w13, #0xff
+    bl      c_byte
+    lsr     w0, w13, #8
+    and     w0, w0, #0xff
+    bl      c_byte
+    lsr     w0, w13, #16
+    bl      c_byte
+    ret     x15
+1:  bl      c_byte
     and     w0, w13, #0xff
     bl      c_byte
     lsr     w0, w13, #8
@@ -480,14 +520,28 @@ c_addconst:
     b.eq    3f
     add     x11, x11, #1
     b       1b
-2:  ldr     x12, [x19, #W_CONST_CAP]
-    cmp     x9, x12
+2:  ldr     x11, [x19, #W_CONST_LO]     // [by Opus] below 65536 while that is under 3/4 full or a name is made; else above
+    ldr     x12, [x19, #W_NAMEK]
+    cbnz    x12, 4f
+    mov     x12, #49152
+    cmp     x11, x12
+    b.lo    4f
+    mov     x11, #0x10000
+    cmp     x9, x11
+    csel    x11, x9, x11, hi
+    ldr     x12, [x19, #W_CONST_CAP]
+    cmp     x11, x12
     b.hs    c_toobig
-    mov     x12, #0xffff
-    cmp     x9, x12
-    b.hi    c_toobig
-    str     x0, [x10, x9, lsl #3]
-    add     x12, x9, #1
+    b       5f
+4:  mov     x12, #0x10000
+    cmp     x11, x12
+    b.hs    c_toobig
+    add     x12, x11, #1
+    str     x12, [x19, #W_CONST_LO]
+5:  str     x0, [x10, x11, lsl #3]
+    add     x12, x11, #1
+    cmp     x12, x9
+    csel    x12, x12, x9, hi
     str     x12, [x19, #W_CONST_N]
 3:  mov     w0, w11
     ret
@@ -514,7 +568,11 @@ c_strconst:
     ldr     x13, [x12], #8
     cmp     x13, x4
     b.ne    4f
-    mov     x14, #0
+    ldr     x14, [x19, #W_NAMEK]        // [by Opus] a name cannot use a copy above 65536
+    cbz     x14, 6f
+    cmp     x11, #0x10, lsl #12
+    b.hs    4f
+6:  mov     x14, #0
 2:  lsr     x5, x4, #32                 // (how many bytes: the units, twice over if wide)
     and     x6, x4, #0xffffffff
     lsl     x6, x6, x5
@@ -706,8 +764,13 @@ c_wordconst:
     b       1f
 c_keyconst:
     str     x30, [sp, #-16]!
-1:  bl      c_strconst
+1:  mov     x9, #1                      // [by Opus] a name: kept below 65536
+    str     x9, [x19, #W_NAMEK]
+    bl      c_strconst
+    str     xzr, [x19, #W_NAMEK]
     ldr     x9, [x29, #F_LEN]
+    cmp     w13, #0x10, lsl #12         // [by Opus] a name must be one of the first 65536 constants (the short form); w13 is
+    b.hs    c_toobig                    // what c_op16 was given
     sub     x9, x9, #3
     str     x9, [x29, #F_LEN]
     ldr     x11, [x29, #F_CODE]
