@@ -192,7 +192,7 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
     s.answer_room = 6 * n + (2u << 20); s.req_room = n + (1u << 20) + 16; s.tree = block(9, 16 * n + (8u << 20)); s.req = block(2, s.req_room); s.answer = block(2, s.answer_room);
     uint8_t *first = malloc(n + 3); if (!first) exit(4); memcpy(first, "H1 ", 3); memcpy(first + 3, d, n);
     if (entry("dom.asm", "begin")(s.tree, 0, 0, 0, table) < 0 || tree_ask(&s, first, n + 3) < 0) { free(first); free(opening); free(s.tree); free(s.req); free(s.answer); return body; } free(first);
-    s.world = block(6, (getenv("TROUGH_WORLD_MB") ? (unsigned)atoi(getenv("TROUGH_WORLD_MB")) : 96u) << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
+    s.world = block(6, (getenv("TROUGH_WORLD_MB") ? (unsigned)atoi(getenv("TROUGH_WORLD_MB")) : 96u) << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table); { const char *st = getenv("TROUGH_GC_STRESS"); if (st && atol(st) > 0) { uint64_t *w = (uint64_t *)s.world; w[808/8] = (uint64_t)atol(st); w[816/8] = w[216/8]; w[216/8] = w[208/8] + w[808/8] < w[216/8] ? w[208/8] + w[808/8] : w[216/8]; } }   /* [by Opus] collect every N bytes, for finding collector faults */
     struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
     entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
     run_script(&s, opening + 64, length(opening), address); free(opening); if (s.failed) s.dead = 1; s.ran = 0;

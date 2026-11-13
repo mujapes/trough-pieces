@@ -878,3 +878,12 @@ during run-time compiling (c_fragment keeps names above the value stack top; str
 allocations, or keep W_HEAP_END just above the top) so the fault shows up in small bench programs; then fix.
 Probe tip: JS String.replace treats $` and $' in the replacement specially; use r.replace(a,function(){return b}).
 Also seen: nf3-style plain closures + 20k-object garbage rounds fill a 24 MB world (40 MB fine): retention worth a look.
+
+### Unit 53 [by Opus] (2026-11-13): collection stress switch; Unicode regular expressions; GitHub 0 failed at 128 MB
+world.S: header 824 bytes; W_STRESS (808) / W_STRESS_END (816): w_slow with stress set skips the free list, collects, and keeps
+W_HEAP_END at top + step + the size wanted. host/browse.c TROUGH_GC_STRESS=bytes sets it (8 MB on GitHub: very slow).
+prelude.js __rxu: flags u/v translate the pattern for the 16-bit engine: \u{...}, astral literals and class ranges as surrogate
+alternatives (full high-surrogate spans collapsed), . matches a pair, \p{..}/\P{..} from a small table (RI, Emoji, EMod,
+Extended_Pictographic, L, Lu, Ll, N, Nd, P, White_Space; unknown names: everything past ASCII). Negated classes with astral parts
+are BMP-only. rxunicode.js; 74 of 74.
+GITHUB: TROUGH_WORLD_MB=128 -> 5 scripts run, 0 failed. At 96 (default) still "an object is not a function" (unit 52 notes).
