@@ -97,7 +97,8 @@
     .equ OP_CONSTERR, 93                // + 16 bits (not used): the assignment itself: TypeError
     .equ OP_GENSNAP, 94                 // + 8 bits (0 a generator, 1 an async function), then OP_RET: the call as it stands is kept aside, and what the prelude makes of it is the call's answer
     .equ OP_YIELD, 95                   // value -> (when resumed) the value sent in: the call is kept aside again and the value is the resuming call's answer
-    .equ OP_COUNT, 96
+    .equ OP_LINE, 96                    // + 32 bits line, 32 bits column: where in the text the statement that follows began (kept for an error)
+    .equ OP_COUNT, 97
 // In the heap, an object begins with its kind: 1 a function (then: its plan, the scope it remembers), 2 a function's plan
 // (then: where its instructions start, parameters (32 bits) and variables in all (32 bits), flags (1: its variables live in
 // the heap because inner functions may keep them), its name).
@@ -295,6 +296,8 @@ m_wrong:
 // m_fail: the machine's own error, given as "Name: message" (x0, x1 bytes). Inside a try it is thrown as an object of that
 // class (looked up among the globals by name; the text itself if there is none); otherwise the program stops with it.
 m_fail:
+    ldr     x9, [x19, #W_POS]           // where it happened: the statement last begun
+    str     x9, [x19, #W_ERR_LINE]
     ldr     x9, [x19, #W_HANDLER]
     cbz     x9, m_fatal
     mov     x23, x0
@@ -483,6 +486,8 @@ i_endtryk:
     str     x0, [x22], #8
     NEXT
 i_throw:
+    ldr     x9, [x19, #W_POS]
+    str     x9, [x19, #W_ERR_LINE]
     POP     x0
     b       m_throw
 i_gosub:
@@ -629,6 +634,10 @@ i_setg:
     add     x1, x24, x0, lsl #4
     ldr     x0, [x22, #-8]
     str     x0, [x1, #8]
+    NEXT
+i_line:
+    ldr     x0, [x21], #8
+    str     x0, [x19, #W_POS]
     NEXT
 i_pop:
     sub     x22, x22, #8
@@ -1632,5 +1641,5 @@ m_table:
     .word   i_append - m_table, i_spread - m_table, i_apply - m_table, i_tail - m_table, i_defacc - m_table, i_extends - m_table, i_home - m_table, i_super - m_table
     .word   i_try - m_table, i_endtry - m_table, i_endtryk - m_table, i_throw - m_table, i_gosub - m_table, i_retsub - m_table, i_getgq - m_table
     .word   i_scope - m_table, i_unscope - m_table, i_copyscope - m_table, i_constget - m_table, i_consterr - m_table
-    .word   i_gensnap - m_table, i_yield - m_table
+    .word   i_gensnap - m_table, i_yield - m_table, i_line - m_table
     .ltorg

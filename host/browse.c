@@ -158,7 +158,9 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
                 fprintf(stderr, "fetch %s: %s\n", where[0] ? where : "?", got ? "came" : why); free(got); free(base); free(rel); free(full); resize(s->answer, gn + 1); text_of(s->answer, qw, 2, 0, table); continue; }
             memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
         if (r == 0) return;
-        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); s->failed++; return; } }
+        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); s->failed++;
+            const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep && text) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }
+            return; } }
     fprintf(stderr, "script: stopped after too many steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }
 static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, size_t room_why);
 /* the page's text with its scripts run. The page is read into a tree (the dom piece); each script element, in page order, runs in one

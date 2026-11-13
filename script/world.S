@@ -25,6 +25,7 @@
     .equ W_ERR, 224                     // the last error: its text (a string value), line, column
     .equ W_ERR_LINE, 232
     .equ W_ERR_COL, 236
+    .equ W_POS, 568                     // line and column (32 bits each) of the statement last begun (OP_LINE)
     .equ W_SRC, 240                     // the program's text, kept in the world: where, how long
     .equ W_SRC_LEN, 248
     .equ W_FP, 256                      // the machine inside a call: the call's record on the stack (0: not in one),

@@ -1110,7 +1110,11 @@ m_delprop:
     ldr     x3, [x0, #O_PROPS]
     add     x3, x19, x3
     ldr     w4, [x0, #O_CNT]
+    cmp     x2, x3                      // (found, but not among its own named properties: left alone)
+    b.lo    9f
     add     x3, x3, x4, lsl #4
+    cmp     x2, x3
+    b.hs    9f
     sub     w4, w4, #1
     str     w4, [x0, #O_CNT]
 1:  add     x5, x2, #16

@@ -1,6 +1,6 @@
 // The library's half that is written in the language (see lib.S). __n(k): the built-in routine numbered k.
 __n(-7);
-function Object(){}function Array(){}function Function(){}function String(x){return arguments.length?''+x:''}
+function Object(v){if(v===undefined||v===null)return {};return v}function Array(n){var a=[],i;if(arguments.length===1&&typeof n==='number'){if(n!==(n>>>0))throw new RangeError('Invalid array length');for(i=0;i<n;i++)a.push(undefined)}else for(i=0;i<arguments.length;i++)a.push(arguments[i]);return a}function Function(){}function String(x){return arguments.length?''+x:''}
 function Number(x){return arguments.length?+x:0}function Boolean(x){return !!x}
 __n(-1,Object.prototype);__n(-2,Array.prototype);__n(-3,Function.prototype);__n(-4,String.prototype);__n(-5,Number.prototype);__n(-6,Boolean.prototype);
 var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),exp:__n(20),log:__n(21),log2:__n(22),log10:__n(23),random:__n(24),sin:__n(25),cos:__n(26),tan:__n(27),atan:__n(31),atan2:__n(32),asin:__n(33),acos:__n(34),expm1:__n(35),log1p:__n(36),sinh:__n(37),cosh:__n(38),tanh:__n(39),cbrt:__n(40),hypot:__n(41),asinh:__n(43),acosh:__n(44),atanh:__n(45),fround:__n(46),clz32:__n(47),imul:__n(48),pow:function(a,b){return a**b},
@@ -283,3 +283,8 @@ String.prototype.codePointAt=function(i){i=i|0;var s=String(this);if(i<0||i>=s.l
 var __spread=Object.assign;
 var __rest=function(v){var o={},ks=Object.keys(v),n=arguments.length,i,j,k;for(i=0;i<ks.length;i++){k=ks[i];for(j=1;j<n&&arguments[j]!==k;j++);if(j>=n)o[k]=v[k]}return o};
 var __import=function(u){return Promise.reject(new TypeError('import() is not made yet: '+u))};__import.meta={url:''};
+Object.prototype.propertyIsEnumerable=function(k){return Object.prototype.hasOwnProperty.call(this,k)};
+Object.prototype.isPrototypeOf=function(o){if(o==null)return false;for(o=Object.getPrototypeOf(o);o!=null;o=Object.getPrototypeOf(o))if(o===this)return true;return false};
+Object.getOwnPropertySymbols=function(){return[]};
+(function(){var old=Symbol,n=0,reg={},k,S=function Symbol(d){return '@@'+(d===undefined?'':d)+'@'+(++n)},w=['hasInstance','toPrimitive','toStringTag','species','unscopables','match','matchAll','replace','search','split','isConcatSpreadable'];
+for(k in old)S[k]=old[k];for(k=0;k<w.length;k++)S[w[k]]='@@'+w[k];S['for']=function(k){k=String(k);return reg[k]||(reg[k]=S(k))};S.keyFor=function(s){for(var k in reg)if(reg[k]===s)return k};Symbol=S})();

@@ -478,3 +478,13 @@ signals, real waiting (a timer more than 3 s out never runs in the one-shot host
 Next: the live screen (PieceScreen) keeping the world alive: a tap reaching dispatchEvent, timers by the real clock, a redraw
 from the tree; bbc's run-time "not a function" (find with a small trace of the callee's name); async generators and
 for await; POST; modules behind `__import`; shapes; fuzz.
+
+**Twenty-fourth unit (Fable, finished and pushed by Opus): positions for run-time errors, and faults real pages found
+(2026-11-13).** OP_LINE (96; 8 bytes: line, column) is written by c_pos at the start of every statement of the program's own
+text; i_line keeps it in W_POS (568); m_fail and i_throw copy it to W_ERR_LINE, so `error` reports where a run-time error
+happened (the statement last begun: after a call returns it is the callee's last statement). host/browse.c keeps a script that
+fails while running too (TROUGH_KEEP_FAILED). prelude.js: Array(n) and Array(a, b) as plain calls (were undefined), Object(v),
+Symbol as a function (a unique '@@desc@n' string; Symbol.for, keyFor, the well-known names), propertyIsEnumerable,
+isPrototypeOf, getOwnPropertySymbols. objects.S m_delprop: a property found on a prototype or outside the own list was
+"deleted" by moving memory past the list's end: the browser host crashed on bbc.com; now left alone. 45 of 45.
+bbc.com/news after this: 57 run, 17 failed: 12 of them one stop in the turbopack loader (failed-3 col 9045 area).

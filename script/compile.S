@@ -22,6 +22,9 @@
     // a function's record
     .equ F_FPEND, 176                   // a class body with fields (the reader's place at its {, kept on the stack; bit 0: the class extends another), for the constructor translated next
     .equ F_FCUR, 184                    // the same for the constructor being translated now (bit 1: its super( call is being written), or 0
+    .equ F_PA, 192                      // how far the text has been counted in lines, then (200) the line there and (208) where it starts
+    .equ F_PL, 200
+    .equ F_PS, 208
     .equ F_PEND, 160                    // what the next function translated is to be: 64 a generator, 128 an async function (0: neither)
     .equ R_PARENT, 0
     .equ R_NAMES, 8                     // its names (parameters first), and how many
@@ -70,8 +73,11 @@
 
 // c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
 c_compile:
-    stp     x29, x30, [sp, #-192]!
+    stp     x29, x30, [sp, #-224]!
     mov     x29, sp
+    mov     x9, #1
+    stp     xzr, x9, [x29, #F_PA]
+    str     xzr, [x29, #F_PS]
     stp     xzr, xzr, [x29, #F_FPEND]
     str     xzr, [x29, #F_PEND]
     mov     x9, #-1
@@ -160,7 +166,7 @@ c_compile:
     str     w9, [x19, #W_STATE]
     mov     x0, #1
 c_out:
-    ldp     x29, x30, [sp], #192
+    ldp     x29, x30, [sp], #224
     ret
 // c_native_in: the opening lines can name the maker of built-in functions, `__n` (a global, made the first time);
 // c_native_out: nothing after them can: its name becomes the empty one.
@@ -4328,11 +4334,52 @@ c_semi:
     ldr     x9, [sp, #32]
     str     x9, [x29, #F_LOOP]
     .endm
+// c_pos: writes OP_LINE with the line and column of the current word (only in the program's own text: not in the library's
+// opening lines, nor in words read from the piece itself). Uses x9-x14, x16.
+c_pos:
+    ldp     x12, x13, [x29, #104]
+    cmp     x20, x12
+    b.ne    9f
+    cmp     x25, x13
+    b.hs    9f
+    mov     x16, x30
+    ldr     x9, [x29, #F_PA]
+    ldp     x13, x14, [x29, #F_PL]
+    cmp     x25, x9
+    b.hs    1f
+    mov     x9, #0                      // (the reader went back: counted again from the top)
+    mov     x13, #1
+    mov     x14, #0
+1:  cmp     x9, x25
+    b.hs    2f
+    ldrb    w12, [x20, x9]
+    add     x9, x9, #1
+    cmp     w12, #10
+    b.ne    1b
+    add     x13, x13, #1
+    mov     x14, x9
+    b       1b
+2:  str     x9, [x29, #F_PA]
+    stp     x13, x14, [x29, #F_PL]
+    sub     x14, x25, x14
+    add     x14, x14, #1
+    orr     x14, x13, x14, lsl #32
+    mov     w0, #OP_LINE
+    bl      c_byte
+    mov     w13, #8
+3:  and     w0, w14, #0xff
+    bl      c_byte
+    lsr     x14, x14, #8
+    subs    w13, w13, #1
+    b.ne    3b
+    mov     x30, x16
+9:  ret
 // c_stmt: one statement. Its frame: 8, 16, 24, 56 for places in the instructions; 32-55 a loop's record, which goes on at
 // 64 (how many places the loop keeps on the machine's stack), 68 (1: it is a switch), 72 and 80 (its label).
 c_stmt:
     stp     x30, xzr, [sp, #-96]!
     DEEPER
+    bl      c_pos
 s_again:
     cmp     w23, #K_PUNCT
     b.ne    s_word
