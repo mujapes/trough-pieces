@@ -812,3 +812,11 @@ gives it as numbers line*2^32+column; Error's stack lists every caller; document
 checks/programs/trail.js; 63 of 63. browse.c: TROUGH_WORLD_MB, free_total, held_sizes. GitHub now shows 12-deep trails, but
 places carry no script identity (138:160598 is in none of core.js's lines): NEXT give each translated text a number and pack
 it into the place (or keep a code-offset -> text table), then read GitHub's two errors.
+Unit 45 [by Opus]: places carry their text's number (W_TEXTNO at 800, header 808; c_pos puts it in bits 24-31 of the line;
+record word 7 is now kind 4 bits, line 20, text 8, column 32; __trail numbers are text*2^44+line*2^24+column; __trail(0)
+gives W_TEXTNO). document.js names module texts (__texts) in "called from"; browse.c prints "script: trail tN:L:C" for
+classic scripts and keeps them as ran-R-tN.js. Found with it on GitHub: (1) TextEncoder/TextDecoder missing (added to
+document.js, UTF-8); (2) TRANSLATOR BUG: c_scan_meth missed a method written short inside a call's brackets
+(`f({m(e){..}})`), so the outer function's variables stayed on the stack and the method read garbage after return; fixed
+(bit 16 of the scan state). checks/programs/meth-in-args.js; 64 of 64. GitHub: 302 failed -> 2 (both with an empty message,
+ran-2 and ran-4: next look). Wikipedia 8/0, HN 1/0, Guardian 18/1 unchanged.

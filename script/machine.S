@@ -387,11 +387,10 @@ m_trail:
     cmp     x11, x22
     b.hs    9f
     ldr     x9, [x11, #56]
-    lsr     x12, x9, #8
-    ands    x12, x12, #0xffffff
-    b.eq    9f
-    lsr     x9, x9, #32
-    orr     x12, x12, x9, lsl #32
+    ubfx    x12, x9, #4, #20
+    cbz     x12, 9f
+    and     x9, x9, #0xffffffffff000000
+    orr     x12, x12, x9
     add     x9, x19, #W_TRAIL
     str     x12, [x9, x10, lsl #3]
     add     x10, x10, #1
@@ -1480,11 +1479,10 @@ m_call:                                 // w0 arguments from x1 on, the function
     sub     x9, x12, x19
     stp     x9, x11, [x22, #32]
     ldr     x9, [x1, #-8]
-    ldr     x16, [x19, #W_POS]          // word 7: the call's kind (8 bits), and where the caller was (line 24 bits, column 32 bits)
-    and     x17, x16, #0xffffff
-    lsr     x16, x16, #32
-    lsl     x16, x16, #32
-    orr     x16, x16, x17, lsl #8
+    ldr     x16, [x19, #W_POS]          // word 7: the call's kind (4 bits), where the caller was: line (20 bits), its text's
+    and     x17, x16, #0xfffff          //   number (8 bits, in place), column (32 bits)
+    and     x16, x16, #0xffffffffff000000
+    orr     x16, x16, x17, lsl #4
     orr     x16, x16, x13
     stp     x9, x16, [x22, #48]
     mov     x20, x22
@@ -1516,7 +1514,7 @@ m_call:                                 // w0 arguments from x1 on, the function
 i_ret:
     ldr     x0, [x22, #-8]
     ldr     x13, [x20, #56]             // 1: called by new; 2: a setter, whose answer is dropped
-    and     x13, x13, #0xff
+    and     x13, x13, #0xf
     cbz     x13, 1f
     cmp     x13, #2
     b.hs    1f
@@ -1526,11 +1524,10 @@ i_ret:
 1:
 m_ret_x0:                               // (i_yield comes in here: x0 the answer, x13 the call's kind)
     ldr     x9, [x20, #56]              // the caller's place becomes the place errors are reported at again
-    lsr     x10, x9, #8
-    ands    x10, x10, #0xffffff
-    b.eq    6f
-    lsr     x9, x9, #32
-    orr     x10, x10, x9, lsl #32
+    ubfx    x10, x9, #4, #20
+    cbz     x10, 6f
+    and     x9, x9, #0xffffffffff000000
+    orr     x10, x10, x9
     str     x10, [x19, #W_POS]
 6:
     ldp     x9, x10, [x20]
@@ -1645,7 +1642,7 @@ i_yield:
     stp     x0, x10, [x9]
     mov     x0, x14
     ldr     x13, [x20, #56]
-    and     x13, x13, #0xff
+    and     x13, x13, #0xf
     b       m_ret_x0
 // m_resume: built-in 59, a turn of the call itself: (holder, null or not, value). The kept call is put back on the stack
 // where the arguments were (the holder stays under it), its record made to answer this call, its try records moved to

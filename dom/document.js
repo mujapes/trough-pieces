@@ -1,7 +1,7 @@
 // What a page's scripts see: document, elements, window. Written in the language over the dom piece (dom/intent.md);
 // every answer comes from the tree, nothing about the page is kept here except one object per node.
 var __d=function(s){var r=__host('d'+s);if(r==='\u0001E')throw new Error('the page tree refused: '+s.slice(0,40));return r};
-var __nodes={};
+var __nodes={},__texts={};
 function __w(n){n=+n;if(!n)return null;var o=__nodes[n];if(!o){var k=+__d('k'+n);o=k==1?new Element(n):k==9?new Document(n):new Node(n,k);__nodes[n]=o}return o}
 function __list(s){var r=[];if(s){var p=s.split(' ');for(var i=0;i<p.length;i++)r.push(__w(p[i]))}r.item=function(i){return this[i]||null};return r}
 class Event{constructor(t,o){this.type=t;this.bubbles=!!(o&&o.bubbles);this.defaultPrevented=false;this.target=null}
@@ -207,7 +207,7 @@ function __module(s){if(__mapd===null){__mapd={};var l=document.getElementsByTag
 var b=__mbase;if(__mapd[s]!==undefined){s=__mapd[s];b=''}else for(var k in __mapd)if(k.charAt(k.length-1)==='/'&&s.indexOf(k)===0){s=__mapd[k]+s.slice(k.length);b='';break}
 var key=b+'\n'+s;if(__mods[key])return __mods[key];var r=__host('M'+key);if(r.charAt(0)!=='1')throw new TypeError('module '+s+': '+r.slice(1));
 var n=r.indexOf('\n'),u=r.slice(1,n);if(__mods[u])return __mods[key]=__mods[u];var ex=__mods[u]=__mods[key]={};
-var f;try{f=Function('__exports',r.slice(n+1))}catch(e){if(e&&e.message)e.message+=' in '+u;throw e}var o=__mbase;__mbase=u;__import.meta.url=u;try{f(ex)}catch(e){if(e&&typeof e.message==='string'&&!e.__named){var t=__trail(),j,s='';for(j=1;j<t.length;j++)s+=' '+Math.floor(t[j]/4294967296)+':'+t[j]%4294967296;e.message+=' (running '+u+(s?'; called from'+s:'')+')';try{e.__named=1}catch(_){}}throw e}finally{__mbase=o;__import.meta.url=o||location.href}return ex}
+var f;try{f=Function('__exports',r.slice(n+1));__texts[__trail(0)&255]=u.slice(u.lastIndexOf('/')+1)}catch(e){if(e&&e.message)e.message+=' in '+u;throw e}var o=__mbase;__mbase=u;__import.meta.url=u;try{f(ex)}catch(e){if(e&&typeof e.message==='string'&&!e.__named){var t=__trail(),j,s='',L;for(j=0;j<t.length;j++){L=Math.floor(t[j]/17592186044416);s+=' '+(__texts[L]||'t'+L)+':'+Math.floor(t[j]/16777216)%1048576+':'+t[j]%16777216}e.message+=' (running '+u+(s?'; called from'+s:'')+')';try{e.__named=1}catch(_){}}throw e}finally{__mbase=o;__import.meta.url=o||location.href}return ex}
 var __import=function(s){try{return Promise.resolve(__module(s))}catch(e){return Promise.reject(e)}};__import.meta={url:location.href};
 // URL and URLSearchParams, in the language: resolution by RFC 3986's steps (dot segments removed), getters from the parts
 function URLSearchParams(q){this._p=[];if(q&&typeof q==='object'){if(q instanceof URLSearchParams)q=q.toString();else{for(var k in q)this._p.push([k,''+q[k]]);return}}q=''+(q||'');if(q.charAt(0)==='?')q=q.slice(1);var a=q?q.split('&'):[];for(var i=0;i<a.length;i++){if(!a[i])continue;var e=a[i].indexOf('='),d=function(x){try{return decodeURIComponent(x.replace(/\+/g,' '))}catch(_){return x}};this._p.push(e<0?[d(a[i]),'']:[d(a[i].slice(0,e)),d(a[i].slice(e+1))])}}
@@ -227,3 +227,10 @@ var IntersectionObserver=function IntersectionObserver(f,o){__Observer.call(this
 var MutationObserver=function MutationObserver(f){__Observer.call(this,f)};MutationObserver.prototype=__Observer.prototype;
 var ResizeObserver=function ResizeObserver(f){__Observer.call(this,f)};ResizeObserver.prototype=__Observer.prototype;
 var PerformanceObserver=function PerformanceObserver(f){__Observer.call(this,f)};PerformanceObserver.prototype=__Observer.prototype;PerformanceObserver.supportedEntryTypes=[];
+/* TextEncoder / TextDecoder [by Opus]: UTF-8 only (GitHub's 4u bundle builds on them) */
+function TextEncoder(){}TextEncoder.prototype.encoding='utf-8';
+TextEncoder.prototype.encode=function(s){s=s===undefined?'':''+s;var o=[],i,c,d;for(i=0;i<s.length;i++){c=s.charCodeAt(i);if(c>=0xd800&&c<0xdc00&&i+1<s.length&&(d=s.charCodeAt(i+1))>=0xdc00&&d<0xe000){c=0x10000+((c-0xd800)<<10)+(d-0xdc00);i++}else if(c>=0xd800&&c<0xe000)c=0xfffd;
+if(c<0x80)o.push(c);else if(c<0x800)o.push(0xc0|c>>6,0x80|c&63);else if(c<0x10000)o.push(0xe0|c>>12,0x80|c>>6&63,0x80|c&63);else o.push(0xf0|c>>18,0x80|c>>12&63,0x80|c>>6&63,0x80|c&63)}return new Uint8Array(o)};
+TextEncoder.prototype.encodeInto=function(s,a){var b=this.encode(s),n=Math.min(b.length,a.length),i;for(i=0;i<n;i++)a[i]=b[i];return {read:s.length,written:n}};
+function TextDecoder(l){this.encoding='utf-8'}
+TextDecoder.prototype.decode=function(b){if(b===undefined)return '';if(!(b instanceof Uint8Array))b=new Uint8Array(b.buffer||b,b.byteOffset||0,b.byteLength);var s='',i=0,c,n=b.length;while(i<n){c=b[i++];if(c>=0xf0&&i+2<n){c=(c&7)<<18|(b[i++]&63)<<12|(b[i++]&63)<<6|b[i++]&63}else if(c>=0xe0&&i+1<n){c=(c&15)<<12|(b[i++]&63)<<6|b[i++]&63}else if(c>=0xc0&&i<n){c=(c&31)<<6|b[i++]&63}else if(c>=0x80)c=0xfffd;s+=String.fromCodePoint(c)}return s};

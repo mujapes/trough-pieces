@@ -241,6 +241,7 @@ error:
     mov     x1, #(e_column - e_line)
     bl      e_put
     ldr     w0, [x9, #W_ERR_LINE]
+    and     w0, w0, #0xffffff           // (above it: the text's number)
     bl      e_dec
     adr     x0, e_column
     mov     x1, #(e_close - e_column)

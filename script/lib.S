@@ -483,17 +483,25 @@ n_markerr:
     ldr     x9, [x19, #W_POS]
     str     x9, [x19, #W_ERR_LINE]
     lsr     x10, x9, #32
-    and     x9, x9, #0xffffffff
+    and     x9, x9, #0xffffff
     orr     x9, x10, x9, lsl #32
     ucvtf   d0, x9
     fmov    x0, d0
     ret
-// 70: the call trail of the last error made (m_trail), as an array of numbers line * 2^32 + column, newest first; with an
+// 70: the call trail of the last error made (m_trail), as an array of numbers (see below), newest first; with an
 // argument that is true, it is taken here first (for an error made by the language: the Error function's own call is first)
 n_trail:
     mov     x15, x30
     ldr     x9, [x1]
-    mov     x10, #(T_BOOL << 48)
+    lsr     x10, x9, #48                // a number: how many texts have been translated instead (W_TEXTNO)
+    mov     w11, #T_UNDEF
+    cmp     w10, w11
+    b.hs    0f
+    ldr     x9, [x19, #W_TEXTNO]
+    ucvtf   d0, x9
+    fmov    x0, d0
+    ret
+0:    mov     x10, #(T_BOOL << 48)
     orr     x10, x10, #1
     cmp     x9, x10
     b.ne    1f
@@ -506,10 +514,12 @@ n_trail:
 2:  cmp     x10, x14
     b.hs    3f
     add     x9, x19, #W_TRAIL
-    ldr     x9, [x9, x10, lsl #3]
-    lsr     x11, x9, #32
-    and     x9, x9, #0xffffffff
-    orr     x9, x11, x9, lsl #32
+    ldr     x9, [x9, x10, lsl #3]   // as text * 2^44 + line * 2^24 + column (20 and 24 bits, exact in a double)
+    ubfx    x11, x9, #32, #24
+    ubfx    x12, x9, #0, #20
+    orr     x11, x11, x12, lsl #24
+    ubfx    x12, x9, #24, #8
+    orr     x9, x11, x12, lsl #44
     ucvtf   d0, x9
     str     d0, [x22, x10, lsl #3]
     add     x10, x10, #1

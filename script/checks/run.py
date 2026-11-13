@@ -9,7 +9,7 @@ def ours(path):
     d=open(T+'w','rb').read(); q=lambda at: struct.unpack('<Q',d[at-64:at-56])[0]
     out=d[q(144)-64:q(144)-64+q(152)].decode('utf8','replace'); err=''
     e=q(224)
-    if e>>48==0xfffc: a=(e&0xffffffffffff)-64; n=struct.unpack('<Q',d[a:a+8])[0]; err=d[a+8:a+8+n].decode()+' (line %d, column %d)'%struct.unpack('<II',d[232-64:240-64])
+    if e>>48==0xfffc: a=(e&0xffffffffffff)-64; n=struct.unpack('<Q',d[a:a+8])[0]; err=d[a+8:a+8+n].decode()+' (line %d, column %d)'%(lambda l,c:(l&0xffffff,c))(*struct.unpack('<II',d[232-64:240-64]))
     return out,err,res
 def ref(cmd,path):
     r=subprocess.run(cmd+[path],capture_output=True,timeout=60); t=r.stdout.decode('utf8','replace')

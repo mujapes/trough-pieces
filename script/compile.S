@@ -76,6 +76,9 @@
 c_compile:
     stp     x29, x30, [sp, #-224]!
     mov     x29, sp
+    ldr     x9, [x19, #W_TEXTNO]        // one more text: its places carry its number
+    add     x9, x9, #1
+    str     x9, [x19, #W_TEXTNO]
     str     wzr, [x29, #F_DEL]
     mov     x9, #1
     stp     xzr, x9, [x29, #F_PA]
@@ -177,6 +180,9 @@ c_out:
 c_fragment:
     stp     x29, x30, [sp, #-224]!
     mov     x29, sp
+    ldr     x9, [x19, #W_TEXTNO]        // one more text: its places carry its number
+    add     x9, x9, #1
+    str     x9, [x19, #W_TEXTNO]
     str     wzr, [x29, #F_DEL]
     mov     x9, #1
     stp     xzr, x9, [x29, #F_PA]
@@ -285,7 +291,7 @@ c_prelude:
     .incbin "script/prelude.js"
     // the error classes: functions, so that Error("x") without new makes an error as the language says (a class called
     // plainly would run on the global object and give back nothing); a second argument {cause} is kept
-    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause;var p=__n(66)(),t=__n(70)(true),i;this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)+\":\"+p%4294967296;for(i=2;i<t.length;i++)this.stack+=\"\\n    at <anonymous>:\"+Math.floor(t[i]/4294967296)+\":\"+t[i]%4294967296}"
+    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause;var p=__n(66)(),t=__n(70)(true),i;this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)%16777216+\":\"+p%4294967296;for(i=2;i<t.length;i++)this.stack+=\"\\n    at <anonymous>:\"+Math.floor(t[i]/16777216)%1048576+\":\"+t[i]%16777216}"
     .ascii "Error.prototype.toString=function(){return this.message===\"\"?this.name:this.name+\": \"+this.message};"
     .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";Error.captureStackTrace=function(){};"
     .ascii "function __errclass(n){var C=function(m,o){if(!(this instanceof C))return new C(m,o);Error.call(this,m,o)};C.prototype=Object.create(Error.prototype);"
@@ -754,17 +760,31 @@ c_scan_meth:
     b.ls    8f
 11: mov     w9, #1
     b       8f
-2:  cmp     w23, #K_PUNCT
-    b.ne    8f
-    cmp     w24, #35
+2:  cmp     w23, #K_PUNCT              // inside a call's brackets ([by Opus]: bit 16 of w10, the word before was a ) still
+    b.ne    25f                         //   inside them: then a { is a method written short, as in f({m(e){..}}))
+    cmp     w24, #33
+    b.ne    22f
+    tbz     w10, #16, 25f
+    ldr     x11, [x29, #F_FUNC]
+    ldr     x12, [x11, #R_FLAGS]
+    orr     x12, x12, #1
+    str     x12, [x11, #R_FLAGS]
+    b       25f
+22: cmp     w24, #35
     b.ne    21f
+    and     w10, w10, #0xffff
     add     w10, w10, #1
     b       8f
 21: cmp     w24, #36
-    b.ne    8f
+    b.ne    25f
+    and     w10, w10, #0xffff
     subs    w10, w10, #1
-    b.ne    8f
+    b.ne    23f
     mov     w9, #3
+    b       8f
+23: orr     w10, w10, #0x10000
+    b       8f
+25: and     w10, w10, #0xffff
 8:  stp     w9, w10, [x29, #88]
     ret
 // c_declare: the current word as a variable of the function being translated -> w0 its number (made if new). Uses x1-x11.
@@ -4682,6 +4702,9 @@ c_pos:
     sub     x14, x25, x14
     add     x14, x14, #1
     orr     x14, x13, x14, lsl #32
+    ldr     x12, [x19, #W_TEXTNO]
+    and     x12, x12, #0xff
+    orr     x14, x14, x12, lsl #24
     mov     w0, #OP_LINE
     bl      c_byte
     mov     w13, #8

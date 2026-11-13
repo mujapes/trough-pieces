@@ -152,7 +152,7 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
         const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }   /* for finding what the engine lacks */
         return; }
     free(source); s->ran++;
-    { const char *all = getenv("TROUGH_KEEP_ALL"); if (all && text) { char path[600]; snprintf(path, sizeof path, "%s/ran-%d.js", all, s->ran); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } } }   /* every script, for finding where a run-time error really was */
+    { const char *all = getenv("TROUGH_KEEP_ALL"); if (all && text) { char path[600]; snprintf(path, sizeof path, "%s/ran-%d-t%d.js", all, s->ran, (int)(*(uint64_t *)(s->world + 800) & 255)); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } } }   /* every script, for finding where a run-time error really was */
     for (int turn = 0; turn < 200000; turn++) {
         long long r = run(s->world, 0, 0, 20000000, table), t = text_of(s->out, qw, 1, 0, table); size_t bytes = t < 0 ? 0 : (size_t)(t & 0xffffffff), want = t < 0 ? 0 : (size_t)(t >> 32); const uint8_t *o = s->out + 64;
         size_t said = want ? want - 1 : bytes; if (said) fprintf(stderr, "console: %.*s", (int)said, o);
@@ -173,7 +173,8 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
                 fprintf(stderr, "fetch %s: %s\n", where[0] ? where : "?", got ? "came" : why); free(got); free(base); free(rel); free(full); resize(s->answer, gn + 1); text_of(s->answer, qw, 2, 0, table); continue; }
             memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
         if (r == 0) return;
-        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s%s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : "", getenv("TROUGH_KEEP_ALL") ? (snprintf(s->which, sizeof s->which, " [ran-%d]", s->ran), s->which) : ""); if (e && memmem(e + 64, length(e), "world is full", 13)) { s->dead = 1; s->full = 1; fprintf(stderr, "script: the page's world is full; its scripts stop here\n"); } free(e); s->failed++;
+        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); { const uint8_t *w = s->world; uint64_t tn = *(uint64_t *)(w + 664); if (e && tn > 1) { fprintf(stderr, "script: trail"); for (uint64_t j = 0; j < tn && j < 16; j++) { uint64_t v = *(uint64_t *)(w + 672 + 8 * j); fprintf(stderr, " t%u:%u:%u", (unsigned)(v >> 24 & 255), (unsigned)(v & 0xffffff), (unsigned)(v >> 32)); } fputc('\n', stderr); } }
+            fprintf(stderr, "script: %.*s%s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : "", getenv("TROUGH_KEEP_ALL") ? (snprintf(s->which, sizeof s->which, " [ran-%d]", s->ran), s->which) : ""); if (e && memmem(e + 64, length(e), "world is full", 13)) { s->dead = 1; s->full = 1; fprintf(stderr, "script: the page's world is full; its scripts stop here\n"); } free(e); s->failed++;
             const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep && text) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }
             return; } }
     fprintf(stderr, "script: stopped after too many steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }
