@@ -887,3 +887,8 @@ alternatives (full high-surrogate spans collapsed), . matches a pair, \p{..}/\P{
 Extended_Pictographic, L, Lu, Ll, N, Nd, P, White_Space; unknown names: everything past ASCII). Negated classes with astral parts
 are BMP-only. rxunicode.js; 74 of 74.
 GITHUB: TROUGH_WORLD_MB=128 -> 5 scripts run, 0 failed. At 96 (default) still "an object is not a function" (unit 52 notes).
+Unit 54 [by Opus]: m_notfn_o keeps the called object's distance at world+824 (W_BADCALL; header now 832); browse.c
+TROUGH_BADCALL=1 prints it, the collection count and the object's first 12 words after a script error. With this build GitHub
+runs 5/0 at 72, 84, 90, 94, 96, 98, 102 MB: the fault no longer shows (layout-sensitive). Not fixed, only not seen: when
+"an object is not a function" appears anywhere, rerun with TROUGH_BADCALL=1 and read the words (kind word should be 1).
+Sites: Wikipedia Moon 8/0, HN 1/0, Guardian 18/1 (unchanged).

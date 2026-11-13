@@ -292,6 +292,8 @@ m_full:
 // m_notfn_v: the value x2 was called: the error says what kind of value it was ("TypeError: undefined is not a function").
 // m_notfn_o: the same for an object that is not a function.
 m_notfn_o:
+    sub     x9, x2, x19                 // [by Opus] where the called object lies, kept for a host's fault finding (W_BADCALL)
+    str     x9, [x19, #824]
     adr     x0, e_nf_object
     mov     x1, #(e_nf_end - e_nf_object)
     b       m_fail

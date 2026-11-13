@@ -87,7 +87,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #95                    // [by Opus] (to 824)
+    mov     x12, #96                    // [by Opus] (to 832)
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -95,7 +95,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #824                   // [by Opus] 808 W_STRESS, 816 W_STRESS_END. The header: 808 bytes (800 W_TEXTNO, 576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
+    mov     x11, #832                   // [by Opus] 824 W_BADCALL, 808 W_STRESS, 816 W_STRESS_END. The header: 808 bytes (800 W_TEXTNO, 576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]
