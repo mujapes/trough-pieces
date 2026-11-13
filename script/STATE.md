@@ -858,3 +858,14 @@ on connectedCallback errors. 72 of 72 programs.
 GITHUB now: landing-pages fails "reading '_zod'" at its line 723:313825 (u.Brp from module fS in chunk 97 is undefined). A harness
 (/tmp/h.js: chunks 97+8d modules with a mini webpack require, built by node) gives the same as node in runhuge, so the cause is
 page-side: suspect a module that threw half-way, or a let read before its value (we give undefined, not ReferenceError: TDZ).
+
+### Unit 51 [by Opus] (2026-11-13): enumerability kept on redefinition; a collector fault found
+Object.defineProperty without `enumerable` on an existing own property no longer hides it (spec: absent attributes keep their
+value). zod's $ZodObject redefines `shape` as a getter: `{...def}` lost it, so object shapes were empty. redefine.js; 73 of 73.
+Way of finding faults inside page modules: python edits of out/document.js's __module (r=r.replace(anchor, probe) for one url),
+markers `,Qn=console.log("Mn"),` between a long let's declarators; restore with cp dom/document.js out/.
+COLLECTOR FAULT (next, high): on github.com with the default world, chunk 97 module uk's local `function o` reads typeof
+"function" but String(o) is "[object Object]" and calling it throws "an object is not a function"; with TROUGH_WORLD_MB=400 it
+does not happen. So a function object's plan/closure is damaged by a collection. Reproduce in a bench: /tmp/h2.js style harness
+(chunks via node, mini require) in a small world with many collections.
+After that on GitHub (400 MB world): RegExp with \p{RI}, \p{Emoji}, \p{EMod}, \u{...} and flag u (landing-pages 426:122916).
