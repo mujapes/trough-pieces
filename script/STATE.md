@@ -619,3 +619,24 @@ translator's three hand-made heap moves (c_strconst undo, string literal trim, u
 when their block is W_LAST. Checked: 47 of 47 in the normal and the smallest (1 MB) world; a 100000-object loop in a 1.2 MB
 world ran with 27 collections, right output; Wikipedia on the live screen 100 s with no full world (before: full within a
 minute); bbc.com/news 58 run, 2 failed (unchanged).
+
+**Measurement before shapes [by Opus] (2026-11-13).** Before building shapes, timed what they would speed up: 900k property reads
+on an 8-property object 0.14 s (qjs 0.12 s); 200k reads of globals among 3000 0.08 s (qjs 0.08 s: globals are slots already);
+a 100000-statement script in a 32 MB world translates and runs in 1.1 s. "the program is too big" seen on the bench came from the
+bench's 1.2-2 MB world (code room is a world's eighth), not a limit real pages meet. So shapes are NOT the bottleneck now; they
+move down the list. NEXT: the real-site failures (bbc.com/news 2 scripts failing, its run-time "not a function"), then live
+background watching on more sites.
+
+**Thirty-seventh unit [by Opus]: Reflect (2026-11-13).** bbc.com/news's two "failed" scripts are the Piano paywall SDK: its feature
+test (`typeof Proxy`, Promise, includes, closest) fails on Proxy, so it takes its old-browser path, which throws on purpose. Reflect
+(13 functions) added to prelude.js; checks/programs/reflect.js; 48 of 48. NEXT: Proxy in machine code (an object kind whose
+get/set/has/delete/apply/construct go to the handler, in m_getprop, m_setprop, i_in, m_delprop and the call path).
+
+**Thirty-eighth unit [by Opus]: Proxy (2026-11-13).** A proxy is an object of kind 7 (lib.S n_proxy, __n(67)) holding a getter
+and setter pair at 32/40; m_getprop and m_setprop hand back a T_ACC value for that pair for ANY name, keeping the name in W_PKEY
+(world 656; header now 672 bytes; __n(68) reads it), so the usual getter/setter call path runs the prelude's trap (get/set, or
+plain forwarding). A proxy of a function is a wrapper function calling handler.apply. Not yet: has, deleteProperty, ownKeys,
+construct traps; `in`, delete and Object.keys on a proxy see an empty object. checks/programs/proxy.js; 49 of 49. script.asm
+promoted. bbc.com/news: the Piano SDK now passes its feature test and runs on, then a timer repeats "Cannot read properties of
+undefined (reading 'push')" at ran-9.js column 493195 (`this.events.push` in addHandler; `this` may be a proxy from its DI
+container). NEXT: find that (TROUGH_KEEP_ALL=/tmp/ka keeps every script).

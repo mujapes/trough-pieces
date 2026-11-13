@@ -408,6 +408,17 @@ m_fnproto:
     orr     x0, x0, x16
 9:  ldp     x29, x30, [sp], #32
     ret
+// m_proxyacc: the proxy x0 is read for the name x1 -> x0 a T_ACC value for its getter and setter (the name kept in W_PKEY).
+// m_proxyacc returns from m_getprop's frame; m_proxyacc0 is a plain call.
+m_proxyacc:
+    ldp     x29, x30, [sp], #32
+m_proxyacc0:
+    str     x1, [x19, #W_PKEY]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x0, #32
+    mov     x16, #(T_ACC << 48)
+    orr     x0, x0, x16
+    ret
 // m_getprop: the value x0, its property named x1 (a string value) -> x0. An array's and a string's length are worked out here.
 m_getprop:
     stp     x29, x30, [sp, #-32]!
@@ -418,6 +429,8 @@ m_getprop:
     b.ne    5f
     and     x9, x0, #0xffffffffffff
     ldr     x9, [x19, x9]
+    cmp     x9, #7                      // a proxy: its getter, which asks the handler
+    b.eq    m_proxyacc
     cmp     x9, #4
     b.ne    2f
     ldr     x2, [x19, #W_K_LENGTH]
@@ -495,7 +508,11 @@ m_setprop:
     b.ne    5f
     and     x9, x0, #0xffffffffffff
     ldr     x9, [x19, x9]
-    cmp     x9, #4
+    cmp     x9, #7
+    b.ne    1f
+    bl      m_proxyacc0
+    b       91f
+1:  cmp     x9, #4
     b.ne    4f
     ldr     x2, [x19, #W_K_LENGTH]
     bl      o_keyeq

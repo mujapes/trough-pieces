@@ -48,6 +48,7 @@
     .equ W_K_TOPRIM, 504                // the key Symbol.toPrimitive ("\001Symbol.toPrimitive")
     .equ W_K_VALUEOF, 496               // the text "valueOf"
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
+    .equ W_PKEY, 656                    // the name a proxy's trap was reached for (read by the prelude's trap through __n(68))
     .equ W_LAST, 584                    // where the newest block made at the top starts (0: the newest came from the free list)
     .equ W_GENFN3, 576                  // the prelude's driver of an async generator (OP_GENSNAP 2)
     .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function
@@ -79,7 +80,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #74
+    mov     x12, #76
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -87,7 +88,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #656                   // the header: 656 bytes (576: W_GENFN3, 584 free, 592-655 the collector's, gc.S)
+    mov     x11, #672                   // the header: 672 bytes (576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 free)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]

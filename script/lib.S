@@ -422,6 +422,27 @@ n_defacc:
     cbz     x0, n_full
     b       n_undef
 // 64: what an object inherits from (null for anything else). 65: (object, an object or null): it inherits from that now
+// 67 (getter, setter): a proxy (kind 7). Any property read or written on it reaches the getter or setter, which find the
+// name with 68. 32: the getter, 40: the setter (the pair a T_ACC value points at)
+n_proxy:
+    stp     x30, x1, [sp, #-16]!
+    mov     x0, #48
+    bl      w_alloc
+    ldp     x30, x1, [sp], #16
+    cbz     x0, n_full
+    add     x9, x19, x0
+    mov     x10, #7
+    VAL     x11, T_NULL
+    stp     x10, x11, [x9]
+    stp     xzr, xzr, [x9, #16]
+    ldp     x10, x11, [x1]
+    stp     x10, x11, [x9, #32]
+    mov     x16, #(T_OBJECT << 48)
+    orr     x0, x0, x16
+    ret
+n_pkey:
+    ldr     x0, [x19, #W_PKEY]
+    ret
 n_getproto:
     ldr     x0, [x1]
     lsr     x9, x0, #48
@@ -987,5 +1008,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .equ    N_COUNT, 67
+    .word   n_proxy - n_table, n_pkey - n_table
+    .equ    N_COUNT, 69
     .ltorg

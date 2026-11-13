@@ -183,7 +183,7 @@ gc_collect:
     str     xzr, [x19, #W_FREE]
     // the roots: the header, the constants, the globals, the machine's stack, the processor's stack
     add     x0, x19, #64
-    add     x1, x19, #656
+    add     x1, x19, #672
     bl      g_range
     bl      g_drain
     ldp     x0, x1, [x19, #W_CONST]

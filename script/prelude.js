@@ -325,3 +325,10 @@ Object.prototype.toString=function(){var o=this,t=typeof o,g;if(o===undefined)re
 if(t==='number')return '[object Number]';if(t==='string')return '[object String]';if(t==='boolean')return '[object Boolean]';if(t==='symbol')return '[object Symbol]';
 g=o[T];if(typeof g==='string')return '[object '+g+']';if(t==='function')return '[object Function]';if(isA(o))return '[object Array]';
 if(o instanceof Date)return '[object Date]';if(o instanceof RegExp)return '[object RegExp]';if(o instanceof Error)return '[object Error]';return '[object Object]'}})();
+var Reflect={apply:function(f,t,a){return f.apply(t,a)},construct:function(F,a){var o=Object.create(F.prototype),r=F.apply(o,a);return r!==null&&(typeof r==='object'||typeof r==='function')?r:o},
+get:function(o,k){return o[k]},set:function(o,k,v){o[k]=v;return true},has:function(o,k){return k in o},deleteProperty:function(o,k){return delete o[k]},
+ownKeys:function(o){return Object.getOwnPropertyNames(o)},defineProperty:function(o,k,d){Object.defineProperty(o,k,d);return true},
+getPrototypeOf:function(o){return Object.getPrototypeOf(o)},setPrototypeOf:function(o,p){Object.setPrototypeOf(o,p);return true},
+getOwnPropertyDescriptor:function(o,k){return Object.getOwnPropertyDescriptor(o,k)},isExtensible:function(){return true},preventExtensions:function(){return true}};
+function Proxy(t,h){if(typeof t==='function')return function(){return h.apply?h.apply(t,this,arguments):t.apply(this,arguments)};
+return __n(67)(function(){var k=__n(68)();return h.get?h.get(t,k,this):t[k]},function(v){var k=__n(68)();if(h.set)h.set(t,k,v,this);else t[k]=v})}
