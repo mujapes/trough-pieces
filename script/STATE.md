@@ -846,3 +846,15 @@ hidden-props.js; 69 of 69. Still missing: writable/configurable; class methods n
 hidden ones. document.js: domain, URL, Blob/File (text only); .content only for <template> (meta.content is the attribute).
 GITHUB: core runs clean; 1 failed script left: landing-pages needs BigInt. Wikipedia 8/0, HN 1/0, Guardian 18/1.
 NEXT: BigInt (a stage of its own: the lexer reads 123n as kind 8; plan in intent.md first), or the Guardian's 1.
+
+### Unit 50 [by Opus] (2026-11-13): GitHub moves past BigInt
+BigInt stage 1 in prelude.js: BigInt(x) from number/string/hex/bool, exact decimal text in `_s`, toString/valueOf, errors as node;
+typeof is still "object", no 123n literals (c_notyet), no operators (they go through valueOf, so lossy past 2^53). Stage 2 = real
+values (a tag), literals, operators. Native 73 n_defval (lib.S): Object.defineProperty with a value puts the own property directly
+(it called the setter before; zod's lazy getters recursed forever). getOwnPropertyDescriptors. compile.S c_function saves and zeroes
+F_DECLKIND (frame 248): function declarations inside any function in a const's value were const (Babel's wrapNativeSuper threw).
+document.js: toggleAttribute, getAttributeNames (empty: no .attributes yet), crypto (Math.random: NOT secure), __trs() call trail
+on connectedCallback errors. 72 of 72 programs.
+GITHUB now: landing-pages fails "reading '_zod'" at its line 723:313825 (u.Brp from module fS in chunk 97 is undefined). A harness
+(/tmp/h.js: chunks 97+8d modules with a mini webpack require, built by node) gives the same as node in runhuge, so the cause is
+page-side: suspect a module that threw half-way, or a let read before its value (we give undefined, not ReferenceError: TDZ).

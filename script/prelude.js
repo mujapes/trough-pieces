@@ -270,8 +270,8 @@ n(-14,function(h){return new AG(h)})})(__n);
 var __host=(function(n){var h=n(60),a=n(61);return function(r){h(''+r);return a()}})(__n);
 var globalThis=__n(62)();var __trail=__n(70);
 var console=(function(){var p=function(){__console.log(...arguments)},z=function(){};return {log:p,info:p,warn:p,error:p,debug:p,trace:p,table:p,group:p,groupCollapsed:p,groupEnd:z,time:z,timeEnd:z,count:z,assert:function(c){if(!c)p('Assertion failed')}}})();
-(function(n){var acc=n(63),gp=n(64),sp=n(65),own=Object.prototype.hasOwnProperty,same=function(o){return o};
-Object.defineProperty=function(o,k,d){if(d&&(d.get||d.set))acc(o,k,d.get,d.set);else if(d&&'value' in d)o[k]=d.value;else if(!own.call(o,k))o[k]=undefined;if(d&&!d.enumerable&&!(typeof o==='object'&&Array.isArray(o)))__n(72)(o,typeof k==='symbol'?k:''+k);return o};
+(function(n){var acc=n(63),dv=n(73),gp=n(64),sp=n(65),own=Object.prototype.hasOwnProperty,same=function(o){return o};
+Object.defineProperty=function(o,k,d){if(d&&(d.get||d.set))acc(o,k,d.get,d.set);else if(d&&'value' in d){if(typeof k==='symbol'||Array.isArray(o)||typeof o!=='object'&&typeof o!=='function')o[k]=d.value;else dv(o,k,d.value)}else if(!own.call(o,k))o[k]=undefined;if(d&&!d.enumerable&&!(typeof o==='object'&&Array.isArray(o)))__n(72)(o,typeof k==='symbol'?k:''+k);return o};
 Object.defineProperties=function(o,ds){for(var k in ds)if(own.call(ds,k))Object.defineProperty(o,k,ds[k]);return o};
 Object.getPrototypeOf=function(o){var t=typeof o;return t=='string'?String.prototype:t=='number'?Number.prototype:t=='boolean'?Boolean.prototype:gp(o)};
 Object.setPrototypeOf=function(o,p){sp(o,p);return o};
@@ -380,3 +380,12 @@ function DataView(b,o,l){if(!(b instanceof ArrayBuffer))throw new TypeError('Fir
  DataView.prototype['get'+k[0]]=function(p,le){p=p|0;if(p<0||p+sz>this.byteLength)throw new RangeError('Offset is outside the bounds of the DataView');var b=this.buffer._b.slice(this.byteOffset+p,this.byteOffset+p+sz);if(!le)b.reverse();return dec(b,sz,fl,sg)};
  DataView.prototype['set'+k[0]]=function(p,v,le){p=p|0;if(p<0||p+sz>this.byteLength)throw new RangeError('Offset is outside the bounds of the DataView');var b=enc(v,sz,fl);if(!le)b.reverse();for(var i=0;i<sz;i++)this.buffer._b[this.byteOffset+p+i]=b[i]}});
 globalThis.DataView=DataView})();
+
+(function(){function B(v){if(this instanceof B)throw new TypeError('BigInt is not a constructor');var o=Object.create(B.prototype),s;
+ if(typeof v==='boolean')s=v?'1':'0';else if(typeof v==='number'){if(v!==Math.floor(v)||!isFinite(v))throw new RangeError('The number '+v+' cannot be converted to a BigInt because it is not an integer');s=v.toFixed(0)}
+ else if(v instanceof B)return v;else{s=String(v).trim();if(s==='')s='0';var m=/^([+-]?)0*([0-9]+)$/.exec(s);if(!m){var h=/^0[xX]([0-9a-fA-F]+)$/.exec(s);if(!h)throw new SyntaxError('Cannot convert '+v+' to a BigInt');var d=[0],i,j,c;for(i=0;i<h[1].length;i++){c=parseInt(h[1].charAt(i),16);for(j=0;j<d.length;j++){c+=d[j]*16;d[j]=c%10;c=Math.floor(c/10)}while(c){d.push(c%10);c=Math.floor(c/10)}}s=d.reverse().join('')}else s=(m[1]==='-'&&m[2]!=='0'?'-':'')+m[2]}
+ if(s==='-0')s='0';Object.defineProperty(o,'_s',{value:s});return o}
+ B.prototype.toString=function(r){if(r===undefined||r===10)return this._s;return Number(this._s).toString(r)};
+ B.prototype.toLocaleString=function(){return this._s};B.prototype.valueOf=function(){return Number(this._s)};B.prototype.toJSON=undefined;
+ B.asIntN=function(n,v){return v};B.asUintN=function(n,v){return v};globalThis.BigInt=B})();
+if(!Object.getOwnPropertyDescriptors)Object.getOwnPropertyDescriptors=function(o){var r={},k=Object.getOwnPropertyNames(o),i;for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i]);if(Object.getOwnPropertySymbols){k=Object.getOwnPropertySymbols(o);for(i=0;i<k.length;i++)r[k[i]]=Object.getOwnPropertyDescriptor(o,k[i])}return r};

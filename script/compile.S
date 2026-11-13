@@ -1816,6 +1816,9 @@ c_scan_inner:                           // marks the function being translated a
 c_function:
     stp     x30, x0, [sp, #-256]!
     DEEPER
+    ldr     w9, [x29, #F_DECLKIND]      // [by Opus] 248: what was declaring names around it (a const's value must not make
+    str     w9, [sp, #248]              // this function's own declarations const); inside, nothing is
+    str     wzr, [x29, #F_DECLKIND]
     ldr     x9, [x29, #F_FPEND]         // 240: the fields of the constructor around this function
     str     xzr, [x29, #F_FPEND]
     ldr     x10, [x29, #F_FCUR]
@@ -2125,6 +2128,8 @@ c_function:
     bl      next_word
 93: NOLV
     SHALLOWER
+    ldr     w9, [sp, #248]
+    str     w9, [x29, #F_DECLKIND]
     ldr     x9, [sp, #240]
     str     x9, [x29, #F_FCUR]
     ldr     x30, [sp]

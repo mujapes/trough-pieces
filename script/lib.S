@@ -421,6 +421,28 @@ n_defacc:
     bl      o_put
     cbz     x0, n_full
     b       n_undef
+// 73 [by Opus]: (object, name, value): its own property becomes that plain value, put directly (no setter, own or inherited,
+// is called; an own getter and setter pair is replaced). Object.defineProperty with a value uses it.
+n_defval:
+    NIN
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    n_undef
+    ldr     x0, [x1, #8]
+    bl      v_text
+    cbz     x0, n_full
+    mov     x1, x0
+    ldr     x9, [sp, #24]
+    ldr     x2, [x9, #16]
+    ldr     x0, [x9]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    bl      o_put
+    cbz     x0, n_full
+    b       n_undef
 // 64: what an object inherits from (null for anything else). 65: (object, an object or null): it inherits from that now
 // 67 (getter, setter): a proxy (kind 7). Any property read or written on it reaches the getter or setter, which find the
 // name with 68. 32: the getter, 40: the setter (the pair a T_ACC value points at)
@@ -1198,6 +1220,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table, n_hide - n_table
-    .equ    N_COUNT, 73
+    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table, n_hide - n_table, n_defval - n_table
+    .equ    N_COUNT, 74
     .ltorg

@@ -77,6 +77,8 @@ class Element extends Node{
  setAttribute(k,v){__d('s'+this.__n+' '+k+' '+v)}
  hasAttribute(k){return __d('g'+this.__n+' '+k).charAt(0)=='1'}
  removeAttribute(k){__d('u'+this.__n+' '+k)}
+ toggleAttribute(k,f){var h=this.hasAttribute(k);if(f===undefined)f=!h;if(f&&!h)this.setAttribute(k,'');else if(!f&&h)this.removeAttribute(k);return !!f}
+ getAttributeNames(){var r=[],a=this.attributes||[];for(var i=0;i<a.length;i++)r.push(a[i].name);return r}
  get id(){return this.getAttribute('id')||''}
  set id(v){this.setAttribute('id',v)}
  get className(){return this.getAttribute('class')||''}
@@ -163,7 +165,8 @@ var location=(function(){var h=__host('l')||'',m=/^(\w+:)\/\/([^\/?#]*)([^?#]*)(
  return {href:h,protocol:m[1]||'',host:m[2]||'',hostname:(m[2]||'').replace(/:\d+$/,''),pathname:m[3]||'/',search:m[4]||'',hash:m[5]||'',origin:(m[1]||'')+'//'+(m[2]||''),toString:function(){return this.href},assign:function(){},replace:function(){},reload:function(){}}})();
 var performance={timeOrigin:Date.now(),now:function(){return Date.now()-this.timeOrigin},mark:function(){},measure:function(){},clearMarks:function(){},clearMeasures:function(){},getEntries:function(){return[]},getEntriesByType:function(){return[]},getEntriesByName:function(){return[]},timing:{navigationStart:Date.now()},navigation:{type:0}};
 var Image=function Image(w,h){var e=document.createElement('img');if(w!==undefined)e.width=w;if(h!==undefined)e.height=h;return e};
-var customElements={_d:{},define:function(n,c){this._d[n]=c;var l=document.querySelectorAll(n);for(var i=0;i<l.length;i++){__upgrade(l[i],n);if(l[i].connectedCallback)try{l[i].connectedCallback()}catch(e){console.log('connectedCallback: '+e)}}},get:function(n){return this._d[n]},whenDefined:function(n){return new Promise(function(){})},upgrade:function(){}};
+function __trs(){var t=__trail(),j,s='',L;for(j=0;j<t.length;j++){L=Math.floor(t[j]/17592186044416);s+=' '+(__texts[L]||'t'+L)+':'+Math.floor(t[j]/16777216)%1048576+':'+t[j]%16777216}return s}
+var customElements={_d:{},define:function(n,c){this._d[n]=c;var l=document.querySelectorAll(n);for(var i=0;i<l.length;i++){__upgrade(l[i],n);if(l[i].connectedCallback)try{l[i].connectedCallback()}catch(e){console.log('connectedCallback: '+e+__trs())}}},get:function(n){return this._d[n]},whenDefined:function(n){return new Promise(function(){})},upgrade:function(){}};
 // fetch and XMLHttpRequest: the host fetches (GET only so far) when asked with __host('f' + address); the answer comes at once
 // ("1", three digits of status, the body; or "0" and why not) and is handed on a moment later, as pages expect. Headers of the answer are not kept.
 var Headers=function Headers(h){this._h={};if(h){if(typeof h.forEach=='function'&&!Array.isArray(h)){var t=this;h.forEach(function(v,k){t.set(k,v)})}else if(Array.isArray(h))for(var i=0;i<h.length;i++)this.set(h[i][0],h[i][1]);else for(var k in h)this.set(k,h[k])}};
@@ -254,3 +257,4 @@ var __upg=null;function __upgrade(e,n){var c=customElements._d[n];if(!c||e.__up)
 class Blob{constructor(p,o){var s='';if(p)for(var x of p)s+=typeof x==='string'?x:x instanceof Blob?x.__s:(x&&x.byteLength!==undefined?new TextDecoder().decode(x):String(x));this.__s=s;this.size=new TextEncoder().encode(s).length;this.type=o&&o.type?String(o.type).toLowerCase():''}
  text(){return Promise.resolve(this.__s)} arrayBuffer(){return Promise.resolve(new TextEncoder().encode(this.__s).buffer)} slice(a,b,t){return new Blob([this.__s.slice(a,b)],{type:t})}}
 class File extends Blob{constructor(p,n,o){super(p,o);this.name=String(n);this.lastModified=o&&o.lastModified||Date.now()}}
+var crypto={getRandomValues:function(a){for(var i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*Math.pow(2,8*(a.BYTES_PER_ELEMENT||4)));return a},randomUUID:function(){var h='0123456789abcdef',s='',i,c;for(i=0;i<36;i++){if(i==8||i==13||i==18||i==23){s+='-';continue}c=Math.floor(Math.random()*16);if(i==14)c=4;else if(i==19)c=8|c&3;s+=h.charAt(c)}return s}};
