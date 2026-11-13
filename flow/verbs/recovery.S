@@ -1,7 +1,6 @@
 // recovery, Trough OS's first layer: a boot verb for the Flow app, written by hand (ARM64) [by Opus]. boot(x0 ctx).
 // A console (the state's text, kept across verbs) above our own keyboard. A line sent with > is a command:
-//   help, ls, cat NAME, write NAME TEXT, rm NAME, load NAME (makes NAME the running verb), or anything else: sent to
-//   Claude (appended to typed.txt). Claude's replies arrive in reply.txt: shown in the console, then the file removed.
+//   a small Linux-like shell: built-ins (help pwd cd ls cat echo write rm mkdir mv cp load) and programs.
 // Files are the app's folder /sdcard/Android/media/t.flow/. A drag scrolls with a glide; new lines scroll into view.
     .equ C_PIX, 0
     .equ C_STRIDE, 8
@@ -72,26 +71,7 @@ recovery:
     adr     x1, hello
     mov     x2, #(hello_end - hello)
     bl      con_add
-1:  ldr     x9, [x19, #C_FRAME]         //    Claude's replies, every 30 frames
-    mov     x10, #30
-    udiv    x11, x9, x10
-    msub    x11, x11, x10, x9
-    cbnz    x11, 2f
-    adr     x1, rname
-    bl      mkpath
-    bl      readfile
-    cmp     x0, #0
-    b.le    2f
-    mov     x2, x0
-    SA      x1, T_TMP
-    bl      con_add
-    adr     x1, rname
-    bl      mkpath
-    mov     x1, x0
-    mov     x0, #-100
-    mov     x2, #0
-    mov     x8, #35
-    svc     #0
+1:
 2:  bl      pump
     // 2. touches since last frame
     ldr     w21, [x20, #T_SEEN]
@@ -625,7 +605,7 @@ starts:
     ret
 // command: the typed line (T_TYPED, ended by a zero) is run. Words are split at spaces into T_ARGS (argv at T_ARGV,
 // argc at T_ARGC). A word that is a built-in runs here; any other names a program, started with its output (and errors)
-// streaming into the console. "claude ..." goes to Claude. All in this verb; nothing linked.
+// streaming into the console. All in this verb; nothing linked.
 command:
     stp     x30, x21, [sp, #-80]!
     stp     x22, x23, [sp, #16]
@@ -1304,12 +1284,10 @@ builtins:
     .word b_cp - builtins
     .ascii "load\0\0\0\0"
     .word b_load - builtins
-    .ascii "claude\0\0"
-    .word b_claude - builtins
     .byte 0
 hello: .ascii "Trough OS recovery\nType help, then > to run it.\n"
 hello_end:
-helptext: .ascii "pwd cd ls cat echo write rm mkdir mv cp\nload NAME: run a verb as the screen\nclaude TEXT: to Claude\nanything else: a program, e.g. ls -l\n"
+helptext: .ascii "pwd cd ls cat echo write rm mkdir mv cp load\nanything else runs as a program, e.g. ls -l\n"
 helptext_end:
 m_sent: .ascii "sent to Claude\n"
 m_sent_end:
