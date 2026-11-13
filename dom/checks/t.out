@@ -1,0 +1,69 @@
+begin 0
+H1 <!DOCTYPE html><h => []
+o1 => [<html><head><title>A &amp; B</title><script>if(a<b&&c){}</script></head><body class="x  wide"><!-- note --><h1 id="top">Hi &lt;you&gt; é😀&nbsp;!</h1><ul><li>one</li><li class="b wide">two</li></ul><p>a</p><p>b<br>c</p><img src="p.png" alt="say &quot;hi&quot;"><a href="/x?a=1&amp;b=2">go</a></body></html>]
+i top => [11]
+q1 li => [15 17]
+q1 .wide => [8 17]
+q1 #top => [11]
+q1 * => [2 3 4 6 8 11 14 15 17 20 22 24 26 29]
+n3 => [head]
+t3 => [A & Bif(a<b&&c){}]
+i nothere => [0]
+g7 id => [0]
+g7 ID => [0]
+g7 nope => [0]
+s7 data-k v w
+ => refused -1
+s7 id head
+ => refused -1
+g7 data-k => [0]
+o7 => [if(a<b&&c){}]
+u7 data-k => []
+T7 new <text> & more => []
+o7 => [new <text> & more]
+t1 => [A & Bnew <text> & moreHi <you> é😀 !onetwoabcgo]
+c DIV => [32]
+x loose text => [33]
+a6 20 => []
+a20 21 => []
+b6 20 7 => []
+s20 class wide => []
+q6 .wide => [20]
+E6 => [20]
+L6 => [20 7]
+p20 => [6]
+N20 => [7]
+P7 => [20]
+a20 6
+ => refused -1
+a21 20
+ => refused -1
+r20 => []
+E6 => []
+H9 <li>x</li><li>y</ => refused -1
+h9
+ => refused -1
+k9
+ => refused -1
+C5 => []
+w <b>w&amp;</b>t => []
+h4 => [<b>w&amp;</b>tA &amp; B]
+S => [5]
+z1
+ => refused -1
+k999
+ => refused -1
+h6 => [new <text> & more]
+s11 data-k v "w" => []
+s11 id head => []
+g11 DATA-K => [1v "w"]
+i head => [11]
+u11 id => []
+T11 new <text> & mor => []
+o11 => [<h1 data-k="v &quot;w&quot;">new &lt;text&gt; &amp; more</h1>]
+H14 <li>x</li><li>y< => []
+h14 => [<li>x</li><li>y</li><li>z</li>]
+E14 => [41 43 45]
+b14 17 15
+ => refused -1
+h14 => [<li>x</li><li>y</li><li>z</li>]

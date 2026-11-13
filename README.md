@@ -154,3 +154,45 @@ url resolve/part/port → http request → tls with trust and Android's roots (o
 - The font recordings refuse about two thirds of their cases (random sizes); rebalance toward valid ones.
 - `piece-render` cannot hold a file or a cache at a live handle, so font and page output have only been
   viewed on the bench.
+
+## One command per hand-written piece
+`./byhand.sh <piece> "caption"` builds `<piece>/impl.S`, runs the recorded checks, the piece's own comparison, the secure
+connection's checks and a real fetch with the piece standing in, then promotes, shows the card and publishes. It stops at the
+first failure. Hand-written and live as of 2026-11-11: all 31 of 31 (font added last: same text widths and the same rendered page as the compiled build; not timed; jpeg added: same dots as the compiled NEON build on 2-megapixel photos in four styles, its transform now uses NEON by hand, and so does its colour step, and flat squares are filled directly: now level with the old compiled build on five 2-megapixel test pictures (some faster, some slower, within the noise of a warm phone); exchange, aesgcm, cert, trust, rsa, ecdsa, voice-policy, listen-step, home, cover, text, fill, image, gif, sound, flac, page, png and tls added; tls reached four live sites on both ciphers with the hand-written piece standing in; png same dots as the compiled one on real files (out/picbench), speed about level; the painters and image not timed; rsa and ecdsa level with the compiled ones; trust not yet timed against the compiled one; aesgcm about 1.7 times the compiled speed,
+exchange level with it. exchange could gain from a dedicated squaring and a shorter inversion chain).
+
+## Rough timing of every hand-written piece against what it replaced (2026-11-11 late, warm phone)
+Replaying each piece's recorded checks through the old compiled build and the hand-written one (best of 3; the harness and the
+pieces behind sockets are in both figures, so only large differences mean anything): none is clearly slower. Timed directly where
+the replay looked worse: cert parses a certificate faster by hand (1.2 against 1.6 microseconds); gif gives the same picture as the
+compiled build on the animation fixture, too small to time. Still not timed properly: gif on a large file, font drawing, page.
+`out/picbench <piece> <file>` works for png, jpeg and gif.
+Text and page, timed with `out/render` (2026-11-11 late): 400 lines of 58 letters drawn by the font piece take 550 ms by hand against
+535 ms compiled (the fill piece behind its socket dominates both), same picture byte for byte; a short page laid out 20 times, 10 ms
+against 11 ms, same picture. A long real page and a large GIF are still untimed.
+
+## The host, and what runs end to end on the phone (2026-11-12)
+`host/browse.c` (built as `out/browse`; `trough-browse`, `trough-ask` in ~/.local/bin) is everything a piece cannot do for itself:
+the name lookup, the socket, the clock, the files. It drives the live pieces.
+- `trough-browse <address> <out.png>`: url, http, tls with trust, inflate, page with font (or png / jpeg / gif with image).
+  Wikipedia over a verified connection in about half a second.
+- `trough-ask <key file> <model> <prompt file>`: llm writes the request, tls carries it to api.anthropic.com, http takes the
+  reply out of its chunks, llm reads the words. Proven as far as a real refusal: a made-up key gets the server's 401
+  `authentication_error`, which the llm piece reports as an error. A real answer needs a real key (not stored yet).
+Hot reload: see RELOAD.md. The pieces' screen in the app: `PieceScreen.java` (written by the Gemini helper), shown over the
+home panel while `~/.trough/piece-screen` exists; drawing confirmed only by the app staying up, touch not yet confirmed by a person.
+The live screen (2026-11-12): `out/browse out --serve ~/.trough/screen.pic ~/.trough/screen.ev 360 720 <address>` keeps a page
+open and redraws it into the shared picture; `echo "picture <pic> <events>" > ~/.trough/piece-screen` makes Trough's home panel
+show it and write touches to the events file (remove that file to get the home panel back). Real drags scroll Wikipedia at
+14 to 33 ms a redraw. The host is started by hand for now; nothing restarts it.
+Since 2026-11-12 06:15 the screen bridge keeps the host running itself: in picture mode it starts the command in
+`~/.trough/screen-host` (one argument a line) and starts it again within about two seconds if it stops (tried by killing it).
+Its output goes to the app's cache as `screen-host.log`. To change the host: rebuild `out/browse`, then stop the running one.
+Build the host: `gcc -O2 -pthread -o out/browse host/browse.c loader/piece.c`; it also needs `out/dom.asm` (`./build.sh dom/impl.S out/dom.asm begin ask`) and `out/document.js` (a copy of `dom/document.js`). Pictures in pages (2026-11-12): the page piece
+lists them (`pictures`), a thread of the host fetches and decodes them one after another (png / jpeg / gif pieces), the image
+piece scales each to its room, and the strips they sit in are drawn again as each arrives. Events the host takes: `d x y`,
+`m x y`, `u`, `o address`, `g row`, `q`.
+Typing (2026-11-12 06:37): `PieceKeys.java` (helper-written) lends the phone's keyboard when the host sets byte 32 of the picture's
+head; keys arrive as `k <code>` events. Tap the address in the bar, type, go: an address opens, other words search
+(html.duckduckgo.com). First real use: eight letters typed on the phone, the search opened, a result was tapped.
+`trough-open <address or words>` types from the shell. Pages that need scripts (YouTube) come out nearly empty.

@@ -29,4 +29,6 @@ for c in leaf wiki root middle; do ./out/certfuzz out/cert.ref "out/cert-$c.fixt
 echo "--- script: our own JavaScript engine against node and qjs, program by program"
 gcc -O2 -o out/render loader/render.c loader/piece.c
 if ./build.sh script/impl.S out/script.asm begin tokens numtext load run text error clock; then python3 script/checks/run.py out/script.asm > out/script.txt 2>&1 || fail=1; tail -15 out/script.txt; else echo "BUILD FAILED script"; fail=1; fi
+echo "--- dom: the page as a tree, request by request against the recorded answers"
+if ./build.sh dom/impl.S out/dom.asm begin ask && gcc -O1 -o out/domt dom/checks/t.c loader/piece.c && ./out/domt out/dom.asm < dom/checks/t.txt | cmp -s - dom/checks/t.out; then echo "dom: answers as recorded"; else echo "dom: FAILED"; fail=1; fi
 exit $fail

@@ -117,11 +117,9 @@ static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, s
  * reaches the page through `document`, written in the language over the engine's one way of asking its host: document.write's text
  * takes the script element's place in the page, so it is read like any other part. The host's part: finding the elements, fetching
  * the ones named by src, the clock, and answering what is asked. No tree of the page yet: that is the dom piece, to come. --- */
-static const char page_opening[] =
-    "var document={write:function(){var s='';for(var i=0;i<arguments.length;i++)s+=arguments[i];__host('w'+s)},"
-    "writeln:function(){var s='';for(var i=0;i<arguments.length;i++)s+=arguments[i];__host('w'+s+'\\n')},"
-    "get title(){return __host('t')},set title(v){__host('T'+v)}};"
-    "var location={href:__host('l'),toString:function(){return this.href}};var navigator={userAgent:'Trough'};var window={document:document,location:location,navigator:navigator};";
+/* what scripts see as document, window and the rest is written in the language: dom/document.js, kept beside the pieces */
+static uint8_t *read_whole(const char *name) { char path[700]; snprintf(path, sizeof path, "%s/%s", dir, name); FILE *f = fopen(path, "rb"); if (!f) return 0; fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
+    uint8_t *b = block(2, (size_t)n); if (fread(b + 64, 1, (size_t)n, f) != (size_t)n) { fclose(f); free(b); return 0; } fclose(f); return b; }
 static int same_word(const uint8_t *p, const uint8_t *end, const char *w) { size_t n = strlen(w); if ((size_t)(end - p) < n) return 0; for (size_t i = 0; i < n; i++) if ((p[i] | 32) != (uint8_t)w[i] && p[i] != (uint8_t)w[i]) return 0; return 1; }
 /* an attribute's value inside a tag's text (name="v", name='v', name=v) -> its length, the value at *v; -1 if it is not there */
 static long attribute(const uint8_t *tag, const uint8_t *end, const char *name, const uint8_t **v) { size_t n = strlen(name);
@@ -130,49 +128,55 @@ static long attribute(const uint8_t *tag, const uint8_t *end, const char *name, 
         if (*q == '"' || *q == '\'') { const uint8_t *c = memchr(q + 1, *q, (size_t)(end - q - 1)); if (!c) return -1; *v = q + 1; return c - q - 1; }
         const uint8_t *c = q; while (c < end && *c != ' ' && *c != '>' && *c != '\n') c++; *v = q; return c - q; }
     return -1; }
-typedef struct { uint8_t *world, *out, *answer; char title[512]; int began, dead, ran, failed; } scripts;
-/* one script's text through the engine; what it writes into the document is added to *made */
-static void run_script(scripts *s, const uint8_t *text, size_t n, const char *address, uint8_t **made, size_t *made_n, size_t *made_room) {
+typedef struct { uint8_t *world, *out, *answer, *tree, *req; size_t answer_room, req_room; char title[512]; int dead, ran, failed; } scripts;
+/* one request to the page's tree (the dom piece); the answer is in s->answer from byte 64, its length returned (negative: refused) */
+static long long tree_ask(scripts *s, const uint8_t *q, size_t n) { if (n > s->req_room) return -2; memcpy(s->req + 64, q, n); resize(s->req, n); resize(s->answer, s->answer_room); at(42, s->req); at(43, s->answer); int16_t h[2] = {42, 43};
+    return entry("dom.asm", "ask")(s->tree, h, 2, 0, table); }
+static long long tree_askf(scripts *s, const char *what, int node, const char *rest) { char q[200]; int n = snprintf(q, sizeof q, "%s%d%s", what, node, rest); return tree_ask(s, (const uint8_t *)q, (size_t)n); }
+/* one script's text through the engine; what it asks about the page goes straight through to the tree */
+static void run_script(scripts *s, const uint8_t *text, size_t n, const char *address) {
     entry5 load = entry("script.asm", "load"), run = entry("script.asm", "run"), text_of = entry("script.asm", "text"), error = entry("script.asm", "error");
     uint8_t *source = text_block((const char *)text, n); at(41, source); int16_t qs[1] = {41}, qw[2] = {40, 1};
     if (load(s->world, qs, 1, 0, table) < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); free(source); s->failed++; return; }
     free(source); s->ran++;
-    for (int turn = 0; turn < 400; turn++) {
+    for (int turn = 0; turn < 200000; turn++) {
         long long r = run(s->world, 0, 0, 20000000, table), t = text_of(s->out, qw, 1, 0, table); size_t bytes = t < 0 ? 0 : (size_t)(t & 0xffffffff), want = t < 0 ? 0 : (size_t)(t >> 32); const uint8_t *o = s->out + 64;
         size_t said = want ? want - 1 : bytes; if (said) fprintf(stderr, "console: %.*s", (int)said, o);
         if (want) { const uint8_t *q = o + want - 1; size_t qn = bytes - (want - 1); const char *a = ""; size_t an = 0;
-            if (qn && q[0] == 'w') { if (*made_n + qn > *made_room) { *made_room = (*made_n + qn) * 2; *made = realloc(*made, *made_room); if (!*made) exit(4); } memcpy(*made + *made_n, q + 1, qn - 1); *made_n += qn - 1; }
-            else if (qn && q[0] == 't') { a = s->title; an = strlen(a); }
+            if (qn && q[0] == 'd') { long long got = tree_ask(s, q + 1, qn - 1); if (got < 0) { memcpy(s->answer + 64, "\x01" "E", 2); got = 2; } resize(s->answer, (size_t)got); text_of(s->answer, qw, 2, 0, table); continue; }
             else if (qn && q[0] == 'T') { size_t k = qn - 1 < sizeof s->title - 1 ? qn - 1 : sizeof s->title - 1; memcpy(s->title, q + 1, k); s->title[k] = 0; }
             else if (qn && q[0] == 'l') { a = address; an = strlen(a); }
             memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
         if (r == 0) return;
         if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); s->failed++; return; } }
-    fprintf(stderr, "script: stopped after eight thousand million steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }
+    fprintf(stderr, "script: stopped after too many steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }
 static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, size_t room_why);
-/* the page's text with its scripts run: each script element replaced by what it wrote. The same block if there is no script. */
+/* the page's text with its scripts run. The page is read into a tree (the dom piece); each script element, in page order, runs in one
+ * world of our own engine and reaches the tree through `document`; the tree written back out is the page that gets drawn. The same
+ * block comes back if there is no script, or the tree or the document object cannot be had. */
 static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *roots, int *ran, int *failed) {
-    const uint8_t *d = body + 64, *end = d + length(body), *p = d, *copied = d; scripts s; memset(&s, 0, sizeof s); uint8_t *page = 0; size_t page_n = 0, page_room = 0; *ran = *failed = 0;
+    const uint8_t *d = body + 64, *end = d + length(body); size_t n = length(body); scripts s; memset(&s, 0, sizeof s); *ran = *failed = 0;
     if (end - d > 8 && (!memcmp(d, "\x89PNG", 4) || (d[0] == 0xff && d[1] == 0xd8) || !memcmp(d, "GIF8", 4))) return body;
-    for (const uint8_t *t = d; t + 16 < end; t++) if (t[0] == '<' && same_word(t + 1, end, "title>")) { const uint8_t *c = t + 7; while (c + 2 < end && !(c[0] == '<' && c[1] == '/')) c++; size_t k = (size_t)(c - t - 7) < sizeof s.title - 1 ? (size_t)(c - t - 7) : sizeof s.title - 1; memcpy(s.title, t + 7, k); s.title[k] = 0; break; }
-    while (p + 8 < end) { p = memchr(p, '<', (size_t)(end - p - 8)); if (!p) break; if (!same_word(p + 1, end, "script") || !(p[7] == '>' || p[7] == ' ' || p[7] == '\n' || p[7] == '\t' || p[7] == '\r')) { p++; continue; }
-        const uint8_t *tag_end = memchr(p, '>', (size_t)(end - p)); if (!tag_end) break; const uint8_t *text = tag_end + 1, *close = text; while (close + 9 <= end && !(close[0] == '<' && close[1] == '/' && same_word(close + 2, end, "script"))) close++; if (close + 9 > end) close = end;
-        const uint8_t *after = memchr(close, '>', (size_t)(end - close)); after = after ? after + 1 : end;
-        const uint8_t *v; long tn = attribute(p + 7, tag_end, "type", &v); int ours = tn <= 0 || (tn >= 10 && same_word(v + tn - 10, tag_end, "javascript"));   /* not data, not a module (modules: to come) */
-        if (page_n + (size_t)(p - copied) + 1 > page_room) { page_room = (page_n + (size_t)(end - d)) * 2 + 64; page = realloc(page, page_room); if (!page) exit(4); } memcpy(page + page_n, copied, (size_t)(p - copied)); page_n += (size_t)(p - copied); copied = after;
-        if (ours && !s.dead) {
-            if (!s.began) { s.began = 1; s.world = block(6, 32u << 20); s.out = block(2, 1u << 20); s.answer = block(2, 4096); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
-                struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-                entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
-                size_t none = 0, room = 0; uint8_t *drop = 0; run_script(&s, (const uint8_t *)page_opening, sizeof page_opening - 1, address, &drop, &none, &room); free(drop); s.ran = 0; }
-            long sn = attribute(p + 7, tag_end, "src", &v);
-            if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block((const char *)v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
-                char where[2048] = "", why[300] = ""; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
-                if (got) { run_script(&s, got + 64, length(got), address, &page, &page_n, &page_room); free(got); } else { fprintf(stderr, "script %.*s: %s\n", (int)sn, v, why[0] ? why : "not an address we can follow"); s.failed++; } free(base); free(rel); free(full); }
-            else run_script(&s, text, (size_t)(close - text), address, &page, &page_n, &page_room); }
-        p = after; }
-    if (!page) return body;
-    uint8_t *fresh = block(2, page_n + (size_t)(end - copied)); memcpy(fresh + 64, page, page_n); memcpy(fresh + 64 + page_n, copied, (size_t)(end - copied)); free(page); free(s.world); free(s.out); free(s.answer); *ran = s.ran; *failed = s.failed; return fresh; }
+    int any = 0; for (const uint8_t *p = d; p + 8 < end && !any; p++) if (p[0] == '<' && same_word(p + 1, end, "script")) any = 1; if (!any) return body;
+    uint8_t *opening = read_whole("document.js"); if (!opening) { fprintf(stderr, "no document.js beside the pieces: scripts not run\n"); return body; }
+    s.answer_room = 6 * n + (2u << 20); s.req_room = n + (1u << 20) + 16; s.tree = block(9, 16 * n + (8u << 20)); s.req = block(2, s.req_room); s.answer = block(2, s.answer_room);
+    uint8_t *first = malloc(n + 3); if (!first) exit(4); memcpy(first, "H1 ", 3); memcpy(first + 3, d, n);
+    if (entry("dom.asm", "begin")(s.tree, 0, 0, 0, table) < 0 || tree_ask(&s, first, n + 3) < 0) { free(first); free(opening); free(s.tree); free(s.req); free(s.answer); return body; } free(first);
+    long long ln = tree_ask(&s, (const uint8_t *)"q1 script", 9); char *list = malloc((size_t)(ln < 0 ? 0 : ln) + 1); if (!list) exit(4); memcpy(list, s.answer + 64, (size_t)(ln < 0 ? 0 : ln)); list[ln < 0 ? 0 : ln] = 0;
+    s.world = block(6, 32u << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
+    struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
+    run_script(&s, opening + 64, length(opening), address); free(opening); if (s.failed) s.dead = 1; s.ran = 0;
+    for (char *at_ = list; *at_ && !s.dead; ) { int node = (int)strtol(at_, &at_, 10); if (!node) break; tree_askf(&s, "C", node, "");
+        long long tn = tree_askf(&s, "g", node, " type"); const char *v = (const char *)s.answer + 65; int ours = tn <= 1 || (tn >= 11 && same_word((const uint8_t *)v + tn - 11, s.answer + 64 + tn, "javascript")); if (!ours) continue;   /* not data, not a module (modules: to come) */
+        long long sn = tree_askf(&s, "g", node, " src") - 1;
+        if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block(v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
+            char where[2048] = "", why[300] = ""; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
+            if (got) { run_script(&s, got + 64, length(got), address); free(got); } else { fprintf(stderr, "script %.*s: %s\n", (int)length(rel), rel + 64, why[0] ? why : "not an address we can follow"); s.failed++; } free(base); free(rel); free(full); }
+        else { long long tx = tree_askf(&s, "t", node, ""); if (tx > 0) { uint8_t *copy = malloc((size_t)tx); if (!copy) exit(4); memcpy(copy, s.answer + 64, (size_t)tx); run_script(&s, copy, (size_t)tx, address); free(copy); } } }
+    free(list); tree_ask(&s, (const uint8_t *)"C0", 2); int before = s.ran; if (!s.dead) run_script(&s, (const uint8_t *)"__fire()", 8, address); s.ran = before;
+    long long pn = tree_ask(&s, (const uint8_t *)"h1", 2); uint8_t *fresh = body; if (pn >= 0) { fresh = text_block((const char *)s.answer + 64, (size_t)pn); free(body); }
+    free(s.world); free(s.out); free(s.answer); free(s.tree); free(s.req); *ran = s.ran; *failed = s.failed; return fresh; }
 /* The live screen: browse <out dir> --serve <picture file> <events file> <width> <height> [address]
  * The picture file is a surface as the pieces know it (64-byte head, then the dots) that the app maps and shows; bytes 24-31 of
  * the head are a counter this host raises after every redraw. The events file gets one line per event from the app:

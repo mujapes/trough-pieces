@@ -370,3 +370,25 @@ switch) instead of 22 and 24. Both lex.S and the separate statement in checks/wo
 agreed with each other; words.py now names the words. Added `programs/slash.js`. With a stand-in document, the scripts of
 www.wikipedia.org (27 kB minified), example.com and news.ycombinator.com now translate whole and run until they want the
 tree (`Element is not defined`, a property of a missing element, a missing document function).
+
+**Eighteenth unit: the page is a tree (the `dom` piece, 2026-11-13; hand-written, 6272 bytes; `dom/intent.md`).** One block holds the
+tree; `ask` answers short written requests (find an id, a tag or class under a node, read or set text, attributes, inner HTML, make,
+put, take out, document.write before the running script). `dom/document.js` (in the language; the host loads `out/document.js` as
+the page's first script) gives `document`, `Element` and its kin, events (`addEventListener`, `dispatchEvent`; the host runs
+`__fire()` after the last script: DOMContentLoaded, load), compound selectors, classList, `window`, `location`, `navigator` and
+small stand-ins (storage, matchMedia, history). host/browse.c `with_scripts` now reads the page into the tree, finds the script
+elements by asking it (`q1 script`), passes `__host('d...')` straight through (`tree_ask`), and draws the tree written back out
+(`h1`); a refused request comes back as "\x01E" and `__d` throws. Seen: `dom/checks/t.txt` -> `t.out` (62 requests, read by hand);
+`dom/checks/page/index.html` -> out/dom-page.png shown on Home (heading rewritten, items made and put first, counts by selector,
+write in place, a line added on DOMContentLoaded, a child under itself refused); script/checks/page still draws. Real sites:
+example.com 1 of 1 and news.ycombinator.com 1 of 1 scripts run clean; www.wikipedia.org 3 of 4 (the fourth:
+`eventLoggingLite is not defined`, a name another script put on `window`).
+Engine gaps met here, in the order worth doing: (1) `window`/`globalThis` must BE the global scope (a property set on it is a
+global and the reverse); (2) `console` is not a value (`window.console=console` is a SyntaxError; `typeof console`); (3)
+`Object.defineProperty` and its kin are missing; (4) `Symbol` is not a function, no WeakMap, no Proxy. Not made in the tree:
+giving room back, attribute name lists (so `dataset`, `attributes`, cloneNode without innerHTML), implied html/head/body and the
+other implied endings, pseudo-classes (matched as true), `~` and exact `>` `+` combinators (read as "somewhere inside"),
+scripts added by scripts, timers after the page is drawn, style and layout answers (all 0). page still lays out from text; walking
+the records directly (and redrawing after an event) is the step that makes pages live.
+Next: (1) and (2) above in the engine; then timers and a click reaching `dispatchEvent` from the live screen, redrawing from the
+tree; lazy loops; shapes; the fuzz job.

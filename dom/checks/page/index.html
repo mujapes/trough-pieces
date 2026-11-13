@@ -1,0 +1,18 @@
+<!DOCTYPE html><html><head><title>Tree test</title></head>
+<body class="plain"><h1 id="head">Before the script</h1>
+<p class="note first">A note &amp; a <a href="/x">link</a>.</p>
+<ul id="list"><li>static one<li>static two</ul>
+<div id="box"><span class="note">inner</span></div>
+<script>
+var h = document.getElementById('head'); h.textContent = 'Heading rewritten by a script';
+var ul = document.getElementById('list');
+['three','four'].forEach(function(t){ var li = document.createElement('li'); li.textContent = 'made ' + t; li.className = 'made'; ul.appendChild(li) });
+ul.insertBefore(document.createElement('li'), ul.firstChild).innerHTML = '<b>first</b> of ' + ul.children.length;
+var box = document.querySelector('#box'); box.innerHTML = '<p>Box now holds ' + document.querySelectorAll('.note').length + ' note, ' + document.getElementsByTagName('li').length + ' items, body class ' + document.body.className + '.</p>';
+box.setAttribute('data-n', '5'); box.classList.add('seen', 'big'); box.classList.remove('seen');
+console.log(h === document.getElementById('head'), box.outerHTML.length, document.querySelector('ul li.made').textContent, box.matches('div.big'), document.querySelector('p.note a').getAttribute('href'), ul.lastChild.previousSibling.textContent, h.parentNode.tagName, document.title);
+document.write('<p>Written in place, after the box.</p>');
+document.addEventListener('DOMContentLoaded', function(){ var p = document.createElement('p'); p.textContent = 'Added when the page had loaded; last item is "' + ul.lastElementChild.textContent + '".'; document.body.appendChild(p); document.title = 'Tree done' });
+try { ul.appendChild(document.body) } catch (e) { console.log('refused:', e.message.slice(0, 20)) }
+</script>
+<p>Static line after the script.</p></body></html>

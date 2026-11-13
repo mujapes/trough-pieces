@@ -1,0 +1,59 @@
+H1 <!DOCTYPE html><html><head><title>A &amp; B</title><script>if(a<b&&c){}</script></head><body class="x  wide"><!-- note --><h1 id=top>Hi &lt;you&gt; &#233;&#x1F600;&nbsp;!</h1><ul><li>one<li class='b wide'>two</ul><p>a<p>b<br>c</p><img src="p.png" alt='say "hi"'><a HREF="/x?a=1&amp;b=2">go</a></body></html>
+o1
+i top
+q1 li
+q1 .wide
+q1 #top
+q1 *
+n3
+t3
+i nothere
+g7 id
+g7 ID
+g7 nope
+s7 data-k v w
+s7 id head
+g7 data-k
+o7
+u7 data-k
+T7 new <text> & more
+o7
+t1
+c DIV
+x loose text
+a6 20
+a20 21
+b6 20 7
+s20 class wide
+q6 .wide
+E6
+L6
+p20
+N20
+P7
+a20 6
+a21 20
+r20
+E6
+H9 <li>x</li><li>y</li><li>z
+h9
+k9
+C5
+w <b>w&amp;</b>t
+h4
+S
+z1
+k999
+h6
+s11 data-k v "w"
+s11 id head
+g11 DATA-K
+i head
+u11 id
+T11 new <text> & more
+o11
+H14 <li>x</li><li>y<li>z
+h14
+E14
+b14 17 15
+h14
