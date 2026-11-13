@@ -21,3 +21,15 @@ piece written into the running Flow memory, never another install.
 3. The browser host's jobs (fetch, tls, page, image pieces) as cells; the background browser inside the new app.
 4. Input: the keyboard as verbs; the prompt goes to the models (llm piece) from inside the app.
 5. Chat/agent view; then the old app is retired.
+
+## Trough OS: recovery first (user dd7e5c9f / f0b2179f, 2026-11-13) [by Opus]
+Name: Trough OS. Built like an operating system. Its first layer is a recovery state (like a BIOS): what everything
+falls back to on any error; a light file system with a command line; and access to the model APIs so Claude Code or
+Codex instances can be run to repair things. Plan:
+1. The core falls back to recovery.bin (not the built-in band) when a boot crashes or is missing: one more install,
+   the last one planned, because that fallback must live in the fixed core.
+2. recovery verb: text console with our keyboard; commands: ls, cat, write, rm over the app's own folder (a light file
+   system), load VERB (start an app verb), log.
+3. Models from recovery: the llm, http and tls pieces (already machine code) as cells, so a prompt typed in recovery goes
+   to a model API with no outside code. Running Claude Code itself needs the Linux userland, which lives in Trough's app:
+   after the merge into Trough, recovery can start it there.
