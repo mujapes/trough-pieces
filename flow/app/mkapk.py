@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""mkapk.py OUT.apk libflow.so [by Opus]: the new Trough's APK without Android build tools: our own binary manifest,
+"""mkapk.py OUT.apk libflow.so [more libs] [by Opus]. Target SDK 28: such apps may run programs from their own storage,
+which recovery's shell and the CLIs installed from it need.: the new Trough's APK without Android build tools: our own binary manifest,
 the zip, and an APK Signature Scheme v2 signature (RSA 2048, SHA-256) with a key kept at ~/.trough/flow-key.pem."""
 import sys,os,struct,zipfile,io,hashlib,datetime
 from cryptography.hazmat.primitives import hashes,serialization
@@ -47,7 +48,7 @@ def axml(tree):
     x=pool+rmap+ns_start+body+ns_end
     return struct.pack('<HHI',0x0003,8,8+len(x))+x
 man=('manifest',[(0,'package',0,'t.flow'),(1,'versionCode',0x0101021b,int(os.environ.get('FLOW_VERSION','1'))),(1,'versionName',0x0101021c,'flow-'+os.environ.get('FLOW_VERSION','1'))],[
-  ('uses-sdk',[(1,'minSdkVersion',0x0101020c,29),(1,'targetSdkVersion',0x01010270,33)],[]),
+  ('uses-sdk',[(1,'minSdkVersion',0x0101020c,28),(1,'targetSdkVersion',0x01010270,28)],[]),
   ('application',[(1,'label',0x01010001,'Flow'),(1,'hasCode',0x0101000c,False),(1,'extractNativeLibs',0x010104ea,True)],[
     ('activity',[(1,'name',0x01010003,'android.app.NativeActivity'),(1,'exported',0x01010010,True),(1,'configChanges',0x0101001f,0x40003fff),(1,'theme',0x01010000,0x0103000a)],[
       ('meta-data',[(1,'name',0x01010003,'android.app.lib_name'),(1,'value',0x01010024,'flow')],[]),
@@ -60,7 +61,9 @@ mx=axml(man)
 z=io.BytesIO(); zf=zipfile.ZipFile(z,'w')
 def put(name,data,comp):
     i=zipfile.ZipInfo(name,(2008,1,1,0,0,0)); i.compress_type=comp; zf.writestr(i,data)
-put('AndroidManifest.xml',mx,zipfile.ZIP_DEFLATED); put('lib/arm64-v8a/libflow.so',open(sys.argv[2],'rb').read(),zipfile.ZIP_DEFLATED); zf.close()
+put('AndroidManifest.xml',mx,zipfile.ZIP_DEFLATED); put('lib/arm64-v8a/libflow.so',open(sys.argv[2],'rb').read(),zipfile.ZIP_DEFLATED)
+for extra in sys.argv[3:]: put('lib/arm64-v8a/'+os.path.basename(extra),open(extra,'rb').read(),zipfile.ZIP_DEFLATED)
+zf.close()
 apk=z.getvalue()
 eocd=apk.rfind(b'PK\x05\x06'); cd_off=struct.unpack_from('<I',apk,eocd+16)[0]
 entries,cd,eo=apk[:cd_off],apk[cd_off:eocd],apk[eocd:]

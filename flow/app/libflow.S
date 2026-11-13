@@ -8,6 +8,8 @@
 // write verbs); dlsym (any system function, by name); the activity (for the soft keyboard); the input ring (256 events of
 // 16 bytes, C_HEAD counts every event ever put: kind 1 touch (action, x, y as floats), kind 2 key (action, keycode)).
 //
+// Recovery (Trough OS's first layer): when boot.bin crashed the app or is missing, recovery.bin is the boot instead.
+//
 // The net without signals (Android's runtime owns them): a new boot is marked in boot.try before its first frame and the
 // mark removed after 120 good frames. If the app starts and finds the mark for the boot.bin that is there now, that boot
 // crashed it: it is skipped and the built-in boot runs instead.
@@ -34,6 +36,7 @@
     .equ C_POSTED, 144
     .equ C_GOOD, 152
     .equ C_TRY, 160
+    .equ C_FILE, 176                    // the path of the boot file looked at: boot.bin, or recovery.bin after a crash
     .equ C_RINGDATA, 256
     .text
     .global ANativeActivity_onCreate
@@ -65,6 +68,8 @@ ANativeActivity_onCreate:
     str     x10, [x19, #C_RING]
     add     x10, x19, #C_TRY + 8         // C_TOP holds where the arena's top is kept
     str     x10, [x19, #C_TOP]
+    adr     x10, sname
+    str     x10, [x19, #C_FILE]
     bl      skip_crashed
 1:  ldr     x19, [sp, #16]
     ldp     x29, x30, [sp], #32
@@ -145,7 +150,8 @@ skip_crashed:
     ldr     x9, [sp, #32]
     cmp     x9, x20
     b.ne    9f
-    str     x20, [x19, #C_SEEN]
+    adr     x10, rname                  // that boot crashed the app: recovery runs instead
+    str     x10, [x19, #C_FILE]
 9:  ldp     x20, x21, [sp, #16]
     ldr     x22, [sp, #48]
     ldp     x29, x30, [sp], #192
@@ -154,7 +160,7 @@ skip_crashed:
 // boot_key -> x0: size ^ mtime ns of boot.bin, 0 if it is not there
 boot_key:
     mov     x0, #-100
-    adr     x1, sname
+    ldr     x1, [x19, #C_FILE]
     sub     sp, sp, #160
     mov     x2, sp
     mov     x3, #0
@@ -261,14 +267,21 @@ look:
     stp     x20, x21, [sp, #16]
     stp     x22, x23, [sp, #32]
     bl      boot_key
+    cbnz    x0, 1f
+    adr     x10, rname                  // no boot.bin: recovery
+    ldr     x11, [x19, #C_FILE]
+    cmp     x10, x11
+    b.eq    9f
+    str     x10, [x19, #C_FILE]
+    bl      boot_key
     cbz     x0, 9f
-    ldr     x9, [x19, #C_SEEN]
+1:  ldr     x9, [x19, #C_SEEN]
     cmp     x0, x9
     b.eq    9f
     str     x0, [x19, #C_SEEN]
     str     x0, [sp, #48]
     mov     x0, #-100
-    adr     x1, sname
+    ldr     x1, [x19, #C_FILE]
     mov     x2, #0
     mov     x8, #56
     svc     #0
@@ -493,6 +506,7 @@ on_input:
 
 mname: .asciz "flow"
 sname: .asciz "/sdcard/Android/media/t.flow/boot.bin"
+rname: .asciz "/sdcard/Android/media/t.flow/recovery.bin"
 tname: .asciz "/sdcard/Android/media/t.flow/boot.try"
     .bss
     .balign 16
