@@ -1568,7 +1568,10 @@ i_gensnap:
     cbz     x0, m_full
     add     x9, x19, x14, lsl #3
     ldr     x9, [x9, #W_GENFN]
-    stp     x9, x0, [x22], #16
+    cmp     x14, #2                     // 2: an async generator
+    b.ne    1f
+    ldr     x9, [x19, #W_GENFN3]
+1:  stp     x9, x0, [x22], #16
     mov     x0, #1
     b       m_call_n
 i_yield:

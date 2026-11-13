@@ -333,13 +333,17 @@ n_maker:
     b       3b
 2:  cmp     x9, #8
     b.lo    21f
-    cmp     x9, #12
+    cmp     x9, #13
     b.hi    4f
     cmp     x9, #11
     b.lo    22f
-    ldr     x1, [sp, #24]               // -12, -13: the prelude's two functions for kept calls
+    ldr     x1, [sp, #24]               // -12, -13, -14: the prelude's three functions for kept calls
     ldr     x10, [x1, #8]
-    add     x9, x19, x9, lsl #3
+    cmp     x9, #13
+    b.ne    23f
+    str     x10, [x19, #W_GENFN3]
+    b       n_undef
+23: add     x9, x19, x9, lsl #3
     str     x10, [x9, #(W_GENFN - 88)]
     b       n_undef
 22:

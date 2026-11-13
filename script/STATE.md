@@ -545,3 +545,17 @@ Map, Set, Promise, Symbol): core-js decides whether bind is native by it (it sai
 helper was undefined and every Set/Map built from a list failed). (5) checks/run.py warns when node itself stops on a program:
 site2.js had two name clashes (k, m) that stopped node halfway, so half of it was not compared; fixed (1905 lines now).
 bbc.com/news: 57 run, 3 failed: piano SDK's own two (logic), `for await` (SyntaxError). old.reddit 17/0 to be rechecked.
+
+**Twenty-ninth unit [by Opus]: async generators (2026-11-13).** `async function*`, `async *m(){}` in objects and classes.
+compile.S: c_function keeps the async flag when `*` follows (flags 192); c_methkind takes `async *name` (F_PEND 192) and
+`async *` after async; c_kept writes OP_GENSNAP 2 for flags 192; `await v` inside an async generator is `yield __awrap(v)`
+(c_w_awrap). machine.S i_gensnap: kind 2 calls the driver in W_GENFN3. world.S: the header is 592 bytes (W_GENFN3 576; 584 free;
+w_begin clears 66 words). lib.S: `__n(-14, f)` registers it. prelude.js (in the generator block): AG objects (next, return,
+throw give promises; requests wait their turn; a yield's value is awaited; return runs finally blocks through RT;
+Symbol.asyncIterator gives itself). 46 of 46 (`asyncgen.js`). Not made: `yield*` in an async generator (delegates
+synchronously).
+NEXT, for await (bbc's last SyntaxError): in s_each/s_for, after `for` accept keyword `await` (id 36) and translate
+`for await (D of E) S` as: E; call prelude `__aiter(E)` (E[Symbol.asyncIterator]() or, failing that, a wrapper over the sync
+iterator); loop: DUP, GETP next, CALLM 0, await it (OP_YIELD, through __awrap in an async generator), DUP, GETP done, JT to the
+end; GETP value; assign to D as for..of does; S; JMP loop; end: POP the result, POP the iterator. break/continue: the loop
+record as for..of keeps it (one place on the machine stack: the iterator). Read s_each first: reuse its target assignment.

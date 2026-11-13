@@ -48,6 +48,7 @@
     .equ W_K_TOPRIM, 504                // the key Symbol.toPrimitive ("\001Symbol.toPrimitive")
     .equ W_K_VALUEOF, 496               // the text "valueOf"
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
+    .equ W_GENFN3, 576                  // the prelude's driver of an async generator (OP_GENSNAP 2)
     .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function
     .equ W_WANT, 544                    // not 0: the program asks its host for something: one more than where the request begins in what it has printed
     .equ W_GOBJ, 560                    // the global object, whose properties are the global variables themselves (0: not made yet)
@@ -77,7 +78,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #64
+    mov     x12, #66
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -85,7 +86,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #576
+    mov     x11, #592                   // the header: 592 bytes (576 to 591: W_GENFN3, and 8 free)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]

@@ -1594,6 +1594,13 @@ c_kept:
     str     x30, [sp, #-16]!
     lsr     w9, w9, #7
     and     w9, w9, #1
+    ldr     x10, [x29, #F_FUNC]
+    ldr     x10, [x10, #R_FLAGS]
+    and     x10, x10, #192
+    cmp     x10, #192                   // both: an async generator, kind 2
+    b.ne    2f
+    mov     w9, #2
+2:
     mov     w0, #OP_GENSNAP
     orr     w0, w0, w9, lsl #8
     bl      c_op8
@@ -1642,10 +1649,19 @@ c_methkind:
     bl      c_peek
     cmp     w0, #K_PUNCT
     b.ne    3f
-    cmp     w1, #37                     // async [key]() is a method; async( and async: and async, are a plain name
+    cmp     w1, #37                     // async [key]() and async *name() are methods; async( and async: and async, are a plain name
+    b.eq    3f
+    cmp     w1, #45
     b.ne    9f
 3:  mov     x9, #128
 2:  str     x9, [x29, #F_PEND]
+    bl      next_word
+    ldr     x9, [x29, #F_PEND]          // async *name: an async generator
+    cmp     x9, #128
+    b.ne    9f
+    ISP     45, 9f
+    mov     x9, #192
+    str     x9, [x29, #F_PEND]
     bl      next_word
 9:  ldr     x30, [sp], #16
     ret
@@ -1689,8 +1705,9 @@ c_function:
     ldr     w9, [sp, #8]
     cmp     w9, #1
     b.hi    2f
-    ISP     45, 10f                     // function* : a generator
-    mov     x9, #64
+    ISP     45, 10f                     // function* : a generator (async function*: an async generator, both flags)
+    ldr     x9, [sp, #16 + R_FLAGS]
+    orr     x9, x9, #64
     str     x9, [sp, #16 + R_FLAGS]
     bl      next_word
     ldr     w9, [sp, #8]
@@ -2585,7 +2602,26 @@ c_unary:
     b.eq    6f
     bl      next_word                   // await value: the call is kept aside until the value's promise settles
     bl      c_unary
-    OP      OP_YIELD
+    bl      c_realfn                    // (in an async generator the value goes out marked, so its driver tells it from a yield)
+    cbz     x1, 53f
+    ldr     x9, [x1, #R_FLAGS]
+    and     x9, x9, #192
+    cmp     x9, #192
+    b.ne    53f
+    adr     x9, c_w_awrap
+    stp     x25, x26, [sp, #-16]!
+    sub     x25, x9, x20
+    mov     x26, #7
+    bl      c_global
+    ldp     x25, x26, [sp], #16
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    OP      OP_SWAP
+    OP      OP_CALL
+    mov     w0, #1
+    bl      c_byte
+53: OP      OP_YIELD
     NOLV
     b       9f
 52: cmp     w24, #8
@@ -2947,6 +2983,8 @@ c_object:
     bl      c_byte
     b       7f
 c_w_spread: .ascii "__spread"
+c_w_awrap:  .ascii "__awrap"
+    .balign 4
 19: bl      next_word
     bl      c_assign
     EXPECT  38

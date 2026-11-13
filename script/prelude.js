@@ -198,7 +198,7 @@ return k===0?ds(p)+' '+ts(p)+' '+zone():k===1?ds(p):k===2?ts(p)+' '+zone():k===3
 P.toString=P['\x01Symbol.toPrimitive']=fmt(0);P.toDateString=fmt(1);P.toTimeString=fmt(2);P.toUTCString=P.toGMTString=fmt(3);P.toLocaleDateString=fmt(4);P.toLocaleTimeString=fmt(5);P.toLocaleString=fmt(6);
 })(__n);
 var __q;if(!__q)__q={m:[],t:[],id:0};
-var Promise,setTimeout,setInterval,clearTimeout,clearInterval,queueMicrotask,__jobs;
+var __awrap;var Promise,setTimeout,setInterval,clearTimeout,clearInterval,queueMicrotask,__jobs;
 (function(n,Q){var now=n(54),setclock=n(57),setwake=n(58),F=Math.floor;
 function P(ex){if(!(this instanceof P))throw new TypeError("Promise constructor cannot be invoked without 'new'");if(typeof ex!=='function')throw new TypeError('Promise resolver '+ex+' is not a function');
 this._s=0;this._v=undefined;this._r=[];var p=this,done=false;
@@ -248,7 +248,22 @@ n(-13,function(h){return new Promise(function(res,rej){
 function step(m,v){var r;h[1]=0;try{r=rs(h,m,v)}catch(e){rej(e);return}
 if(!h[1]){res(r);return}
 Promise.resolve(r).then(function(x){step(null,x)},function(e){step(1,e)})}
-step(null)})})})(__n);
+step(null)})});
+// an async generator: its calls are kept aside as a generator's; an await inside goes out wrapped by __awrap, and is awaited
+// here before the body goes on; a yield's value is awaited and settles the promise its next() gave. Requests wait their turn.
+var AWK={};__awrap=function(v){return {__aw:AWK,v:v}};
+function AG(h){this._h=h;this._q=[];this._run=this._s=this._d=false}
+function en(g,m,v){return new Promise(function(ok,no){g._q.push({m:m,v:v,ok:ok,no:no});if(!g._run)pump(g)})}
+function pump(g){if(!g._q.length){g._run=false;return}g._run=true;var q=g._q.shift();
+if(g._d||(q.m&&!g._s)){g._d=true;if(q.m===1)q.no(q.v);else q.ok({value:q.m?q.v:undefined,done:true});pump(g);return}
+g._s=true;go(g,q,q.m?1:null,q.m===2?RT:q.v)}
+function go(g,q,mode,val){var h=g._h,r;h[1]=0;try{r=rs(h,mode,val)}catch(e){g._d=true;if(e===RT)q.ok({value:q.v,done:true});else q.no(e);pump(g);return}
+if(h[1]){if(r!==null&&typeof r==='object'&&r.__aw===AWK){Promise.resolve(r.v).then(function(x){go(g,q,null,x)},function(e){go(g,q,1,e)});return}
+Promise.resolve(r).then(function(x){q.ok({value:x,done:false});pump(g)},function(e){go(g,q,1,e)});return}
+g._d=true;Promise.resolve(r).then(function(x){q.ok({value:x,done:true});pump(g)},function(e){q.no(e);pump(g)})}
+AG.prototype={next:function(v){return en(this,0,v)},'return':function(v){return en(this,2,v)},'throw':function(e){return en(this,1,e)}};
+AG.prototype['\x01Symbol.asyncIterator']=function(){return this};
+n(-14,function(h){return new AG(h)})})(__n);
 var __host=(function(n){var h=n(60),a=n(61);return function(r){h(''+r);return a()}})(__n);
 var globalThis=__n(62)();
 var console=(function(){var p=function(){__console.log(...arguments)},z=function(){};return {log:p,info:p,warn:p,error:p,debug:p,trace:p,table:p,group:p,groupCollapsed:p,groupEnd:z,time:z,timeEnd:z,count:z,assert:function(c){if(!c)p('Assertion failed')}}})();
