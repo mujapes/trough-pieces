@@ -1,0 +1,12 @@
+var base = { hi: function () { return 'hi ' + this.name } };
+var o = Object.create(base); o.name = 'o'; console.log(o.hi(), Object.getPrototypeOf(o) === base, Object.getPrototypeOf(Object.create(null)));
+var n = 0; Object.defineProperty(o, 'count', { get: function () { return ++n }, set: function (v) { n = v * 10 } });
+console.log(o.count, o.count); o.count = 5; console.log(o.count);
+Object.defineProperty(o, 'fixed', { value: 42 }); console.log(o.fixed);
+Object.defineProperties(o, { a: { value: 1 }, b: { get: function () { return this.a + 1 } } }); console.log(o.a, o.b);
+function A() {} A.prototype.who = function () { return 'A' }; function B() {} B.prototype = Object.create(A.prototype); B.prototype.constructor = B;
+var b = new B(); console.log(b.who(), b instanceof A, b instanceof B, Object.getPrototypeOf(b) === B.prototype);
+var p = {}; Object.setPrototypeOf(p, base); p.name = 'p'; console.log(p.hi(), Object.getPrototypeOf('s') === String.prototype);
+console.log(Object.is(NaN, NaN), Object.is(0, -0), Object.freeze(p) === p, Object.getOwnPropertyNames({ x: 1, y: 2 }).join(), JSON.stringify(Object.fromEntries([['k', 1], ['m', 2]])));
+var d = Object.getOwnPropertyDescriptor({ q: 7 }, 'q'); console.log(d.value, d.writable, Object.getOwnPropertyDescriptor({}, 'q'));
+console.log(typeof this, (function () { return typeof this })());

@@ -1,0 +1,9 @@
+<html><head><title>Added scripts</title></head><body><h1>Scripts that add scripts</h1><ul id="log"></ul>
+<script>
+function say(t){ var li = document.createElement('li'); li.textContent = t; document.getElementById('log').appendChild(li) }
+var s = document.createElement('script'); s.src = 'more.js'; s.onload = function(){ say('more.js said it loaded; shared value is ' + window.shared) }; document.head.appendChild(s);
+var t = document.createElement('script'); t.textContent = "say('an inline script added by a script ran; this is window: ' + (this === window))"; document.body.appendChild(t);
+var gone = document.createElement('script'); gone.src = 'missing.js'; gone.onerror = function(){ say('a missing script reported its error') }; document.head.appendChild(gone);
+Object.defineProperty(window, 'answer', { value: 42 }); say('first script done');
+window.addEventListener('load', function(){ say('page loaded; answer ' + answer) });
+</script></body></html>

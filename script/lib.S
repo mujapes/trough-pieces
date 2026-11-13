@@ -388,6 +388,64 @@ n_global:
 1:  mov     x16, #(T_OBJECT << 48)
     orr     x0, x0, x16
     NOUT
+// 63: (object, name, getter, setter): the property becomes that pair (either may be undefined)
+n_defacc:
+    NIN
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    n_undef
+    ldr     x0, [x1, #8]
+    bl      v_text
+    cbz     x0, n_full
+    str     x0, [sp, #40]
+    mov     x0, #16
+    bl      w_alloc
+    cbz     x0, n_full
+    add     x9, x19, x0
+    ldr     x1, [sp, #24]
+    ldp     x10, x11, [x1, #16]
+    stp     x10, x11, [x9]
+    mov     x16, #(T_ACC << 48)
+    orr     x2, x0, x16
+    ldr     x0, [x1]
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    ldr     x1, [sp, #40]
+    bl      o_put
+    cbz     x0, n_full
+    b       n_undef
+// 64: what an object inherits from (null for anything else). 65: (object, an object or null): it inherits from that now
+n_getproto:
+    ldr     x0, [x1]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    1f
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    ldr     x0, [x0, #O_PROTO]
+    ret
+1:  VAL     x0, T_NULL
+    ret
+n_setproto:
+    ldp     x0, x2, [x1]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    1f
+    lsr     x9, x2, #48
+    cmp     w9, w10
+    b.eq    2f
+    mov     w10, #T_NULL
+    cmp     w9, w10
+    b.ne    1f
+2:  and     x9, x0, #0xffffffffffff
+    add     x9, x19, x9
+    str     x2, [x9, #O_PROTO]
+1:  ret
 n_reply:
     ldr     x0, [x19, #W_ANSWER]
     str     xzr, [x19, #W_ANSWER]
@@ -913,5 +971,6 @@ n_table:
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
-    .equ    N_COUNT, 63
+    .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table
+    .equ    N_COUNT, 66
     .ltorg

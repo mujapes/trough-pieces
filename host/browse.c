@@ -162,19 +162,25 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
     s.answer_room = 6 * n + (2u << 20); s.req_room = n + (1u << 20) + 16; s.tree = block(9, 16 * n + (8u << 20)); s.req = block(2, s.req_room); s.answer = block(2, s.answer_room);
     uint8_t *first = malloc(n + 3); if (!first) exit(4); memcpy(first, "H1 ", 3); memcpy(first + 3, d, n);
     if (entry("dom.asm", "begin")(s.tree, 0, 0, 0, table) < 0 || tree_ask(&s, first, n + 3) < 0) { free(first); free(opening); free(s.tree); free(s.req); free(s.answer); return body; } free(first);
-    long long ln = tree_ask(&s, (const uint8_t *)"q1 script", 9); char *list = malloc((size_t)(ln < 0 ? 0 : ln) + 1); if (!list) exit(4); memcpy(list, s.answer + 64, (size_t)(ln < 0 ? 0 : ln)); list[ln < 0 ? 0 : ln] = 0;
     s.world = block(6, 32u << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
     struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
     entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
     run_script(&s, opening + 64, length(opening), address); free(opening); if (s.failed) s.dead = 1; s.ran = 0;
-    for (char *at_ = list; *at_ && !s.dead; ) { int node = (int)strtol(at_, &at_, 10); if (!node) break; tree_askf(&s, "C", node, "");
-        long long tn = tree_askf(&s, "g", node, " type"); const char *v = (const char *)s.answer + 65; int ours = tn <= 1 || (tn >= 11 && same_word((const uint8_t *)v + tn - 11, s.answer + 64 + tn, "javascript")); if (!ours) continue;   /* not data, not a module (modules: to come) */
-        long long sn = tree_askf(&s, "g", node, " src") - 1;
-        if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block(v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
-            char where[2048] = "", why[300] = ""; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
-            if (got) { run_script(&s, got + 64, length(got), address); free(got); } else { fprintf(stderr, "script %.*s: %s\n", (int)length(rel), rel + 64, why[0] ? why : "not an address we can follow"); s.failed++; } free(base); free(rel); free(full); }
-        else { long long tx = tree_askf(&s, "t", node, ""); if (tx > 0) { uint8_t *copy = malloc((size_t)tx); if (!copy) exit(4); memcpy(copy, s.answer + 64, (size_t)tx); run_script(&s, copy, (size_t)tx, address); free(copy); } } }
-    free(list); tree_ask(&s, (const uint8_t *)"C0", 2); int before = s.ran; if (!s.dead) run_script(&s, (const uint8_t *)"__fire()", 8, address); s.ran = before;
+    /* the script elements are asked for again after each round: a script may have added more (loaders do). When a round finds none new, the page has loaded. */
+    int *seen = 0, seen_n = 0, fired = 0;
+    for (int round = 0; round < 40 && !s.dead; round++) { long long ln = tree_ask(&s, (const uint8_t *)"q1 script", 9); if (ln < 0) break; char *list = malloc((size_t)ln + 1); if (!list) exit(4); memcpy(list, s.answer + 64, (size_t)ln); list[ln] = 0; int fresh = 0;
+        for (char *at_ = list; *at_ && !s.dead && seen_n < 400; ) { int node = (int)strtol(at_, &at_, 10); if (!node) break; int old = 0; for (int i = 0; i < seen_n; i++) if (seen[i] == node) old = 1; if (old) continue;
+            seen = realloc(seen, (size_t)(seen_n + 1) * sizeof *seen); if (!seen) exit(4); seen[seen_n++] = node; fresh++; tree_askf(&s, "C", node, "");
+            long long tn = tree_askf(&s, "g", node, " type"); const char *v = (const char *)s.answer + 65; int ours = tn <= 1 || (tn >= 11 && same_word((const uint8_t *)v + tn - 11, s.answer + 64 + tn, "javascript")); if (!ours) continue;   /* not data, not a module (modules: to come) */
+            long long sn = tree_askf(&s, "g", node, " src") - 1;
+            if (sn > 0) { uint8_t *base = text_block(address, strlen(address)), *rel = text_block(v, (size_t)sn); at(30, base); at(31, rel); int16_t q2[2] = {30, 31}; uint8_t *full = made_text(entry("url", "resolve"), q2, 2, strlen(address) + (size_t)sn + 64);
+                char where[2048] = "", why[300] = "", after[64]; if (full && length(full) < sizeof where) { memcpy(where, full + 64, length(full)); where[length(full)] = 0; } uint8_t *got = where[0] ? fetch_body(where, roots, why, sizeof why) : 0;
+                if (got) { size_t i = 0, gn = length(got); while (i < gn && got[64 + i] <= ' ') i++; if (i < gn && got[64 + i] == '<') { free(got); got = 0; snprintf(why, sizeof why, "a page came back, not a script"); } }   /* an error page is not a program */
+                if (got) { run_script(&s, got + 64, length(got), address); free(got); } else { fprintf(stderr, "script %.*s: %s\n", (int)length(rel), rel + 64, why[0] ? why : "not an address we can follow"); s.failed++; } free(base); free(rel); free(full);
+                if (!s.dead) { int kept = s.ran, bad = s.failed; int k = snprintf(after, sizeof after, "__loaded(%d,%d)", node, got ? 1 : 0); run_script(&s, (const uint8_t *)after, (size_t)k, address); s.ran = kept; s.failed = bad; } }
+            else { long long tx = tree_askf(&s, "t", node, ""); if (tx > 0) { uint8_t *copy = malloc((size_t)tx); if (!copy) exit(4); memcpy(copy, s.answer + 64, (size_t)tx); run_script(&s, copy, (size_t)tx, address); free(copy); } } }
+        free(list); if (fresh) continue; if (fired) break; fired = 1; tree_ask(&s, (const uint8_t *)"C0", 2); int before = s.ran; if (!s.dead) run_script(&s, (const uint8_t *)"__fire()", 8, address); s.ran = before; }
+    free(seen);
     long long pn = tree_ask(&s, (const uint8_t *)"h1", 2); uint8_t *fresh = body; if (pn >= 0) { fresh = text_block((const char *)s.answer + 64, (size_t)pn); free(body); }
     free(s.world); free(s.out); free(s.answer); free(s.tree); free(s.req); *ran = s.ran; *failed = s.failed; return fresh; }
 /* The live screen: browse <out dir> --serve <picture file> <events file> <width> <height> [address]

@@ -172,3 +172,4 @@ function addEventListener(t,f){__win.addEventListener(t,f)}
 function removeEventListener(t,f){__win.removeEventListener(t,f)}
 function dispatchEvent(e){return __win.dispatchEvent(e)}
 function __fire(){document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));__win.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';var e=new Event('load');__win.dispatchEvent(e);if(typeof window.onload=='function')window.onload(e)}
+function __loaded(n,ok){var e=__w(n);if(e)e.dispatchEvent(new Event(ok?'load':'error'))}

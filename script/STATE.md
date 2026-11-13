@@ -407,3 +407,22 @@ it does nothing; Object.defineProperty and kin; Symbol as a function, WeakMap, P
 loader adds its real code that way, so "no failures" is not yet "the page's code all ran").
 Next: scripts added by scripts (an appended script element with src or text runs), top-level `this`, Object.defineProperty; then
 timers after load and a click from the live screen reaching dispatchEvent with a redraw from the tree; lazy loops; shapes; fuzz.
+
+**Twentieth unit: Object's own functions, `this`, scripts that add scripts (2026-11-13).** Built-ins 63 to 65 (lib.S: n_defacc
+stores a getter and setter pair; n_getproto, n_setproto): 66 routines in machine code. On them, in prelude.js: Object.defineProperty,
+defineProperties, create, getPrototypeOf, setPrototypeOf, getOwnPropertyNames, getOwnPropertyDescriptor (always a plain value),
+is, fromEntries; freeze, seal, preventExtensions are accepted and do nothing. `this` at the top of a script, and in a function
+called plainly, is globalThis (objects.S m_this: an undefined `this` reads as the global object, so strict code sees it too).
+Also in prelude.js: encodeURIComponent, encodeURI, decodeURIComponent, decodeURI, String.fromCodePoint, codePointAt.
+host/browse.c: after each round of scripts the tree is asked for its script elements again and any not yet run is run (40 rounds,
+400 scripts at most); a fetched script gets `__loaded(node, ok)` (load or error event; an HTML answer counts as a failure); when
+a round finds nothing new, `__fire()` runs once, then rounds go on until quiet. 43 of 43 programs (`objectfns.js`, `uri.js`).
+Seen: dom/checks/page/added.html -> out/added-page.png (a fetched added script, its onload, a missing one's onerror, an added
+inline script with this === window, a window property made by defineProperty, the load listener).
+Real pages now: www.wikipedia.org 4/0, news.ycombinator.com 1/0, lite.cnn.com 2/0; old.reddit.com 15 run, 6 failed (two
+SyntaxErrors in its big scripts, at line 2 columns 86 and 1605, not looked at; `SML is not defined` follows from them).
+Not made: properties that do not show in loops (defineProperty's are all enumerable), real freezing, `__proto__`, accessors
+defined on globalThis, escape/unescape, URL and URLSearchParams, XMLHttpRequest and fetch, Symbol as a function, WeakMap, Proxy.
+Next: the two SyntaxErrors on old.reddit.com (fetch the script, cut around the column); then timers after load and a tap on the
+live screen reaching dispatchEvent with a redraw from the tree; XMLHttpRequest/fetch through the host; lazy loops; shapes; fuzz.
+The map (MAP.md) has NOT been regenerated since unit 17: line numbers in objects.S, lib.S are off by the lines added here.

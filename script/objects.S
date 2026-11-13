@@ -521,11 +521,21 @@ m_index:
     ret
 // m_this: the `this` of the running call -> x0 (undefined outside any call)
 m_this:
-    VAL     x0, T_UNDEF
     cmp     x20, x19
-    b.eq    9f
+    b.eq    8f
     ldr     x0, [x20, #40]
-9:  ret
+    lsr     x16, x0, #48
+    mov     w17, #T_UNDEF
+    cmp     w16, w17
+    b.eq    8f
+    ret
+8:  ldr     x0, [x19, #W_GOBJ]          // at the top of a script, or in a function called plainly: the global object (once the prelude has made it)
+    cbz     x0, 7f
+    mov     x16, #(T_OBJECT << 48)
+    orr     x0, x0, x16
+    ret
+7:  VAL     x0, T_UNDEF
+    ret
 
 i_object:
     mov     x0, #32
