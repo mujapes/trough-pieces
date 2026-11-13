@@ -48,6 +48,7 @@ def axml(tree):
     x=pool+rmap+ns_start+body+ns_end
     return struct.pack('<HHI',0x0003,8,8+len(x))+x
 man=('manifest',[(0,'package',0,'t.flow'),(1,'versionCode',0x0101021b,int(os.environ.get('FLOW_VERSION','1'))),(1,'versionName',0x0101021c,'flow-'+os.environ.get('FLOW_VERSION','1'))],[
+  ('uses-permission',[(1,'name',0x01010003,'android.permission.INTERNET')],[]),
   ('uses-sdk',[(1,'minSdkVersion',0x0101020c,28),(1,'targetSdkVersion',0x01010270,28)],[]),
   ('application',[(1,'label',0x01010001,'Flow'),(1,'hasCode',0x0101000c,False),(1,'extractNativeLibs',0x010104ea,True)],[
     ('activity',[(1,'name',0x01010003,'android.app.NativeActivity'),(1,'exported',0x01010010,True),(1,'configChanges',0x0101001f,0x40003fff),(1,'theme',0x01010000,0x0103000a)],[
