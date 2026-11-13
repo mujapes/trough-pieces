@@ -14,7 +14,22 @@ m_native:
     b.eq    m_resume
     cmp     x9, #29
     b.eq    m_fapply
-    cmp     x9, #49                     // 49-51 take an array only (join: one with no objects in it): anything else
+    cmp     x9, #10                     // push on anything but an array goes to the prelude's push
+    b.ne    7f
+    lsr     x8, x11, #48
+    mov     w7, #T_OBJECT
+    cmp     w8, w7
+    b.ne    8f
+    and     x8, x11, #0xffffffffffff
+    add     x8, x19, x8
+    ldr     x7, [x8]
+    cmp     x7, #4
+    b.eq    0f
+8:  ldr     x8, [x19, #W_PUSHFB]
+    cbz     x8, 0f
+    str     x8, [x1, #-8]
+    b       m_call
+7:  cmp     x9, #49                     // 49-51 take an array only (join: one with no objects in it): anything else
     b.lo    0f                          // goes to the prelude's function for it instead, by a turn of the call
     cmp     x9, #51
     b.hi    0f
@@ -402,7 +417,13 @@ n_maker:
     ldr     x10, [x1, #8]
     str     x10, [x19, #W_ITERFN]
     b       n_undef
-4:  stp     xzr, xzr, [x11]
+4:  cmp     x9, #14                     // -15: the prelude's push for what is not an array
+    b.ne    24f
+    ldr     x1, [sp, #24]
+    ldr     x10, [x1, #8]
+    str     x10, [x19, #W_PUSHFB]
+    b       n_undef
+24: stp     xzr, xzr, [x11]
     stp     xzr, xzr, [x11, #16]
     stp     xzr, xzr, [x11, #32]
     b       n_undef

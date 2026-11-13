@@ -974,3 +974,6 @@ NOT ENABLED: DOMParser and document.implementation.createHTMLDocument (code kept
 and VisualEditor take paths our fake document breaks, and Wikipedia stalled past 280 s. A real detached document (host side) is
 needed first. Sites: Wikipedia 8/0, GitHub 5/0, Guardian 31/0, BBC 62/0, NPR 23/2, HN 1/0, reddit 27/4.
 LESSON: sweep Wikipedia after every document.js change; three regressions here came from adding globals pages feature-test.
+Unit 71 [by Opus]: native generic push. Array.prototype.push is the machine-code routine again for real arrays; m_native
+(lib.S) sends any other `this` to the prelude's push in the language (W_PUSHFB, registered by __n(-15)), the way 49-51 fall
+back. Removes the wrapper's cost on every push. push-arraylike.js; 86 of 86. Wikipedia Machine_code 7/0.
