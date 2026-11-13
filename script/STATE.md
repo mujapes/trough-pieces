@@ -392,3 +392,18 @@ scripts added by scripts, timers after the page is drawn, style and layout answe
 the records directly (and redrawing after an event) is the step that makes pages live.
 Next: (1) and (2) above in the engine; then timers and a click reaching `dispatchEvent` from the live screen, redrawing from the
 tree; lazy loops; shapes; the fuzz job.
+
+**Nineteenth unit: the global object, and console as a value (2026-11-13).** `globalThis` (prelude; built-in 62, lib.S n_global,
+W_GOBJ 560) is an object whose properties ARE the global variables: objects.S o_find answers from the globals table (a name
+nothing has stored to is not there) and o_put stores into the global of that name, filling one that was only named before or
+adding a new one. So `window.x = 1` in one script is `x` in the next, and a function that named `x` earlier now finds it.
+`console` is an object of the prelude (log, info, warn, error, debug and quiet stand-ins); the translator's own print form is now
+spelled `__console.log(` and the prelude's functions call it. dom/document.js: `window`, `self`, `top`, `parent` are globalThis;
+window's listeners live on a hidden target behind the global addEventListener. 63 routines in machine code; 41 of 41 programs
+(`programs/global.js`). Real pages, scripts run / failed: www.wikipedia.org 4/0, an en.wikipedia.org article (1.4 MB) 4/0,
+news.ycombinator.com 1/0, lite.cnn.com 2/0, example.com 1/0.
+Not made: `this` at the top of a script is undefined (should be globalThis); `Object.keys(globalThis)` is empty and `delete` on
+it does nothing; Object.defineProperty and kin; Symbol as a function, WeakMap, Proxy; scripts that scripts add (Wikipedia's
+loader adds its real code that way, so "no failures" is not yet "the page's code all ran").
+Next: scripts added by scripts (an appended script element with src or text runs), top-level `this`, Object.defineProperty; then
+timers after load and a click from the live screen reaching dispatchEvent with a redraw from the tree; lazy loops; shapes; fuzz.

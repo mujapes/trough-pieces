@@ -43,6 +43,28 @@ o_keyeq:
 // o_find: the object at the address x0, its own property named x1 -> x2 where its value is (an address), or 0. Uses x2-x13.
 o_find:
     mov     x13, x30
+    ldr     x9, [x19, #W_GOBJ]          // the global object: its properties are the global variables that hold something
+    add     x9, x19, x9
+    cmp     x0, x9
+    b.ne    0f
+    ldr     x9, [x19, #W_GLOB]
+    add     x9, x19, x9
+    ldr     x10, [x19, #W_GLOB_N]
+    add     x11, x9, x10, lsl #4
+5:  cmp     x9, x11
+    b.hs    7f
+    ldr     x2, [x9]
+    bl      o_keyeq
+    b.eq    6f
+    add     x9, x9, #16
+    b       5b
+6:  ldr     x10, [x9, #8]
+    lsr     x10, x10, #48
+    mov     w12, #T_HOLE
+    cmp     w10, w12
+    b.eq    7f
+    b       8f
+0:
     ldr     x9, [x0, #O_PROPS]
     add     x9, x19, x9
     ldr     w10, [x0, #O_CNT]
@@ -84,7 +106,36 @@ o_put:
     ldr     x3, [sp, #32]
     str     x3, [x2]
     b       9f
-1:  ldp     w10, w11, [x0, #O_CNT]
+1:  ldr     x9, [x19, #W_GOBJ]          // on the global object: the global of that name (named before or not), or a new one
+    add     x9, x19, x9
+    cmp     x0, x9
+    b.ne    10f
+    ldr     x9, [x19, #W_GLOB]
+    add     x9, x19, x9
+    ldr     x10, [x19, #W_GLOB_N]
+    add     x11, x9, x10, lsl #4
+5:  cmp     x9, x11
+    b.hs    6f
+    ldr     x2, [x9]
+    bl      o_keyeq
+    b.eq    7f
+    add     x9, x9, #16
+    b       5b
+6:  mov     x0, #0
+    ldr     x12, [x19, #W_GLOB_CAP]
+    cmp     x10, x12
+    b.hs    9f
+    mov     x12, #0xffff
+    cmp     x10, x12
+    b.hs    9f
+    str     x1, [x9]
+    add     x10, x10, #1
+    str     x10, [x19, #W_GLOB_N]
+7:  ldr     x3, [sp, #32]
+    str     x3, [x9, #8]
+    mov     x0, x9
+    b       9f
+10: ldp     w10, w11, [x0, #O_CNT]
     cmp     w10, w11
     b.lo    4f
     lsl     w12, w11, #1                // no room: twice the room (4 to begin with), the pairs copied over

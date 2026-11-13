@@ -164,12 +164,11 @@ function getComputedStyle(){return {getPropertyValue:function(){return ''}}}
 function matchMedia(q){return {matches:false,media:q,addListener:function(){},removeListener:function(){},addEventListener:function(){},removeEventListener:function(){}}}
 function requestAnimationFrame(f){return setTimeout(f,16)}
 function cancelAnimationFrame(t){clearTimeout(t)}
-var window=new EventTarget();window.parentNode=null;
-window.window=window;window.self=window;window.top=window;window.parent=window;window.document=document;window.location=location;window.navigator=navigator;window.screen=screen;window.history=history;
-window.localStorage=localStorage;window.sessionStorage=sessionStorage;window.innerWidth=360;window.innerHeight=720;window.devicePixelRatio=1;window.pageXOffset=0;window.pageYOffset=0;window.scrollX=0;window.scrollY=0;
-window.getComputedStyle=getComputedStyle;window.matchMedia=matchMedia;window.requestAnimationFrame=requestAnimationFrame;window.setTimeout=setTimeout;window.clearTimeout=clearTimeout;window.setInterval=setInterval;window.clearInterval=clearInterval;
-window.scrollTo=function(){};window.Element=Element;window.HTMLElement=Element;window.Node=Node;window.Event=Event;window.CustomEvent=Event;
-var self=window,top=window,parent=window;
-function addEventListener(t,f){window.addEventListener(t,f)}
-function removeEventListener(t,f){window.removeEventListener(t,f)}
-function __fire(){document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));window.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';window.dispatchEvent(new Event('load'))}
+var window=globalThis,self=window,top=window,parent=window,__win=new EventTarget();
+var innerWidth=360,innerHeight=720,outerWidth=360,outerHeight=720,devicePixelRatio=1,pageXOffset=0,pageYOffset=0,scrollX=0,scrollY=0;
+function scrollTo(){}
+function scroll(){}
+function addEventListener(t,f){__win.addEventListener(t,f)}
+function removeEventListener(t,f){__win.removeEventListener(t,f)}
+function dispatchEvent(e){return __win.dispatchEvent(e)}
+function __fire(){document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));__win.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';var e=new Event('load');__win.dispatchEvent(e);if(typeof window.onload=='function')window.onload(e)}

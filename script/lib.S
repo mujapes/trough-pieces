@@ -375,6 +375,19 @@ n_host:
     bl      w_outs
     mov     x25, #1
     b       n_undef
+// 62: the global object (globalThis): made once; objects.S makes its properties the global variables
+n_global:
+    NIN
+    ldr     x0, [x19, #W_GOBJ]
+    cbnz    x0, 1f
+    mov     x0, #32
+    mov     x1, #3
+    bl      o_make
+    cbz     x0, n_full
+    str     x0, [x19, #W_GOBJ]
+1:  mov     x16, #(T_OBJECT << 48)
+    orr     x0, x0, x16
+    NOUT
 n_reply:
     ldr     x0, [x19, #W_ANSWER]
     str     xzr, [x19, #W_ANSWER]
@@ -899,6 +912,6 @@ n_table:
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
-    .word   n_host - n_table, n_reply - n_table
-    .equ    N_COUNT, 62
+    .word   n_host - n_table, n_reply - n_table, n_global - n_table
+    .equ    N_COUNT, 63
     .ltorg

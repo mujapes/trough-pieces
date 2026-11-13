@@ -249,3 +249,5 @@ if(!h[1]){res(r);return}
 Promise.resolve(r).then(function(x){step(null,x)},function(e){step(1,e)})}
 step(null)})})})(__n);
 var __host=(function(n){var h=n(60),a=n(61);return function(r){h(''+r);return a()}})(__n);
+var globalThis=__n(62)();
+var console=(function(){var p=function(){__console.log(...arguments)},z=function(){};return {log:p,info:p,warn:p,error:p,debug:p,trace:p,table:p,group:p,groupCollapsed:p,groupEnd:z,time:z,timeEnd:z,count:z,assert:function(c){if(!c)p('Assertion failed')}}})();

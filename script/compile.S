@@ -288,7 +288,7 @@ c_m_end:
 c_w_undefined:  .ascii "undefined"
 c_w_nan:        .ascii "NaN"
 c_w_infinity:   .ascii "Infinity"
-c_w_console:    .ascii "console"
+c_w_console:    .ascii "__console"
 c_w_log:        .ascii "log"
 c_w_end:
 c_w_arguments:  .ascii "arguments"

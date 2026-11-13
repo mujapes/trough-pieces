@@ -49,6 +49,7 @@
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
     .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function
     .equ W_WANT, 544                    // not 0: the program asks its host for something: one more than where the request begins in what it has printed
+    .equ W_GOBJ, 560                    // the global object, whose properties are the global variables themselves (0: not made yet)
     .equ W_ANSWER, 552                  // the host's answer, a string value (0: none)
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
     // values: a number is itself; anything else has these top 16 bits and a payload below
