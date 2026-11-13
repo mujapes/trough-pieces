@@ -156,6 +156,8 @@ s_objtext:   .ascii "[object Object]"
 s_end:
 s_symbol:    .ascii "symbol"
 s_symbol_end:
+s_bigint:    .ascii "bigint"
+s_bigint_end:
     .balign 4
 // v_join: the two string values x0 and x1 as one string -> x0 (0 if the world is full)
 v_join:
@@ -1097,8 +1099,18 @@ i_typeof:
     and     x1, x0, #0xffffffffffff
     ldr     x1, [x19, x1]
     cmp     x1, #1
-    b.ne    5f
-    LIT     s_function, s_function_end
+    b.eq    52f
+    ldr     x2, [x19, #W_BIGPROTO]
+    cbz     x2, 5f
+    and     x1, x0, #0xffffffffffff
+    add     x1, x19, x1
+    ldr     x1, [x1, #8]
+    cmp     x1, x2
+    b.eq    51f
+    b       5f
+52: LIT     s_function, s_function_end
+    b       9f
+51: LIT     s_bigint, s_bigint_end      // [by Opus] an object whose prototype is BigInt's (n 74 names it)
     b       9f
 5:  LIT     s_object, s_objtext         // null too: the language's oldest mistake, kept
 9:  cbz     x0, m_full

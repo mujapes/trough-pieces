@@ -426,6 +426,13 @@ n_defacc:
     b       n_undef
 // 73 [by Opus]: (object, name, value): its own property becomes that plain value, put directly (no setter, own or inherited,
 // is called; an own getter and setter pair is replaced). Object.defineProperty with a value uses it.
+// 74 [by Opus]: (BigInt.prototype): kept in the world's head for typeof
+n_bigproto:
+    NIN
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1]
+    str     x0, [x19, #W_BIGPROTO]
+    b       n_undef
 n_defval:
     NIN
     ldr     x1, [sp, #24]
@@ -1223,6 +1230,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table, n_hide - n_table, n_defval - n_table
-    .equ    N_COUNT, 74
+    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table, n_hide - n_table, n_defval - n_table, n_bigproto - n_table
+    .equ    N_COUNT, 75
     .ltorg

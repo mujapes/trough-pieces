@@ -926,3 +926,7 @@ it went through ''+x, valueOf first). NOT fixed: template literals `${o}` still 
 rather than a String call per value. bigint-lit.js; 80 of 80.
 Unit 60 [by Opus]: OP_TOTEXT 98 (machine.S i_totext, lib.S m_totext: toString first) after each template value; templates
 `${o}` now match node. 80 of 80.
+Unit 61 [by Opus]: typeof answers "bigint" for objects whose prototype is BigInt.prototype (world head 832 W_BIGPROTO, set by
+native 74 n_bigproto from the prelude; header now 848 bytes). String(bigint) exact. Still: operators lossy (valueOf), console.log
+shows an object not 5n. Operator plan: in m_toprim/m_tonum, a BigInt operand on an arithmetic or compare instruction calls a
+prelude __bigop(op, a, b) on the decimal texts instead of converting. 80 of 80.
