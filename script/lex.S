@@ -156,9 +156,9 @@ w_word:
     mov     w23, #K_KEYWORD
     mov     w24, w2
     mov     w28, #1                     // after most keywords a slash begins a pattern; not after this, super, null, true, false
-    cmp     w2, #23
+    cmp     w2, #24                     // (this)
     b.eq    8f
-    cmp     w2, #21
+    cmp     w2, #22                     // (super)
     b.eq    8f
     cmp     w2, #40
     b.lo    9f

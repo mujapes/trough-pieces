@@ -364,3 +364,9 @@ at); example.com reported one failed script, not looked at. Not made: timers aft
 but never calls `clock 0`), modules, defer/async order, document.write of a further <script>, events, any tree.
 Next: the `dom` piece (the page as a tree, in machine code) and getElementById, textContent, innerHTML, createElement,
 appendChild over `__host`; find Wikipedia's SyntaxError; lazy loops over generators; shapes; the fuzz job.
+**Fault found on a real page (2026-11-13): a pattern straight after `return`.** `return/Android/i.test(s)` (Wikipedia's
+minified script) was refused: the reader's rule "a slash after this or super divides" named keywords 21 and 23 (return,
+switch) instead of 22 and 24. Both lex.S and the separate statement in checks/words.py carried the same two numbers, so they
+agreed with each other; words.py now names the words. Added `programs/slash.js`. With a stand-in document, the scripts of
+www.wikipedia.org (27 kB minified), example.com and news.ycombinator.com now translate whole and run until they want the
+tree (`Element is not defined`, a property of a missing element, a missing document function).

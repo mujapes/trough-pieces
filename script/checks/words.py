@@ -35,7 +35,7 @@ def theirs(s):
         if name(c) and not chr(c).isdigit():
             while i<n and name(s[i]): i+=1
             w=s[st:i].decode('latin1')
-            if w in KW: k=KW.index(w); out.append((2,nl,k,st,i-st,0.0)); rx=not (k in (21,23) or k>=40)
+            if w in KW: k=KW.index(w); out.append((2,nl,k,st,i-st,0.0)); rx=not (KW[k] in ('this','super') or k>=40)
             else: out.append((1,nl,0,st,i-st,0.0)); rx=False
             continue
         if chr(c).isdigit() or (c==ord('.') and i+1<n and chr(s[i+1]).isdigit()):
