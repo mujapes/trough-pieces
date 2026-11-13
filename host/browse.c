@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 /* The browser's host: everything a piece cannot do for itself, and nothing else.
  *   browse <pieces out dir> <address> <out.png> [text size] [scroll] [width] [height]
  * It looks the site's name up, owns the socket and the clock, keeps the blocks, and writes the finished picture as a PNG. Every
@@ -281,6 +282,26 @@ static void job_leave(job *j) { if (!j) return; j->cancel = 1; if (__atomic_exch
 static pthread_mutex_t pg = PTHREAD_MUTEX_INITIALIZER; static scripts *pg_live; static char pg_addr[2048]; static volatile int pg_tap; static uint8_t *pg_changed;
 static void *page_worker(void *unused) { (void)unused; for (;;) { for (int i = 0; i < 50 && !pg_tap; i++) usleep(4000);
     pthread_mutex_lock(&pg); if (pg_live) { int force = pg_tap; pg_tap = 0; uint8_t *c = scripts_tick(pg_live, pg_addr, force); if (c) { free(pg_changed); pg_changed = c; } } pthread_mutex_unlock(&pg); } return 0; }
+/* [by Opus] Flow verbs on the live screen. One memfd seen twice: written through wv, run through rv. Cells are named; the
+   writer is the event "w NAME PATH" (trough-flow write): the file's code is appended and the cell flipped at once. A verb
+   that faults is caught by the net: its cell goes back to the address before, and the call answers -1. */
+#include <signal.h>
+#include <ucontext.h>
+#define ARENA (4 << 20)
+static char *fl_wv, *fl_rv; static size_t fl_top; static char cell_name[16][32]; static void *volatile cell[16], *cell_prev[16]; static int cells;
+static void net(int sig, siginfo_t *info, void *ctx) { ucontext_t *u = ctx; uint64_t pc = u->uc_mcontext.pc; (void)info;
+    if (!fl_rv || pc - (uint64_t)fl_rv >= ARENA) { signal(sig, SIG_DFL); return; }
+    /* the live verb starting nearest below pc is the one that faulted */ int hit = -1; uint64_t near = 0; for (int i = 0; i < cells; i++) { uint64_t a = (uint64_t)cell[i]; if (a <= pc && a >= near) { near = a; hit = i; } }
+    if (hit >= 0) { cell[hit] = cell_prev[hit]; cell_prev[hit] = 0; }
+    u->uc_mcontext.regs[0] = (uint64_t)-1; u->uc_mcontext.pc = u->uc_mcontext.regs[30]; }
+static void fl_arena(void) { int fd = memfd_create("flow", MFD_CLOEXEC); if (fd < 0 || ftruncate(fd, ARENA)) return;
+    void *w = mmap(0, ARENA, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), *r = mmap(0, ARENA, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0); close(fd);
+    if (w == MAP_FAILED || r == MAP_FAILED) return; fl_wv = w; fl_rv = r;
+    struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_sigaction = net; sa.sa_flags = SA_SIGINFO | SA_NODEFER; sigaction(SIGSEGV, &sa, 0); sigaction(SIGBUS, &sa, 0); sigaction(SIGILL, &sa, 0); }
+static int fl_cell(const char *name) { for (int i = 0; i < cells; i++) if (!strcmp(cell_name[i], name)) return i; if (cells == 16) return -1; snprintf(cell_name[cells], 32, "%s", name); return cells++; }
+static void fl_write(const char *name, const char *path) { if (!fl_wv) return; FILE *f = fopen(path, "rb"); if (!f) return; size_t n = fread(fl_wv + fl_top, 1, ARENA - fl_top, f); fclose(f);
+    if (!n || (n & 3)) return; int c = fl_cell(name); if (c < 0) return; char *a = fl_rv + fl_top; __builtin___clear_cache(a, a + n); fl_top = (fl_top + n + 15) & ~(size_t)15;
+    cell_prev[c] = cell[c]; __atomic_store_n(&cell[c], (void *)a, __ATOMIC_RELEASE); printf("flow: %s is live (%zu bytes)\n", name, n); fflush(stdout); }
 static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     if (argc < 7) { fprintf(stderr, "browse <pieces out dir> --serve <picture file> <events file> <width> <height> [address]\n"); return 2; }
     uint32_t W = (uint32_t)atoi(argv[5]), H = (uint32_t)atoi(argv[6]); if (W < 16 || H < 16 || W > 4096 || H > 4096) return 2; size_t bytes = 64 + 4ull * W * H;
@@ -289,6 +310,7 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
     char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 17, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0, editing = 0; char typed[512] = ""; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; job *now = 0; scripts *live = 0; double ticked = 0, refilled = -1e9; int tapped = 0; static int applied[PICS]; pic *pics = 0; int pic_n = 0;
     { const char *need[][2] = {{"url","resolve"},{"url","part"},{"url","port"},{"http","request"},{"http","status"},{"http","header"},{"http","packed"},{"http","body"},{"inflate","unpack"},{"tls","feed"},{"png","decode"},{"jpeg","decode"},{"gif","decode"},{"image","blit"},{"image","smooth"},{"image","stretch"},{"paint","clear"},{"page","pictures"},{"page","link"}}; for (size_t i = 0; i < sizeof need / sizeof need[0]; i++) entry(need[i][0], need[i][1]); }   /* every piece is loaded before a second thread exists */ static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
+    fl_arena();
     struct flowfield { uint32_t n, spare; double p[510]; } *fl = 0; long long fl_seen = -1;
     { char fp[600]; snprintf(fp, sizeof fp, "%s", argv[3]); char *sl = strrchr(fp, '/'); snprintf(sl ? sl + 1 : fp, sizeof fp - (size_t)(sl ? sl + 1 - fp : 0), "flow.field");
       int fd = open(fp, O_RDWR | O_CREAT, 0600); if (fd >= 0 && !ftruncate(fd, 4096)) { void *m = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (m != MAP_FAILED) { fl = m; if (!fl->n) fl->n = 1; } } if (fd >= 0) close(fd); }
@@ -317,9 +339,12 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
               int16_t r[4] = {0, 0, (int16_t)W, BAR}; rect(screen, r, 4, 0xffe8ecf0ll, table); int16_t l[4] = {0, BAR - 1, (int16_t)W, 1}; rect(screen, l, 4, 0xffc0c8d0ll, table);
               int16_t t[160] = {35, 18, 12, 30, '<'}; if (depth) words(screen, t, 5, 0xff202020ll, table);
               int n = 4, room_chars = (int)(W - 60) / 9; char line_now[600]; const char *shown = address; if (!strncmp(shown, "https://", 8)) shown += 8; if (editing) { snprintf(line_now, sizeof line_now, "%s|", typed); shown = line_now; int over = (int)strlen(shown) - room_chars; if (over > 0) shown += over; } t[1] = 15; t[2] = 48; t[3] = 28; for (int i = 0; shown[i] && i < room_chars && n < 150; i++) t[n++] = (int16_t)(unsigned char)shown[i]; words(screen, t, n, editing ? 0xff101010ll : 0xff505860ll, table); screen[32] = (uint8_t)editing; }   /* byte 32 of the head: the host wants the keyboard */
+            { int oc = -1; for (int i = 0; i < cells; i++) if (!strcmp(cell_name[i], "overlay")) oc = i;   /* [by Opus] the overlay verb draws over the page; nonzero: draw again next frame */
+              void *v = oc >= 0 ? __atomic_load_n(&cell[oc], __ATOMIC_ACQUIRE) : 0; if (v && ((entry5)v)(screen, (const int16_t *)fl, (long long)counter, (long long)now_ms(), table) > 0) dirty = 1; }
             counter++; memcpy(screen + 24, &counter, 8); if (drawn || now_ms() - t > 8) { printf("shown at %lld of %lld in %.1f ms (%d strips drawn by the pieces)\n", scroll, tall, now_ms() - t, drawn); fflush(stdout); } }
         struct stat st; if (fstat(fileno(ev), &st) == 0 && st.st_size > read_to) { fseek(ev, read_to, SEEK_SET); char line[2100];
             while (fgets(line, sizeof line, ev)) { size_t n = strlen(line); if (!n || line[n - 1] != '\n') break; read_to += (long)n; line[n - 1] = 0; int x, y;
+                { char cn[32], cp[1024]; if (line[0] == 'w' && sscanf(line + 1, "%31s %1023s", cn, cp) == 2) fl_write(cn, cp); }
                 if (line[0] == 'd' && sscanf(line + 1, "%d %d", &x, &y) == 2) { down = 1; last_y = y; down_x = x; down_y = y; moved = 0; }
                 else if (line[0] == 'm' && down && sscanf(line + 1, "%d %d", &x, &y) == 2) { moved += abs(y - last_y) + abs(x - down_x) / 4; long long limit = tall + BAR > (long long)H ? tall + BAR - H : 0, to = scroll - (y - last_y); if (to < 0) to = 0; if (to > limit) to = limit; last_y = y; if (to != scroll) { scroll = to; dirty = 1; } }
                 else if (line[0] == 'u') { if (down && moved < 12 && down_y < BAR) { if (down_x < 64 && depth) { snprintf(address, sizeof address, "%s", before[--depth]); fresh = 1; printf("back to %s\n", address); fflush(stdout); } else if (down_x >= 64) { editing = !editing; typed[0] = 0; dirty = 1; } }
