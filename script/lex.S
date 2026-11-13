@@ -124,7 +124,18 @@ w_end:
 w_word:
     mov     x25, x22
     mov     w24, #0
-    NAMEPART w0, w_not_name
+    cmp     w0, #'#'                    // #name (a class's private name): read as a name that keeps its #; stage 1, not yet private
+    b.ne    6f
+    add     x9, x22, #1
+    cmp     x9, x21
+    b.hs    w_not_name
+    ldrb    w10, [x20, x9]
+    NAMEPART w10, w_not_name
+    sub     w9, w10, #'0'
+    cmp     w9, #9
+    b.ls    w_not_name
+    b       1f
+6:  NAMEPART w0, w_not_name
     sub     w9, w0, #'0'
     cmp     w9, #9
     b.ls    w_number

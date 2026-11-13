@@ -4557,6 +4557,57 @@ s_again:
     add     sp, sp, #128
     bl      next_word
     b       s_done
+s_export:
+    bl      next_word
+    cmp     w23, #K_KEYWORD
+    mov     w9, #7
+    ccmp    w24, w9, #0, eq
+    b.ne    1f
+    bl      next_word                   // export default: what follows is the statement
+    b       s_again
+1:  cmp     w23, #K_PUNCT
+    b.ne    s_again
+    cmp     w24, #33
+    b.eq    2f
+    cmp     w24, #45
+    b.ne    s_again
+2:  cbz     w23, c_unexpected           // export { .. } [from "x"] / export * [as n] from "x"
+    cmp     w23, #K_STRING
+    b.eq    4f
+    cmp     w23, #K_PUNCT
+    mov     w9, #34
+    ccmp    w24, w9, #0, eq
+    b.eq    3f
+    bl      next_word
+    b       2b
+3:  bl      next_word                   // after }: a from "x" may follow
+    cmp     w23, #K_NAME
+    b.ne    5f
+    cmp     x26, #4
+    b.ne    5f
+    ldr     w9, [x20, x25]
+    movz    w10, #0x7266                // "fr"
+    movk    w10, #0x6d6f, lsl #16       // "om"
+    cmp     w9, w10
+    b.ne    5f
+    bl      next_word
+4:  bl      next_word
+5:  bl      c_semi
+    b       s_done
+s_import:
+    bl      c_peek
+    cmp     w0, #K_PUNCT
+    b.ne    1f
+    cmp     w1, #35
+    b.eq    s_expr
+    cmp     w1, #56
+    b.eq    s_expr
+1:  bl      next_word
+2:  cbz     w23, c_unexpected
+    cmp     w23, #K_STRING
+    b.eq    4b
+    bl      next_word
+    b       2b
 s_forw:                                 // a for statement is read inside a block of its own, for the let of its head
     ldr     w9, [x29, #F_FORIN]
     cbz     w9, 1f
@@ -4577,6 +4628,10 @@ s_forw:                                 // a for statement is read inside a bloc
 s_word:
     cmp     w23, #K_KEYWORD
     b.ne    s_expr
+    cmp     w24, #11                    // export: the declaration is read as it stands (stage 1: nothing is recorded yet)
+    b.eq    s_export
+    cmp     w24, #17                    // import: stage 1 reads it and binds nothing; import( and import. are expressions
+    b.eq    s_import
     cmp     w24, #28
     b.eq    s_var
     cmp     w24, #33

@@ -703,3 +703,22 @@ Done in the same unit [by Opus]: `__compile` (lib.S n_compile, #69) over `c_frag
 `var n=1` NEWLINE `return f(),D` declared D as a local; a statement-only keyword (mask 0xc6a14063) now closes the list.
 dom: document.implementation. Guardian 15 scripts, 1 failed (ran-9 'g'). host: TROUGH_SWAP=dir runs dir/swap-N.js in place of
 script N (probe a live page's script). 50 of 50 programs (checks/programs/runtime-function.js).
+Side bug [by Opus, 2026-11-13], open: the first byte of a program's printed text sometimes loses bit 5 ('function' printed as 'Function') in programs that print more than one line; out region follows globals in the world; nothing found clearing bit 5 yet.
+Narrowed [by Opus]: `console.log("function");console.log("function","x")` prints "Function" first (only the very first output byte, only with the same text again in a two-argument log; "abc" does not do it). Constant dedupe (c_strconst) and toUpperCase checked: not them.
+GitHub [by Opus, 2026-11-13]: all 13 of its scripts are `type="module"` (plus an importmap), so none run. Next big unit: modules.
+Plan: host (browse.c) runs module scripts too, after classic ones, in document order, deferred; the engine translates
+`import ... from "x"` / `export ...` into a per-module record: each module's body wrapped as a function taking its import
+bindings, run once its dependencies have run; specifiers resolved by the host (importmap, then url resolve) and fetched
+through the existing __host round trip; `import()` returns a promise. Live bindings can start as copies (note it).
+
+**Forty-first unit [by Opus], begun (2026-11-13): modules.** Host step done: browse.c defers `type="module"` scripts and runs
+them after the classic ones (a second pass once no new classic scripts appear). GitHub now: 2 run, 3 failed (module syntax:
+"not made yet" at `import`). NEXT, in compile.S c_stmt: `import {a, b as c} from "x"` -> const bindings from `__import("x")`
+(default -> .default, `* as ns` -> the record); `export` before a declaration -> the declaration plus a record entry;
+`export default e`; `export {..}`; host `__import` resolves (importmap, url) and fetches via __host; modules wrapped so their
+top-level names stay their own.
+Unit 41, stage 1 done [by Opus]: compile.S c_stmt reads `import ... from "x"` / `import "x"` (binds nothing yet; `import(`
+and `import.` stay expressions) and `export` (default, declarations, `{..} [from]`, `* from`; nothing recorded). lex.S: `#name`
+lexes as a name keeping its `#` (private names work as ordinary properties; not yet private, `#x in o` not made).
+checks/programs/private-names.js; 51 of 51. GitHub: all scripts translate, 5 run, 3 fail at run time on unbound imports
+(`import * as e from "react"`, resolved through its importmap). NEXT: stage 2, bindings and loading as planned above.
