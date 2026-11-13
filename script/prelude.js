@@ -96,7 +96,7 @@ if(r){i=0;while(1){if(i===a.length){a.push(1);break}a[i]=a[i]+1;if(a[i]<10)break
 s='';for(i=a.length-1;i>=0;i--)s+=a[i];i=0;while(i<s.length-1&&s.charCodeAt(i)===48)i++;s=s.substring(i);while(s.length<=f)s='0'+s}
 if(f)s=s.substring(0,s.length-f)+'.'+s.substring(s.length-f);return g+s};
 })(Array.prototype,String.prototype,Number.prototype,__n);
-var Symbol={iterator:'@@iterator',asyncIterator:'@@asyncIterator'},Map,Set;
+var Symbol={iterator:'@@iterator',asyncIterator:'@@asyncIterator'},Map,Set,WeakMap,WeakSet,WeakRef,FinalizationRegistry;
 (function(n,A){
 var id=n(42),D={};
 function AI(a,m){this.a=a;this.i=0;this.m=m}
@@ -121,6 +121,7 @@ Set=function Set(it){if(!(this instanceof Set))throw new TypeError("Constructor 
 var S=Set.prototype;S.has=has;S['delete']=del;
 S.add=function(k){var s=key(k);if(this._h[s]===undefined){this._h[s]=this._k.length;this._k.push(k===0?0:k);this.size++}return this};
 S.clear=function(){this._h={};this._k=[];this.size=0;this._d=0};
+WeakMap=Map;WeakSet=Set;WeakRef=function WeakRef(o){this._o=o};FinalizationRegistry=function FinalizationRegistry(){};WeakRef.prototype.deref=function(){return this._o};FinalizationRegistry.prototype.register=FinalizationRegistry.prototype.unregister=function(){};
 S.forEach=function(f,t){var i,k;for(i=0;i<this._k.length;i++)if((k=this._k[i])!==D)f.call(t,k,k,this)};
 S.values=S.keys=S['@@iterator']=function(){return new AI(list(this,0),0)};S.entries=function(){return new AI(list(this,3),0)};
 })(__n,Array.prototype);
@@ -280,3 +281,5 @@ decodeURIComponent=function(s){return dec(s,'')};decodeURI=function(s){return de
 String.fromCodePoint=function(){var r='';for(var i=0;i<arguments.length;i++){var c=+arguments[i];if(!(c>=0&&c<=0x10ffff)||c!==Math.floor(c))throw new RangeError('Invalid code point '+arguments[i]);r+=c<0x10000?String.fromCharCode(c):String.fromCharCode(0xd800+((c-0x10000)>>10),0xdc00+((c-0x10000)&1023))}return r};
 String.prototype.codePointAt=function(i){i=i|0;var s=String(this);if(i<0||i>=s.length)return undefined;var c=s.charCodeAt(i);if(c>=0xd800&&c<0xdc00&&i+1<s.length){var d=s.charCodeAt(i+1);if(d>=0xdc00&&d<0xe000)return 0x10000+((c-0xd800)<<10)+(d-0xdc00)}return c};
 var __spread=Object.assign;
+var __rest=function(v){var o={},ks=Object.keys(v),n=arguments.length,i,j,k;for(i=0;i<ks.length;i++){k=ks[i];for(j=1;j<n&&arguments[j]!==k;j++);if(j>=n)o[k]=v[k]}return o};
+var __import=function(u){return Promise.reject(new TypeError('import() is not made yet: '+u))};__import.meta={url:''};

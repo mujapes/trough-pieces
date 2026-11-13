@@ -155,6 +155,9 @@ class Document extends Node{
 var document=__w(1);
 var location=(function(){var h=__host('l')||'',m=/^(\w+:)\/\/([^\/?#]*)([^?#]*)(\?[^#]*)?(#.*)?/.exec(h)||[];
  return {href:h,protocol:m[1]||'',host:m[2]||'',hostname:(m[2]||'').replace(/:\d+$/,''),pathname:m[3]||'/',search:m[4]||'',hash:m[5]||'',origin:(m[1]||'')+'//'+(m[2]||''),toString:function(){return this.href},assign:function(){},replace:function(){},reload:function(){}}})();
+var performance={timeOrigin:Date.now(),now:function(){return Date.now()-this.timeOrigin},mark:function(){},measure:function(){},clearMarks:function(){},clearMeasures:function(){},getEntries:function(){return[]},getEntriesByType:function(){return[]},getEntriesByName:function(){return[]},timing:{navigationStart:Date.now()},navigation:{type:0}};
+var Image=function Image(w,h){var e=document.createElement('img');if(w!==undefined)e.width=w;if(h!==undefined)e.height=h;return e};
+var customElements={_d:{},define:function(n,c){this._d[n]=c},get:function(n){return this._d[n]},whenDefined:function(n){return new Promise(function(){})},upgrade:function(){}};
 var navigator={userAgent:'Mozilla/5.0 (Linux; Android 14) Trough/1',language:'en',languages:['en'],platform:'Linux aarch64',onLine:true,cookieEnabled:false,vendor:'',maxTouchPoints:5};
 var screen={width:360,height:720,availWidth:360,availHeight:720};
 var history={length:1,state:null,pushState:function(){},replaceState:function(){},back:function(){}};

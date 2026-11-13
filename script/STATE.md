@@ -441,3 +441,25 @@ failed. Known next stops: old.reddit.com `await` after a comma inside what shoul
 function that is) and dynamic `import(x)`; bbc.com: six "Unexpected token" kinds, not looked at (run with TROUGH_KEEP_FAILED).
 Next: those stops, in the order that unblocks most scripts; regenerate MAP.md; then timers after load, a tap reaching
 dispatchEvent with a redraw from the tree; XMLHttpRequest/fetch through the host.
+
+**Twenty-second unit: what BBC News and Reddit stopped on (2026-11-13).** All in compile.S unless said; 45 of 45 programs
+(`site2.js` holds every case below). (1) Tagged templates (c_tagged, from c_postfix): the call is OP_APPLY on one array, the
+pieces' array first (no `raw` yet). (2) `??=`, `||=`, `&&=` on a property. (3) The rest of an object in a pattern
+(`{a, ...r}`): c_pattern keeps up to 32 plain keys and calls the prelude's `__rest(value, keys...)`; a worked-out or numeric
+key before a rest is still "not made". (4) Class fields: c_fields goes through the class body and writes `this[key] = value`
+INTO THE CONSTRUCTOR (at its start, or right after `super(...)`; F_FPEND/F_FCUR carry the body's place; with no constructor
+the text `(){}` or `(...a){super(...a)}` is read from the piece itself); static fields are set in c_class; static blocks are
+c_function kind 5 called on the class; the class's name holds it before its members are read. Known: initialisers see the
+constructor's parameters; `super()` inside an arrow sets no fields; private names (#x) not made. (5) A named statement that
+is not a loop (`e:{... break e}`): a loop record with 68 = 2 that plain break and continue pass by. (6) await and yield inside
+a block with its own scope were refused (c_inkept looked at the block's record): fixed. (7) `arguments` read inside such a
+block, or inside an arrow, was empty: the advance scan (c_scan_block) now declares it in the function; an arrow's record has
+bit 9 and never makes its own. (8) lex.S: a template inside a template's `${ }` is now read as a template (depths wait on the
+stack); before, braces and quotes in the inner text lost the reader's place (every styled-components file). (9) `import(x)`
+and `import.meta` are the prelude's `__import` (answers with a refusal for now). prelude.js: WeakMap, WeakSet (Map and Set
+themselves), WeakRef, FinalizationRegistry. dom/document.js: performance, Image, customElements (copy it to out/ after edits).
+Real pages, scripts run / failed: old.reddit.com 17/0 (was 15/6), www.bbc.com/news 57/6 (was 17/42), www.wikipedia.org 4/0.
+What stops now: BBC `for await (x of y)` and `async function*` (not made), two "not a function" at run time (not looked at),
+reddit and others `fetch is not defined` in a load listener. checks/runbig.py is run.py with a 32 MB world (big scripts).
+Next: fetch and XMLHttpRequest through the host (most asked for by pages now); timers after load and a tap reaching
+dispatchEvent with a redraw from the tree; async generators and for await; real modules behind `__import`; shapes; fuzz.

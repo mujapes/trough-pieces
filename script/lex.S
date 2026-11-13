@@ -294,12 +294,18 @@ w_quoted:                               // a string: to the same quote, a backsl
     mov     w28, #0
     ret
 w_template:                             // a template: to the closing backtick; ${ ... } inside may hold anything, strings and
-    add     x22, x22, #1                // templates of its own included
-    mov     w2, #0                      // how deep in braces
+    add     x22, x22, #1                // templates of its own included: for each template entered from inside a ${ },
+    mov     x2, #-1                     // how deep in braces that ${ } was waits on the stack (under them all: -1)
+    str     x2, [sp, #-16]!
+    mov     w2, #0                      // how deep in braces (0: in the template's own text)
     mov     w3, #0                      // inside a quoted string within ${ }: its quote, or 0
 1:  cmp     x22, x21
-    b.hs    w_bad
-    ldrb    w0, [x20, x22]
+    b.lo    10f
+11: ldr     x1, [sp], #16
+    cmn     x1, #1
+    b.ne    11b
+    b       w_bad
+10: ldrb    w0, [x20, x22]
     add     x22, x22, #1
     cmp     w0, #'\\'
     b.ne    2f
@@ -314,7 +320,12 @@ w_template:                             // a template: to the closing backtick; 
     b.eq    4f
     cmp     w0, #39
     b.eq    4f
-    cmp     w0, #'{'
+    cmp     w0, #'`'
+    b.ne    31f
+    str     x2, [sp, #-16]!
+    mov     w2, #0
+    b       1b
+31: cmp     w0, #'{'
     cinc    w2, w2, eq
     cmp     w0, #'}'
     b.ne    1b
@@ -323,8 +334,12 @@ w_template:                             // a template: to the closing backtick; 
 4:  mov     w3, w0
     b       1b
 5:  cmp     w0, #'`'
+    b.ne    51f
+    ldr     x2, [sp], #16               // this template is over: back in the ${ } it stood in, or done
+    cmn     x2, #1
     b.eq    6f
-    cmp     w0, #'$'
+    b       1b
+51: cmp     w0, #'$'
     b.ne    1b
     CH      w1
     cmp     w1, #'{'

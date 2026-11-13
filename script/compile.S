@@ -20,6 +20,8 @@
     .equ F_PTOP, 80                     // translation in the machine's idle stack; from its other end, declared functions waiting
     .equ C_DEEPEST, 400
     // a function's record
+    .equ F_FPEND, 176                   // a class body with fields (the reader's place at its {, kept on the stack; bit 0: the class extends another), for the constructor translated next
+    .equ F_FCUR, 184                    // the same for the constructor being translated now (bit 1: its super( call is being written), or 0
     .equ F_PEND, 160                    // what the next function translated is to be: 64 a generator, 128 an async function (0: neither)
     .equ R_PARENT, 0
     .equ R_NAMES, 8                     // its names (parameters first), and how many
@@ -68,8 +70,9 @@
 
 // c_compile: the text at x20, x21 bytes long, as instructions in the world -> x0 1, or -1 with the error left in the world
 c_compile:
-    stp     x29, x30, [sp, #-176]!
+    stp     x29, x30, [sp, #-192]!
     mov     x29, sp
+    stp     xzr, xzr, [x29, #F_FPEND]
     str     xzr, [x29, #F_PEND]
     mov     x9, #-1
     stp     x9, xzr, [x29, #F_CONSTPOS]
@@ -157,7 +160,7 @@ c_compile:
     str     w9, [x19, #W_STATE]
     mov     x0, #1
 c_out:
-    ldp     x29, x30, [sp], #176
+    ldp     x29, x30, [sp], #192
     ret
 // c_native_in: the opening lines can name the maker of built-in functions, `__n` (a global, made the first time);
 // c_native_out: nothing after them can: its name becomes the empty one.
@@ -1392,6 +1395,24 @@ c_scan_block:
     str     xzr, [x29, #88]
 1:  bl      next_word
 100: cbz    w23, 9f
+    cmp     w23, #K_NAME                // `arguments` anywhere in the body proper: a variable of this function (blocks with
+    b.ne    103f                        // a scope of their own, and arrows, must find it there, not make another)
+    ldr     x9, [x29, #F_FUNC]
+    cbz     x9, 103f
+    ldr     x10, [x9, #R_FLAGS]
+    tbnz    x10, #9, 103f
+    adr     x0, c_w_arguments
+    mov     x1, #(c_w_arguments_end - c_w_arguments)
+    bl      c_is
+    b.ne    103f
+    bl      c_declare
+    ldr     x9, [x29, #F_FUNC]
+    ldr     x10, [x9, #R_FLAGS]
+    tbnz    x10, #3, 103f
+    orr     x10, x10, #8
+    orr     x10, x10, x0, lsl #16
+    str     x10, [x9, #R_FLAGS]
+103:
     bl      c_scan_meth
     ldp     w1, w2, [sp]
     ldp     w3, w4, [sp, #8]
@@ -1589,9 +1610,12 @@ c_peek:
 // c_inkept: is the function being translated of the kind x0 (64 a generator, 128 async) -> flags: ne if so. Uses x9.
 c_inkept:
     ldr     x9, [x29, #F_FUNC]
-    cbz     x9, 1f
-    ldr     x9, [x9, #R_FLAGS]
-    tst     x9, x0
+0:  cbz     x9, 1f
+    ldr     x10, [x9, #R_FLAGS]
+    tbz     x10, #8, 2f                 // (a block with a scope of its own: the function around it is what counts)
+    ldr     x9, [x9, #R_PARENT]
+    b       0b
+2:  tst     x10, x0
     ret
 1:  cmp     x9, x9
     ret
@@ -1626,8 +1650,13 @@ c_scan_inner:                           // marks the function being translated a
 // 96 a declaration's variable (its reading instruction), 104 the variable holding itself (a named expression) plus one,
 // 112 the jump over it, 120 the jump to its declared functions' making, 128 where the body proper starts.
 c_function:
-    stp     x30, x0, [sp, #-240]!
+    stp     x30, x0, [sp, #-256]!
     DEEPER
+    ldr     x9, [x29, #F_FPEND]         // 240: the fields of the constructor around this function
+    str     xzr, [x29, #F_FPEND]
+    ldr     x10, [x29, #F_FCUR]
+    str     x10, [sp, #240]
+    str     x9, [x29, #F_FCUR]
     stp     xzr, xzr, [sp, #224]        // 224: it has pattern parameters (then: how many names its defaults may see); 232: kept
     stp     xzr, xzr, [sp, #208]        // 208: it has defaults; 216: its last parameter gathers the rest (flag 4)
     ldr     x9, [x29, #F_FUNC]
@@ -1669,10 +1698,19 @@ c_function:
 11: bl      next_word
     b       2f
 1:  cbnz    w9, c_unexpected
-2:  add     x9, sp, #16
+2:  ldr     w9, [sp, #8]                // (an arrow's record has bit 9: `arguments` in it is the function's around it)
+    sub     w9, w9, #2
+    cmp     w9, #1
+    b.hi    21f
+    ldr     x9, [sp, #16 + R_FLAGS]
+    orr     x9, x9, #0x200
+    str     x9, [sp, #16 + R_FLAGS]
+21: add     x9, sp, #16
     str     x9, [x29, #F_FUNC]
     str     xzr, [x29, #F_LOOP]
     ldr     w9, [sp, #8]
+    cmp     w9, #5                      // (5: no parameters at all, the body's { is the current word: a class's static block)
+    b.eq    5f
     cmp     w9, #2
     b.ne    3f
     bl      c_declare
@@ -1783,7 +1821,7 @@ c_function:
     cmp     w9, #2
     b.lo    6f
     cmp     w9, #4                      // (4: a method written short in an object: no arrow)
-    b.eq    6f
+    b.hs    6f
     EXPECT  11
 6:  ldr     w9, [sp, #8]                // a named function expression can call itself by its name
     ldr     x10, [sp, #88]
@@ -1798,7 +1836,13 @@ c_function:
     b.lo    61f
     add     x0, x0, #1
     str     x0, [sp, #104]
-61: mov     w0, #OP_JMP
+61: ldr     x9, [x29, #F_FCUR]          // a constructor that fields are written into may get inner functions from them
+    cbz     x9, 611f
+    ldr     x9, [sp, #16 + R_FLAGS]
+    orr     x9, x9, #1
+    str     x9, [sp, #16 + R_FLAGS]
+611:
+    mov     w0, #OP_JMP
     bl      c_jump
     str     x0, [sp, #112]
     ldr     x9, [x29, #F_LEN]
@@ -1824,6 +1868,11 @@ c_function:
     add     x0, sp, #144
     bl      c_defaults
 70: bl      c_kept
+    ldr     x0, [x29, #F_FCUR]          // a class with no parent: its fields are set before the constructor's own words
+    cbz     x0, 72f
+    tbnz    x0, #0, 72f
+    mov     w1, #0
+    bl      c_fields
 72: mov     w9, #34
     cmp     w23, #K_PUNCT
     ccmp    w24, w9, #0, eq
@@ -1871,6 +1920,7 @@ c_function:
     ldr     x10, [sp, #16 + R_COUNT]
     str     w10, [x9, #20]
     ldr     x10, [sp, #16 + R_FLAGS]
+    and     x10, x10, #0xfffffffffffffdff
     ldr     w11, [sp, #8]               // an arrow (flag 2) takes its `this` from where it was made
     sub     w11, w11, #2
     cmp     w11, #1
@@ -1910,7 +1960,10 @@ c_function:
     bl      next_word
 93: NOLV
     SHALLOWER
-    ldr     x30, [sp], #240
+    ldr     x9, [sp, #240]
+    str     x9, [x29, #F_FCUR]
+    ldr     x30, [sp]
+    add     sp, sp, #256
     ret
 // c_skip_default: steps over a parameter's default, from its first word to the , or ) that ends it (left as the current word)
 c_skip_default:
@@ -2345,11 +2398,37 @@ c_assign:
     b       7f
 2:  cmp     w10, #OP_JFK
     b.lo    4f
-    ldr     w9, [sp, #8]                // (on a property: to come)
+    ldr     w9, [sp, #8]
     and     w9, w9, #0xff
     sub     w9, w9, #OP_GETP
     cmp     w9, #3
-    b.ls    c_notyet
+    b.hi    20f
+    ldr     w0, [sp, #8]                // on a property: the object (and key) stay under the value read; if it is kept as it
+    bl      c_lvdup                     // is they are dropped from under it
+    ldr     w0, [sp, #12]
+    bl      c_jump
+    str     x0, [sp, #16]
+    bl      next_word
+    bl      c_assign
+    ldr     w0, [sp, #8]
+    bl      c_store
+    mov     w0, #OP_JMP
+    bl      c_jump
+    str     x0, [sp, #24]
+    ldr     x0, [sp, #16]
+    bl      c_patch
+    OP      OP_SWAP
+    OP      OP_POP
+    ldr     w9, [sp, #8]
+    and     w9, w9, #0xff
+    cmp     w9, #OP_GETE
+    b.ne    21f
+    OP      OP_SWAP
+    OP      OP_POP
+21: ldr     x0, [sp, #24]
+    bl      c_patch
+    b       8f
+20: ldr     w10, [sp, #12]
     mov     w0, w10                     // &&= ||= ??=: the right side is worked out, and kept, only if needed
     bl      c_jump
     str     x0, [sp, #16]
@@ -2575,7 +2654,14 @@ c_postfix:
     bl      c_byte
 22: NOLV
     b       2b
-20: bl      c_member                    // o.name and o[key]
+20: cmp     w23, #K_TEMPLATE            // tag`text ${v}`: the tag is called with the pieces of text in an array, then the values
+    b.ne    26f
+    bl      c_method
+    str     w0, [sp, #12]
+    bl      c_tagged
+    bl      next_word
+    b       21b
+26: bl      c_member                    // o.name and o[key]
     cbnz    w0, 2b
     ISP     19, 5f                      // a?.b, a?.[k], a?.(x): if a is null or undefined the whole rest of the chain is undefined
     bl      next_word
@@ -3082,6 +3168,74 @@ c_template:
     SHALLOWER
     ldr     x30, [sp], #32
     ret
+// c_tagged: the current word is a template after a tag: leaves one array on the stack, the arguments of the call: the array
+// of the pieces of text (always one more than the values; its `raw` is itself), then each value. Kept: 16 just past the
+// closing mark, 24 where this piece of text ends. While it works the stack holds the pieces' array under the arguments'.
+c_tagged:
+    stp     x30, xzr, [sp, #-32]!
+    DEEPER
+    add     x9, x25, x26
+    str     x9, [sp, #16]
+    add     x9, x25, #1
+    str     x9, [sp, #24]
+    mov     w0, #OP_ARRAY
+    mov     w1, #0
+    bl      c_op16
+    OP      OP_DUP
+    mov     w0, #OP_ARRAY
+    mov     w1, #1
+    bl      c_op16
+    ldr     x10, [sp, #24]
+1:  ldr     x9, [sp, #16]
+    sub     x9, x9, #1
+    mov     x11, x10
+2:  cmp     x11, x9
+    b.hs    3f
+    ldrb    w12, [x20, x11]
+    cmp     w12, #'\\'
+    b.ne    21f
+    add     x11, x11, #2
+    b       2b
+21: cmp     w12, #'$'
+    b.ne    22f
+    add     x13, x11, #1
+    cmp     x13, x9
+    b.hs    22f
+    ldrb    w13, [x20, x13]
+    cmp     w13, #'{'
+    b.eq    3f
+22: add     x11, x11, #1
+    b       2b
+3:  cmp     x11, x9
+    csel    x11, x9, x11, hi
+    str     x11, [sp, #24]
+    sub     x25, x10, #1
+    sub     x26, x11, x10
+    add     x26, x26, #2
+    OP      OP_SWAP
+    bl      c_string
+    bl      c_strconst
+    OP      OP_APPEND
+    OP      OP_SWAP
+    ldr     x11, [sp, #24]
+    ldr     x9, [sp, #16]
+    sub     x9, x9, #1
+    cmp     x11, x9
+    b.hs    8f
+    add     x22, x11, #2
+    bl      next_word
+    bl      c_expr
+    ISP     34, c_unexpected
+    OP      OP_APPEND
+    mov     x10, x22
+    b       1b
+8:  ldr     x22, [sp, #16]
+    OP      OP_SWAP
+    OP      OP_POP
+    NOLV
+    SHALLOWER
+    ldr     x30, [sp], #32
+    ret
 // Patterns: [a, , b = 1, ...rest] and {a, b: c, "d": e = 2, [key]: f}, each target a name, a place that can be assigned to, or
 // another pattern. w0 says whether names are declared (1: var, let, const, parameters) or only assigned to (0).
 // c_destructure: the current word begins a pattern that an = and a value follow: the value is worked out first (the pattern's
@@ -3170,7 +3324,8 @@ c_hidden:
 // 2 worked out and on the stack), 24 an object pattern?, 28 which item, 32 the name constant, 36 the rest?, 40 the number,
 // 48 and 56 jumps, 64 and 72 a short name's word.
 c_pattern:
-    stp     x30, x0, [sp, #-80]!
+    stp     x30, x0, [sp, #-224]!           // (from 80: how many keys an object pattern has named, -1 if one was not a plain name; from 84: which constants)
+    str     wzr, [sp, #80]
     DEEPER
     cmp     w24, #33
     cset    w9, eq
@@ -3199,8 +3354,6 @@ c_pattern:
 2:  str     wzr, [sp, #36]
     str     wzr, [sp, #20]
     ISP     1, 20f
-    ldr     w9, [sp, #24]
-    cbnz    w9, c_notyet                // (the rest of an object: to come)
     mov     w9, #1
     str     w9, [sp, #36]
     bl      next_word
@@ -3332,7 +3485,26 @@ c_pattern:
     cmp     w9, #2
     b.ne    51f
     OP      OP_POP
-51: NOLV
+51: ldr     w9, [sp, #24]               // an object pattern remembers the key, for a rest that may follow
+    cbz     w9, 53f
+    ldr     w9, [sp, #36]
+    cbnz    w9, 53f
+    ldr     w10, [sp, #80]
+    tbnz    w10, #31, 53f
+    ldr     w9, [sp, #20]
+    cmp     w9, #0
+    mov     w11, #32
+    ccmp    w10, w11, #2, eq
+    b.lo    54f
+    mov     w10, #-1
+    str     w10, [sp, #80]
+    b       53f
+54: add     x11, sp, #84
+    ldr     w9, [sp, #32]
+    str     w9, [x11, x10, lsl #2]
+    add     w10, w10, #1
+    str     w10, [sp, #80]
+53: NOLV
     ldr     w9, [sp, #28]
     add     w9, w9, #1
     str     w9, [sp, #28]
@@ -3351,7 +3523,7 @@ c_pattern:
 9:  bl      next_word
     NOLV
     SHALLOWER
-    ldr     x30, [sp], #80
+    ldr     x30, [sp], #224
     ret
 60: str     x30, [sp, #-16]!            // the item is fetched: a copy of the value (it lies under what the target put down)
     ldr     w9, [sp, #16 + 20]
@@ -3382,7 +3554,40 @@ c_pattern:
     ldr     w1, [sp, #16 + 28]
     bl      c_op16
     b       69f
-63: ldr     w9, [sp, #16 + 20]
+63: ldr     w9, [sp, #16 + 36]
+    cbz     w9, 66f
+    ldr     w9, [sp, #16 + 80]          // ...rest: the prelude's __rest(value, each key named before) -> a new object
+    tbnz    w9, #31, c_notyet
+    stp     x25, x26, [sp, #-32]!
+    str     wzr, [sp, #16]
+    adr     x9, c_w_rest
+    sub     x25, x9, x20
+    mov     x26, #6
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    OP      OP_SWAP
+67: ldr     w9, [sp, #16]
+    ldr     w10, [sp, #32 + 16 + 80]
+    cmp     w9, w10
+    b.hs    68f
+    add     x11, sp, #32 + 16 + 84
+    ldr     w1, [x11, x9, lsl #2]
+    add     w9, w9, #1
+    str     w9, [sp, #16]
+    mov     w0, #OP_CONST
+    bl      c_op16
+    b       67b
+68: OP      OP_CALL
+    ldr     w0, [sp, #16]
+    add     w0, w0, #1
+    bl      c_byte
+    ldp     x25, x26, [sp], #32
+    b       69f
+c_w_rest: .ascii "__rest"
+    .balign 4
+66: ldr     w9, [sp, #16 + 20]
     cbnz    w9, 64f
     mov     w0, #OP_GETP
     ldr     w1, [sp, #16 + 32]
@@ -3409,7 +3614,11 @@ c_super:
     bl      next_word
     OP      OP_THIS
     ISP     35, 2f
-    mov     w0, #OP_SUPER
+    ldr     x9, [x29, #F_FCUR]          // super(...) in a constructor whose class has fields: they are set right after it
+    tbz     x9, #0, 10f
+    orr     x9, x9, #2
+    str     x9, [x29, #F_FCUR]
+10: mov     w0, #OP_SUPER
     mov     w1, #0xffff
     bl      c_op16
 1:  bl      next_word
@@ -3439,7 +3648,13 @@ c_super:
 4:  OP      OP_SWAP
     OP      OP_POP
 8:  NOLV
-    ldr     x30, [sp], #16
+    ldr     x0, [x29, #F_FCUR]
+    tbz     x0, #1, 81f
+    and     x9, x0, #0xfffffffffffffffd
+    str     x9, [x29, #F_FCUR]
+    mov     w1, #0
+    bl      c_fields
+81: ldr     x30, [sp], #16
     ret
 c_w_constructor: .ascii "constructor"
 c_w_prototype:   .ascii "prototype"
@@ -3509,13 +3724,47 @@ c_class:
     str     w9, [sp, #28]
 2:  ISP     33, c_unexpected
     LEXSAVE
+    mov     x0, sp
+    mov     w1, #1
+    bl      c_fields
+    str     w0, [sp, #64 + 36]          // 36: how many fields each new object gets
     bl      c_find_ctor
     b.ne    3f
-    mov     w0, #4
+    ldr     w9, [sp, #64 + 36]
+    cbz     w9, 21f
+    ldr     w10, [sp, #64 + 28]
+    mov     x9, sp
+    orr     x9, x9, x10
+    str     x9, [x29, #F_FPEND]
+21: mov     w0, #4
     bl      c_function
     LEXBACK
     b       4f
-3:  LEXBACK
+3:  ldr     w9, [sp, #64 + 36]
+    cbz     w9, 31f
+    ldr     w10, [sp, #64 + 28]         // fields and no constructor: the plainest one is read from here, and gets them
+    mov     x9, sp
+    orr     x9, x9, x10
+    str     x9, [x29, #F_FPEND]
+    str     x21, [sp, #-16]!
+    adr     x9, c_w_ctor0
+    mov     x11, #(c_w_ctor1 - c_w_ctor0)
+    cbz     w10, 32f
+    adr     x9, c_w_ctor1
+    mov     x11, #(c_w_ctor_end - c_w_ctor1)
+32: sub     x22, x9, x20
+    add     x21, x22, x11
+    bl      next_word
+    mov     w0, #4
+    bl      c_function
+    ldr     x21, [sp], #16
+    LEXBACK
+    b       4f
+c_w_ctor0: .ascii "(){}"
+c_w_ctor1: .ascii "(...a){super(...a)}"
+c_w_ctor_end:
+    .balign 4
+31: LEXBACK
     mov     x0, #40
     bl      w_alloc
     cbz     x0, c_full
@@ -3536,7 +3785,11 @@ c_class:
 4:  ldr     w9, [sp, #28]
     cbz     w9, 5f
     OP      OP_EXTENDS
-5:  OP      OP_DUP
+5:  ldr     w0, [sp, #16]               // its own name holds it from here on (static fields and blocks may use it)
+    cmn     w0, #1
+    b.eq    51f
+    bl      c_store
+51: OP      OP_DUP
     adr     x0, c_w_prototype
     mov     x1, #(c_w_proto_end - c_w_prototype)
     bl      w_string
@@ -3558,6 +3811,23 @@ c_class:
     mov     w9, #-1
     stp     wzr, w9, [sp, #20]
     ISK     34, 62f
+    bl      c_peek
+    cmp     w0, #K_PUNCT
+    b.ne    611f
+    cmp     w1, #33
+    b.ne    611f
+    bl      next_word                   // static { ... }: a function with no name, called once on the class
+    OP      OP_PICK
+    mov     w0, #1
+    bl      c_byte
+    mov     w0, #5
+    bl      c_function
+    OP      OP_CALLM
+    mov     w0, #0
+    bl      c_byte
+    OP      OP_POP
+    b       6b
+611:
     bl      c_peek_acc
     b.ne    62f
     mov     w9, #1
@@ -3590,9 +3860,14 @@ c_class:
     bl      c_skip_pattern
     b       6b
 64: OP      OP_SWAP
-65: bl      c_methkind
+65: ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #40]
+    bl      c_methkind
     bl      c_propkey
-    ISP     35, c_notyet
+    cmp     w23, #K_PUNCT
+    b.ne    68f
+    cmp     w24, #35
+    b.ne    68f
     mov     w0, #4
     bl      c_function
     OP      OP_HOME
@@ -3608,6 +3883,23 @@ c_class:
     cbz     w9, 6b
     OP      OP_SWAP
     b       6b
+68: str     xzr, [x29, #F_PEND]         // a field. static: set on the class here and now; otherwise the constructor has
+    ISP     55, 681f                    // it already (c_fields), and what is written here is taken back
+    bl      next_word
+    bl      c_assign
+    b       682f
+681:
+    OP      OP_UNDEF
+682:
+    ldr     w9, [sp, #20]
+    cbz     w9, 683f
+    OP      OP_INITE
+    b       67b
+683:
+    ldr     x9, [sp, #40]
+    str     x9, [x29, #F_LEN]
+    NOLV
+    b       6b
 9:  OP      OP_POP
     ldr     w0, [sp, #16]
     cmn     w0, #1
@@ -3616,6 +3908,92 @@ c_class:
 91: bl      next_word
     NOLV
     SHALLOWER
+    ldr     x30, [sp], #48
+    ret
+// c_fields: goes through a class's body (x0: the reader's place at its {, low two bits passed over) and writes, for each
+// field that is not static, this[key] = value (undefined without one); everything else in the body is stepped over (what
+// stepping over writes is taken back). w1 1: only count, write nothing. -> w0 how many. The reader ends where it began.
+// Kept: 8 the place, 16 only count?, 20 how many, 32 static?, 40 where this member's instructions began.
+c_fields:
+    stp     x30, x0, [sp, #-48]!
+    stp     w1, wzr, [sp, #16]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #24]
+    DEEPER
+    LEXSAVE
+    ldr     x9, [sp, #64 + 8]
+    and     x9, x9, #0xfffffffffffffffc
+    ldp     x22, x25, [x9]
+    ldp     x26, x23, [x9, #16]
+    ldp     x24, x27, [x9, #32]
+    ldr     x28, [x9, #48]
+    ldr     d8, [x9, #56]
+    bl      next_word
+1:  cbz     w23, c_unexpected
+    cmp     w23, #K_PUNCT
+    b.ne    2f
+    cmp     w24, #34
+    b.eq    9f
+    cmp     w24, #39
+    b.ne    2f
+    bl      next_word
+    b       1b
+2:  str     wzr, [sp, #64 + 32]
+    ldr     x9, [x29, #F_LEN]
+    str     x9, [sp, #64 + 40]
+    ISK     34, 3f
+    bl      c_peek
+    cmp     w0, #K_PUNCT
+    b.ne    21f
+    cmp     w1, #33
+    b.ne    21f
+    bl      next_word
+    bl      c_skip_pattern
+    b       1b
+21: bl      c_peek_acc
+    b.ne    3f
+    mov     w9, #1
+    str     w9, [sp, #64 + 32]
+    bl      next_word
+3:  cmp     w23, #K_KEYWORD
+    b.ne    4f
+    sub     w9, w24, #38
+    cmp     w9, #1
+    b.hi    4f
+    bl      c_peek_acc
+    b.ne    4f
+    bl      next_word
+4:  bl      c_methkind
+    str     xzr, [x29, #F_PEND]
+    OP      OP_THIS
+    bl      c_propkey
+    ISP     35, 5f
+    bl      c_skip_pattern
+    bl      c_skip_pattern
+    b       7f
+5:  ISP     55, 6f
+    bl      next_word
+    bl      c_assign
+    b       61f
+6:  OP      OP_UNDEF
+61: ldr     w9, [sp, #64 + 32]
+    cbnz    w9, 7f
+    ldr     w9, [sp, #64 + 20]
+    add     w9, w9, #1
+    str     w9, [sp, #64 + 20]
+    ldr     w9, [sp, #64 + 16]
+    cbnz    w9, 7f
+    OP      OP_INITE
+    OP      OP_POP
+    NOLV
+    b       1b
+7:  ldr     x9, [sp, #64 + 40]
+    str     x9, [x29, #F_LEN]
+    NOLV
+    b       1b
+9:  LEXBACK
+    SHALLOWER
+    ldr     w0, [sp, #20]
     ldr     x30, [sp], #48
     ret
 // c_rxlit: a pattern literal /source/flags is the call RegExp("source", "flags"), made anew each time it is reached.
@@ -3694,7 +4072,19 @@ c_primary:
     mov     w0, #0
     bl      c_class
     b       9f
-21: cmp     w24, #22
+21: cmp     w24, #17                    // import(x), import.meta: the prelude's __import stands for the word
+    b.ne    211f
+    adr     x9, c_w_import
+    sub     x25, x9, x20
+    mov     x26, #8
+    bl      c_global
+    mov     w1, w0
+    mov     w0, #OP_GETG
+    bl      c_op16
+    b       8f
+c_w_import: .ascii "__import"
+211:
+    cmp     w24, #22
     b.eq    c_super
     cmp     w24, #35                    // async function, async name => , async (names) =>
     b.ne    773f
@@ -3811,6 +4201,9 @@ c_primary:
     b.eq    50f
     ldr     x9, [x29, #F_FUNC]          // `arguments` inside a function: a variable of it, filled when it is called
     cbz     x9, 45f
+    ldr     x10, [x9, #R_FLAGS]
+    tst     x10, #0x300
+    b.ne    45f
     adr     x0, c_w_arguments
     mov     x1, #(c_w_arguments_end - c_w_arguments)
     bl      c_is
@@ -4054,7 +4447,25 @@ s_expr:
     stp     x25, x26, [x29, #F_LABEL]
     bl      next_word
     bl      next_word
-    b       s_again
+    cmp     w23, #K_KEYWORD
+    b.ne    3f
+    cmp     w24, #30
+    b.eq    s_again
+    cmp     w24, #9
+    b.eq    s_again
+    cmp     w24, #14
+    b.eq    s_again
+    cmp     w24, #23
+    b.eq    s_again
+3:  LOOP_IN                             // any other statement with a name: a record like a loop's (68: 2), which only a
+    mov     w9, #2                      // break with that name goes to
+    stp     wzr, w9, [sp, #64]
+    bl      c_stmt
+    ldr     x0, [sp, #40]
+    ldr     x1, [x29, #F_LEN]
+    bl      c_resolve
+    LOOP_OUT
+    b       s_done
 1:  bl      c_expr
     OP      OP_POP
     bl      c_semi
@@ -4351,12 +4762,14 @@ s_continue:
     ldr     x12, [sp, #16]
     b       6f
 4:  cbz     x12, c_noloop
+    ldr     w9, [x12, #36]              // a named statement that is not a loop is passed by
+    cmp     w9, #2
+    b.eq    41f
     ldr     x10, [sp, #8]
     cmp     x10, #16                    // continue passes by a switch
     b.ne    6f
-    ldr     w9, [x12, #36]
     cbz     w9, 6f
-    ldr     x12, [x12]
+41: ldr     x12, [x12]
     b       4b
 6:  str     x12, [sp, #16]
     mov     w0, #0
