@@ -840,3 +840,9 @@ because Object.defineProperty(..,{value}) makes ENUMERABLE properties (channels/
 non-enumerable flag per property (idea: a bit in the key word above the 48-bit offset; o_keyeq must mask it; KEYS skips it;
 defineProperty default enumerable false; class methods non-enumerable). Landing-pages now stops on BigInt (not defined):
 BigInt is a large stage of its own (the lexer already reads 123n as kind 8).
+Unit 49 [by Opus]: NON-ENUMERABLE properties: a key word tagged 0xfff8 (n_hide, built-in 72; the key lister in objects.S
+skips it; o_keyeq and the collector are unaffected). Object.defineProperty hides unless enumerable (not on arrays).
+hidden-props.js; 69 of 69. Still missing: writable/configurable; class methods non-enumerable; getOwnPropertyNames omits
+hidden ones. document.js: domain, URL, Blob/File (text only); .content only for <template> (meta.content is the attribute).
+GITHUB: core runs clean; 1 failed script left: landing-pages needs BigInt. Wikipedia 8/0, HN 1/0, Guardian 18/1.
+NEXT: BigInt (a stage of its own: the lexer reads 123n as kind 8; plan in intent.md first), or the Guardian's 1.

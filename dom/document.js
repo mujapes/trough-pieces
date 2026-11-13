@@ -120,7 +120,7 @@ class Element extends Node{
  matches(s){var p=String(s).split(',');for(var j=0;j<p.length;j++){var ch=__split(p[j]);if(ch&&__is(this,ch[ch.length-1])&&__chain(this,ch))return true}return false}
  attachShadow(o){var f=document.createDocumentFragment();f.host=this;f.mode=o&&o.mode;this.__shadow=f;if(!o||o.mode!=='closed')this.shadowRoot=f;return f}
  attachInternals(){var e=this;return {states:new Set(),setFormValue:function(){},setValidity:function(){},checkValidity:function(){return true},reportValidity:function(){return true},get form(){return e.closest('form')},role:null,ariaLabel:null,shadowRoot:e.__shadow||null}}
- get content(){return this.__content||(this.__content=document.createDocumentFragment())}
+ get content(){if(String(this.tagName).toLowerCase()!=="template")return this.getAttribute("content");return this.__content||(this.__content=document.createDocumentFragment())}
  closest(s){var e=this;while(e&&e.nodeType==1){if(e.matches(s))return e;e=e.parentNode}return null}
  insertAdjacentHTML(pos,h){var t=document.createElement('div');t.innerHTML=h;var k=t.childNodes,p=String(pos).toLowerCase(),f=this.firstChild,n=this.nextSibling,up=this.parentNode;
   for(var i=0;i<k.length;i++){if(p=='beforeend')this.appendChild(k[i]);else if(p=='afterbegin')this.insertBefore(k[i],f);else if(up)up.insertBefore(k[i],p=='beforebegin'?this:n)}}
@@ -152,6 +152,8 @@ class Document extends Node{
  get links(){return this.getElementsByTagName('a')}
  get forms(){return this.getElementsByTagName('form')}
  get location(){return location}
+ get domain(){return location.hostname}
+ get URL(){return location.href}
  get defaultView(){return window}
  write(){var s='';for(var i=0;i<arguments.length;i++)s+=arguments[i];__d('w '+s)}
  writeln(){var s='';for(var i=0;i<arguments.length;i++)s+=arguments[i];__d('w '+s+'\n')}
@@ -248,3 +250,7 @@ class AbortController{constructor(){this.signal=new AbortSignal()}
 /* custom elements [by Opus]: an element whose tag has a defined class gets that class's prototype and runs its constructor
    on itself (Element's constructor answers with the element being upgraded; super() takes it over as this) */
 var __upg=null;function __upgrade(e,n){var c=customElements._d[n];if(!c||e.__up)return;e.__up=1;Object.setPrototypeOf(e,c.prototype);__upg=e;try{new c()}catch(x){console.log('custom element '+n+': '+x)}__upg=null}
+/* Blob / File [by Opus]: text only (parts joined); enough for code that builds one and reads its size or text */
+class Blob{constructor(p,o){var s='';if(p)for(var x of p)s+=typeof x==='string'?x:x instanceof Blob?x.__s:(x&&x.byteLength!==undefined?new TextDecoder().decode(x):String(x));this.__s=s;this.size=new TextEncoder().encode(s).length;this.type=o&&o.type?String(o.type).toLowerCase():''}
+ text(){return Promise.resolve(this.__s)} arrayBuffer(){return Promise.resolve(new TextEncoder().encode(this.__s).buffer)} slice(a,b,t){return new Blob([this.__s.slice(a,b)],{type:t})}}
+class File extends Blob{constructor(p,n,o){super(p,o);this.name=String(n);this.lastModified=o&&o.lastModified||Date.now()}}

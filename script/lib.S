@@ -561,6 +561,36 @@ n_ownacc:
 9:  VAL     x0, T_UNDEF
     mov     x30, x15
     ret
+// 72 [by Opus]: (object, string key): its own property stops being enumerable: the key's word gets the tag 0xfff8 (the
+// key lists skip it; o_keyeq compares by the text, so finding it is unchanged; the collector looks at the low 48 bits)
+n_hide:
+    mov     x15, x30
+    ldp     x0, x1, [x1]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    9f
+    lsr     x9, x1, #48
+    mov     w10, #T_STRING
+    cmp     w9, w10
+    b.ne    9f
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    bl      o_find
+    cbz     x2, 9f
+    ldr     x9, [x0, #O_PROPS]          // only a named property of its own (not a global variable's place)
+    add     x9, x19, x9
+    sub     x2, x2, #8
+    cmp     x2, x9
+    b.lo    9f
+    ldr     x3, [x2]
+    and     x3, x3, #0xffffffffffff
+    mov     x9, #0xfff8000000000000
+    orr     x3, x3, x9
+    str     x3, [x2]
+9:  VAL     x0, T_UNDEF
+    mov     x30, x15
+    ret
 n_ident:
     ldr     x9, [x1]
     and     x9, x9, #0xffffffffffff
@@ -1168,6 +1198,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table
-    .equ    N_COUNT, 72
+    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table, n_hide - n_table
+    .equ    N_COUNT, 73
     .ltorg

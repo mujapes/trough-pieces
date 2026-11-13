@@ -1379,6 +1379,10 @@ m_keylist:
     ldr     x1, [x3]
     add     x2, x2, #1
     str     x2, [sp, #32]
+    lsr     x9, x1, #48                 // [by Opus] a key tagged 0xfff8 is a property that is not enumerable (n_hide)
+    mov     w10, #0xfff8
+    cmp     w9, w10
+    b.eq    3b
     ldr     x4, [sp, #40]
     cbz     x4, 4f
     ldr     x2, [x19, #W_K_CONSTRUCTOR]
