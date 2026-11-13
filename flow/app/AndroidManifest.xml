@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="t.flow" android:versionCode="1" android:versionName="flow-1">
+  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="33"/>
+  <application android:label="Flow" android:hasCode="false" android:extractNativeLibs="true">
+    <activity android:name="android.app.NativeActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden|keyboard|screenLayout|uiMode">
+      <meta-data android:name="android.app.lib_name" android:value="flow"/>
+      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+    </activity>
+  </application>
+</manifest>
