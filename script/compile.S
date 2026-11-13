@@ -2458,11 +2458,17 @@ c_string:
     cset    x9, ne
     orr     x9, x0, x9, lsl #63
     str     x9, [sp, #8]
+    ldr     x10, [x19, #W_GCS]          // [by Opus] a collection inside w_text frees the first copy (nothing holds it):
+    str     x10, [sp, #-16]!            // then the second must not be moved down over freed room
     mov     x0, x6
     mov     x1, x5
     bl      w_text
+    ldr     x10, [sp], #16
     cbz     x0, c_full
     and     x0, x0, #0xffffffffffff
+    ldr     x9, [x19, #W_GCS]
+    cmp     x9, x10
+    b.ne    89f
     ldr     x1, [sp, #8]
     tbnz    x1, #63, 89f
     ldr     x9, [x19, #W_LAST]          // moved down only if both copies were made at the top, one after the other

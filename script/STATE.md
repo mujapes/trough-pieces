@@ -941,3 +941,8 @@ Unit 63 [by Opus]: BigInt === by interning: BigInt() returns one object per deci
 and + or - with the number 1 or -1 treats it as a BigInt (DEVIATION: 5n+1 answers 6n instead of throwing; a real fix is an
 increment instruction that knows its operand). bigint-eq.js; 82 of 82.
 Unit 64 [by Opus]: console.log prints top-level BigInts as 5n (prelude console p). 82 of 82.
+Unit 65 [by Opus]: collector-fault candidate fixed in compile.S (string literal with non-ASCII text): the first copy's place was
+kept only as a raw number on the processor stack, so a collection inside the second w_text freed it, and the second copy could
+then be moved down over room already on the free list (a block both live and free: later reuse damages it, e.g. a function's
+plan). Now W_GCS is read before and after; if a collection happened the second copy stays where it is. Not proven to be THE
+GitHub fault (it no longer reproduces); no stress reproducer yet. 82 of 82.
