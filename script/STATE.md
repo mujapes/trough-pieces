@@ -897,3 +897,11 @@ Unit 55 [by Opus]: Guardian 18/1 -> 29/0. (1) host/browse.c: a tree question ('d
 (2) prelude.js: Array forEach/map/filter/some/every/find/findIndex take thisArg (they ignored it; IntersectionObserver polyfill).
 thisarg.js; 75 of 75. Sites: Wikipedia 8/0, HN 1/0, GitHub 5/0, Guardian 29/0.
 NEXT candidates: BBC, NPR (old notes say the sites' own faults); BigInt stage 2 (typeof, literals, operators); the collector fault.
+Unit 56 [by Opus]: BBC 62/297 -> 62/0. prelude.js bind: `new` on a bound function constructs the target (Reflect.construct) and
+the bound function shares the target's prototype (DI containers do `new (C.bind.apply(C,[void 0,...args]))`). document.js:
+per-tag element classes (HTML<Tag>Element extends Element, __tagc by tag name, __w picks the class; SVGElement for svg tags):
+every element was instanceof HTMLIFrameElement before. newbound.js; 76 of 76.
+Seen: errors made by the engine are objects whose `message` is an own enumerable key and constructor.name is '' (node: Error,
+no own enumerable keys); String(element) gives [object Object]. Symbol.hasInstance is not supported by instanceof.
+Sites: Wikipedia 8/0, HN 1/0, GitHub 5/0, Guardian 29/0, BBC 62/0, NPR 20/306 (299 JSON errors: next).
+Local page testing: python3 -m http.server 8765 --bind 127.0.0.1 in a folder, then out/browse out http://127.0.0.1:8765/x.html.

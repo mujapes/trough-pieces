@@ -93,7 +93,7 @@ S.padStart=function(k,p){var s=''+this,f='';p=p===undefined?' ':''+p;if(!p.lengt
 S.padEnd=function(k,p){var s=''+this,f='';p=p===undefined?' ':''+p;if(!p.length)return s;while(f.length+s.length<k)f+=p;return s+f.substring(0,k-s.length)};
 S.concat=function(){var s=''+this;for(var i=0;i<arguments.length;i++)s+=arguments[i];return s};
 Function.prototype.call=n(28);Function.prototype.apply=n(29);
-Function.prototype.bind=function(t){var f=this,a=[];for(var i=1;i<arguments.length;i++)a.push(arguments[i]);return function(){var b=a.slice();for(var i=0;i<arguments.length;i++)b.push(arguments[i]);return f.apply(t,b)}};
+Function.prototype.bind=function(t){var f=this,a=[];for(var i=1;i<arguments.length;i++)a.push(arguments[i]);var g=function(){var b=a.slice();for(var i=0;i<arguments.length;i++)b.push(arguments[i]);if(this instanceof g)return Reflect.construct(f,b);return f.apply(t,b)};if(f.prototype)g.prototype=f.prototype;return g};
 Object.prototype.toString=function(){return '[object Object]'};
 Object.keys=n(13);
 function quote(s){var r='"',i=0,l=s.length,a=0,c;while(i<l){c=s.charCodeAt(i);if(c<32||c===34||c===92){r+=s.substring(a,i);a=i+1;

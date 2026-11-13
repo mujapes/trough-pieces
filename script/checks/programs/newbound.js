@@ -1,0 +1,1 @@
+function K(a,b){this.a=a;this.b=b}K.prototype.s=function(){return this.a+this.b};var B=K.bind.apply(K,[void 0,2,3]);var x=new B();console.log(x.s(),x instanceof K,Object.keys(x).join());var C=K.bind(null,5);var y=new C(1);console.log(y.s(),y instanceof C);
