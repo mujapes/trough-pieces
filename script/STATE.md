@@ -775,3 +775,8 @@ OPEN, seen today: BBC news 58 run / 299 failed, 298 of them "'push' of undefined
 same with the engine as pushed before this unit, so it came earlier (modules? typed arrays? document.js?): bisect next.
 GitHub: 'not a function' line 4 col 64207; 'call' of undefined x300 (wp-runtime: a webpack module id missing); 'illegal
 invocation' line 138 col 160598. Runtime errors in modules do not name the module (add it like the translation errors).
+Bisect [by Opus]: BBC's 299 failures are the same with the engine of 6dd9a76 (before today's work): BBC changed, not us. It is
+the known paywall `addHandler` with `this` undefined (ran-9.js), repeated by timers. Run-time errors thrown while a module's
+body runs now say "(running URL)" (dom/document.js __module). GitHub: illegal invocation (running core-..js) and not a
+function (running landing-pages-..js); their line/column do not match those files (the throw site is elsewhere, perhaps in
+code the module called): errors need a call trail (e.stack) to be findable. Parked GitHub here for the older list.
