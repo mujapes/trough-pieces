@@ -1060,3 +1060,10 @@ LAST YouTube error is ARRAY HOLES: d3's `Array(3).concat("...").map(ly)`: spec m
 NEXT (a real engine change): a hole value in array storage (read as undefined by every get; `in`/hasOwnProperty/keys false;
 skipped by forEach/map/filter/some/every/reduce/indexOf/join-as-empty), made by Array(n), elisions, length growth, delete.
 Guardian 20 vs 31 note above (unit 82) still open.
+Array holes plan detail (written before starting, by Opus): store VAL T_HOLE (0xffff, already the globals' "never set") in
+array items. Make: a_set gap fill (objects.S ~247 VAL x7,T_UNDEF -> T_HOLE), length growth (objects.S ~532 VAL x2,T_UNDEF ->
+T_HOLE), i_dele (array item -> hole), prelude Array(n) via a.length=n. Read as undefined (macro UNHOLE after the item load):
+i_getek ~843, i_spread ~1043, i_tail ~1078 (a_from copies: convert), i_apply ~1100, a_text ~1184 (empty), i_fornext ~1536,
+machine.S i_yield/m_resume ~1720-1744, lib.S n_pop and n_join (+ any other native reading A_ITEMS: 9 sites). `in` (i_in
+~1244: index < length -> also not a hole), m_keylist's index enumeration (skip holes), prelude forEach/map/filter/some/every/
+reduce skip `!(i in this)`. Test: Array(3) holes, [1,,3], delete, map/forEach/join/JSON/spread/for-of/for-in/keys.
