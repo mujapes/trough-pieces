@@ -940,3 +940,4 @@ Unit 63 [by Opus]: BigInt === by interning: BigInt() returns one object per deci
 ===, indexOf, Set, Map and switch work by identity. ++/--: unary + returns the BigInt itself (spec throws; ++ needs ToNumeric),
 and + or - with the number 1 or -1 treats it as a BigInt (DEVIATION: 5n+1 answers 6n instead of throwing; a real fix is an
 increment instruction that knows its operand). bigint-eq.js; 82 of 82.
+Unit 64 [by Opus]: console.log prints top-level BigInts as 5n (prelude console p). 82 of 82.

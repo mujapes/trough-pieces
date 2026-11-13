@@ -301,7 +301,7 @@ AG.prototype['\x01Symbol.asyncIterator']=function(){return this};
 n(-14,function(h){return new AG(h)})})(__n);
 var __host=(function(n){var h=n(60),a=n(61);return function(r){h(''+r);return a()}})(__n);
 var globalThis=__n(62)();var __trail=__n(70);
-var console=(function(){var p=function(){__console.log(...arguments)},z=function(){};return {log:p,info:p,warn:p,error:p,debug:p,trace:p,table:p,group:p,groupCollapsed:p,groupEnd:z,time:z,timeEnd:z,count:z,assert:function(c){if(!c)p('Assertion failed')}}})();
+var console=(function(){var p=function(){var a=[],i;for(i=0;i<arguments.length;i++)a.push(typeof arguments[i]==='bigint'?arguments[i]._s+'n':arguments[i]);__console.log(...a)},z=function(){};return {log:p,info:p,warn:p,error:p,debug:p,trace:p,table:p,group:p,groupCollapsed:p,groupEnd:z,time:z,timeEnd:z,count:z,assert:function(c){if(!c)p('Assertion failed')}}})();
 (function(n){var acc=n(63),dv=n(73),gp=n(64),sp=n(65),own=Object.prototype.hasOwnProperty,same=function(o){return o};
 Object.defineProperty=function(o,k,d){var ex=d&&!('enumerable' in d)&&(typeof o==='object'||typeof o==='function')&&o!==null&&own.call(o,k);if(d&&(d.get||d.set))acc(o,k,d.get,d.set);else if(d&&'value' in d){if(typeof k==='symbol'||Array.isArray(o)||typeof o!=='object'&&typeof o!=='function')o[k]=d.value;else dv(o,k,d.value)}else if(!own.call(o,k))o[k]=undefined;if(d&&!d.enumerable&&!ex&&!(typeof o==='object'&&Array.isArray(o)))__n(72)(o,typeof k==='symbol'?k:''+k);return o};
 Object.defineProperties=function(o,ds){for(var k in ds)if(own.call(ds,k))Object.defineProperty(o,k,ds[k]);return o};
