@@ -193,5 +193,9 @@ function dispatchEvent(e){return __win.dispatchEvent(e)}
 function __fire(){document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));__win.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';var e=new Event('load');__win.dispatchEvent(e);if(typeof window.onload=='function')window.onload(e)}
 function __loaded(n,ok){var e=__w(n);if(e)e.dispatchEvent(new Event(ok?'load':'error'))}
 // the live screen: elements with a click handler are marked only while the drawn copy is written; a tap there clicks them
-function __mark(on){for(var k in __nodes){var o=__nodes[k];if(o instanceof Element&&((o.__l&&o.__l.click&&o.__l.click.length)||typeof o.onclick=='function')){if(on)o.setAttribute('data-trough-click',k);else o.removeAttribute('data-trough-click')}}}
+function __clicky(o){return o&&((o.__l&&o.__l.click&&o.__l.click.length)||typeof o.onclick=='function')}
+function __mark(on){var m=[],k,o;for(k in __nodes){o=__nodes[k];if(o instanceof Element&&__clicky(o))m.push(o)}
+ // listeners on the whole page (delegation): its controls are marked too, unless inside a link
+ if(__clicky(document)||__clicky(document.body)||__clicky(__win)){var c=document.querySelectorAll('button,[role=button],[tabindex],summary,[data-href]');for(var i=0;i<c.length;i++)if(!c[i].closest('a'))m.push(c[i])}
+ for(var j=0;j<m.length;j++){if(on)m[j].setAttribute('data-trough-click',m[j].__n);else m[j].removeAttribute('data-trough-click')}}
 function __tap(n){var o=__nodes[n];if(o)o.dispatchEvent(new Event('click',{bubbles:true}))}

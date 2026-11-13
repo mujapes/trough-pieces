@@ -598,3 +598,7 @@ loads the file on the bench (no run) and prints every instruction of the world's
 target. Names and operand sizes come from the .S sources (the `+ N bits` notes on .equ lines or handler labels, else the
 handler's U16/U8/FAR reads), so it follows the engine. 0 undecodable over the whole prelude. The prelude comes first: grep
 for the instructions you want, or pass a range.
+
+**Thirty-fifth unit [by Opus]: delegated clicks (2026-11-13).** dom/document.js __mark: when document, body or window listens for
+clicks, buttons, [role=button], [tabindex], summary and [data-href] outside links are marked too, so a tap reaches the page's
+delegated handler with the right target (e.target.closest works). Checked: a span role=button with a document listener.
