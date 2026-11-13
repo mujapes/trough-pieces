@@ -56,6 +56,7 @@ class Node extends EventTarget{
  get isConnected(){return document.contains(this)}
  hasChildNodes(){return !!this.firstChild}
  contains(o){while(o){if(o===this)return true;o=o.parentNode}return false}
+ compareDocumentPosition(o){if(o===this)return 0;function up(n){var a=[];while(n){a.unshift(n);n=n.parentNode}return a}var A=up(this),B=up(o);if(A[0]!==B[0])return 1|32|2;var i=0;while(i<A.length&&i<B.length&&A[i]===B[i])i++;if(i===A.length)return 4|16;if(i===B.length)return 2|8;var k=Array.prototype.slice.call(A[i-1].childNodes);return k.indexOf(B[i])<k.indexOf(A[i])?2:4}
  appendChild(c){if(c.__frag){var k=c.childNodes;for(var i=0;i<k.length;i++)this.appendChild(k[i]);return c}__d('a'+this.__n+' '+c.__n);return c}
  insertBefore(c,r){if(!r)return this.appendChild(c);if(c.__frag){var k=c.childNodes;for(var i=0;i<k.length;i++)this.insertBefore(k[i],r);return c}__d('b'+this.__n+' '+c.__n+' '+r.__n);return c}
  removeChild(c){__d('r'+c.__n);return c}
@@ -296,3 +297,6 @@ document.createTreeWalker=__walker;document.createNodeIterator=__walker;
 (function(){function CustomElementRegistry(){}var ce=window.customElements||customElements;Object.setPrototypeOf(ce,CustomElementRegistry.prototype);['define','get','whenDefined','upgrade'].forEach(function(k){if(typeof ce[k]==='function')CustomElementRegistry.prototype[k]=ce[k]});window.CustomElementRegistry=CustomElementRegistry;try{globalThis.CustomElementRegistry=CustomElementRegistry}catch(e){}})();
 // [by Opus] window's own class: a prototype of its own between window and what it inherited, holding the event methods
 if(typeof Window!=='function'){var Window=function Window(){};(function(){var p=Object.create(Object.getPrototypeOf(window));['addEventListener','removeEventListener','dispatchEvent'].forEach(function(k){if(typeof window[k]==='function')p[k]=window[k]});p.constructor=Window;Window.prototype=p;try{Object.setPrototypeOf(window,p)}catch(e){}window.Window=Window})()}
+// [by Opus] parsers enabled (unit 72): createHTMLDocument and DOMParser over __DOMParser's detached body
+Object.defineProperty(document,"implementation",{configurable:true,get:function(){return {hasFeature:function(){return true},createHTMLDocument:function(t){return new __DOMParser().parseFromString("<title>"+(t||"")+"</title>","text/html")}}}});
+window.DOMParser=__DOMParser;

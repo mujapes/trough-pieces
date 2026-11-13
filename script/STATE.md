@@ -977,3 +977,11 @@ LESSON: sweep Wikipedia after every document.js change; three regressions here c
 Unit 71 [by Opus]: native generic push. Array.prototype.push is the machine-code routine again for real arrays; m_native
 (lib.S) sends any other `this` to the prelude's push in the language (W_PUSHFB, registered by __n(-15)), the way 49-51 fall
 back. Removes the wrapper's cost on every push. push-arraylike.js; 86 of 86. Wikipedia Machine_code 7/0.
+Unit 72 [by Opus]: (1) BUG in unit 71 fixed: W_PUSHFB at 512 collided with date.S's W_WAKE (timers), so push on a non-array
+called a number in the browser (run.py has no timers, so it passed). Now 848, header 856; Array.__pushfb holds the function.
+LESSON: world offsets are defined in several .S files: grep `.equ W_` across all of them. (2) DOMParser and
+document.implementation.createHTMLDocument ENABLED (document.js tail). Their Wikipedia breakage was not the fake document:
+jQuery then took paths needing element.compareDocumentPosition (added, browser-exact bits) and String.prototype.normalize
+(prelude: returns the text unchanged; DEVIATION, no Unicode normalization). push-apply.js; 87 of 87. Wikipedia Machine_code
+11/0 (was 7/0, now ~37 s against 5 s: more runs), Guardian 31/0, GitHub 5/1 NEW: "the program is too big" in
+global-banner-disable (instruction area full; more code runs now) - next to look at.

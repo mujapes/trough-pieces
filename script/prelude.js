@@ -176,6 +176,7 @@ function rep(s,m,f){if(typeof f==='function'){var a=m.slice(0);a.push(m.index,s)
 S.match=function(r){var s=''+this;if(!(r instanceof RegExp))r=new RegExp(r);if(!r.global)return r.exec(s);r.lastIndex=0;var a=all(r,s),i;if(!a.length)return null;for(i=0;i<a.length;i++)a[i]=a[i][0];return a};
 S.matchAll=function(r){var s=''+this,l=0;if(r instanceof RegExp){if(!r.global)throw new TypeError('String.prototype.matchAll called with a non-global RegExp argument');l=r.lastIndex;r=new RegExp(r)}else r=new RegExp(r,'g');r.lastIndex=l;return all(r,s).values()};
 S.search=function(r){if(!(r instanceof RegExp))r=new RegExp(r);var c=X(r._p,''+this,0,0);return c===null?-1:c[0]};
+S.normalize=function(f){if(f!==undefined&&!/^NF(K?)(C|D)$/.test(f))throw new RangeError('The normalization form should be one of NFC, NFD, NFKC, NFKD.');return ''+this};
 S.replace=function(r,f){var s=''+this,o='',p=0,a,i,m;if(typeof f!=='function')f=''+f;
 if(r instanceof RegExp){if(r.global){r.lastIndex=0;a=all(r,s)}else{m=r.exec(s);a=m?[m]:[]}}else{r=''+r;i=s.indexOf(r);a=[];if(i>=0){m=[r];m.index=i;a.push(m)}}
 for(i=0;i<a.length;i++){m=a[i];o+=s.substring(p,m.index)+rep(s,m,f);p=m.index+m[0].length}return o+s.substring(p)};
@@ -461,5 +462,5 @@ if(!Object.getOwnPropertyDescriptors)Object.getOwnPropertyDescriptors=function(o
 (function(){var S=String.prototype,W=Object.create(S),k=Object.getOwnPropertyNames(S);k.forEach(function(m){var f=S[m];if(typeof f==='function'&&m!=='constructor'&&m!=='toString'&&m!=='valueOf')W[m]=function(){return f.apply(this._pv,arguments)};__n(72)(W,m)});String.__w=W})();
 var __evc=new Map();function eval(c){if(typeof c!=='string')return c;var f=__evc.get(c);if(!f){try{f=new Function('return ('+c+'\n)')}catch(e){f=new Function(c)}if(__evc.size>5000)__evc.clear();__evc.set(c,f)}return f()}
 (function(ap){Function.prototype.apply=function(t,a){if(a!==null&&a!==undefined&&!Array.isArray(a)){if(typeof a!=='object'&&typeof a!=='function')throw new TypeError('CreateListFromArrayLike called on non-object');var b=[],n=a.length>>>0,i;for(i=0;i<n;i++)b.push(a[i]);a=b}return ap.call(this,t,a)}})(Function.prototype.apply);
-__n(-15,function(){var o=Object(this),n=o.length>>>0,i;for(i=0;i<arguments.length;i++)o[n+i]=arguments[i];o.length=n+arguments.length;return o.length});
+__n(-15,Array.__pushfb=function(){var o=Object(this),n=o.length>>>0,i;for(i=0;i<arguments.length;i++)o[n+i]=arguments[i];o.length=n+arguments.length;return o.length});
 (function(){function d(n,f){Object.defineProperty(RegExp,n,{get:function(){var r=RegExp.__last;return r?f(r):''},configurable:true})}for(var k=1;k<10;k++)(function(k){d('$'+k,function(r){return r[k]===undefined?'':r[k]})})(k);d('lastMatch',function(r){return r[0]});d('$&',function(r){return r[0]});d('input',function(r){return r.input});d('$_',function(r){return r.input});d('leftContext',function(r){return r.input.slice(0,r.index)});d('rightContext',function(r){return r.input.slice(r.index+r[0].length)})})();
