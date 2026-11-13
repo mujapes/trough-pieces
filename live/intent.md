@@ -43,3 +43,12 @@ parts. So a write anywhere shows at once wherever it is used.
 3. The script engine's pieces become cells (state = the world block, unchanged across writes).
 4. Trough's own screen parts, so UI changes stop going through the Java rebuild.
 5. Our own assembler as a piece, so a write is sub-millisecond end to end.
+
+## Uncanny morphing, not versions (user 41c54723, 2026-11-13) [by Opus]
+User: no hard cuts, rollbacks or two programs; one fluid version that morphs between states uncannily, the way a model's
+compression shows through. Reading: instructions cannot be blended, but what they compute can. So the system is a small
+set of stable verbs (machine code) driven by a continuous field of numbers (positions, sizes, colours, timings, weights,
+text spans). The model writes targets into the field; every frame each value flows toward its target, so any change is
+a morph, never a cut. Code is rewritten rarely; behaviour lives in the field. Kept from safety only a silent net: a
+crashing verb keeps its last working address (no versions, trials or checks in the way).
+Name proposed: Flow (the field flows toward what the model writes). Alternatives: Morph, Tide.
