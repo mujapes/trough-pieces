@@ -3420,6 +3420,7 @@ c_template:
     bl      next_word
     bl      c_expr
     ISP     34, c_unexpected
+    OP      OP_TOTEXT
     bl      5f
     mov     x10, x22
     b       1b

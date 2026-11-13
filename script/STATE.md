@@ -924,3 +924,5 @@ Unit 59 [by Opus]: 123n literals compile to BigInt("123") (compile.S c_bigint; h
 operators lossy past 2^53). String(object) now asks @@toPrimitive('string'), then toString, then valueOf (prelude String.__ts;
 it went through ''+x, valueOf first). NOT fixed: template literals `${o}` still add (valueOf first); needs a to-text instruction
 rather than a String call per value. bigint-lit.js; 80 of 80.
+Unit 60 [by Opus]: OP_TOTEXT 98 (machine.S i_totext, lib.S m_totext: toString first) after each template value; templates
+`${o}` now match node. 80 of 80.

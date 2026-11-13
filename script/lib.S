@@ -117,6 +117,9 @@ m_drain:
 m_tonum:                                // the same where a number is wanted: valueOf first, then toString
     mov     x7, #1
     b       0f
+m_totext:                               // [by Opus] where text is wanted: toString first
+    mov     x7, #0
+    b       0f
 m_toprim:                               // (for +: first the object's own '@@toPrimitive', which a Date has; then as for a number)
     mov     x7, #2
 0:  sub     x21, x21, #1
