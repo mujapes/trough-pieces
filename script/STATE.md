@@ -1048,7 +1048,15 @@ LESSON: document.js may be joined; never put // comments inside a line of code t
 Unit 82 [by Opus]: host/browse.c: timers after the load event run up to 5 s of page time after it (fire_ms), not 3 s past
 the page's start. The Guardian 31 -> 20 drop after unit 81 is NOT timing (old document.js still gives 31 with this host):
 the only semantic difference is that old __sel threw on an empty id in the node list (__w('') -> null -> e.__n) and new
-skips it; some Guardian path depends on that. (Checked after: old code plus only a null guard still gives 31, so it is not the empty id either; variant with lazy wrapping and no early stop gives 20. Unresolved.) NYT: world fills even at 200 MB (296 s). Found so far with
+skips it; some Guardian path depends on that. (Checked after: old code plus only a null guard still gives 31, so it is not the empty id either; variant with lazy wrapping and no early stop gives 20. Then: both selector versions return identical results on every Guardian query (differential log); wrapping all elements once at the first querySelector restores 31, and bisecting tags shows wrapping the <img> elements alone restores 31 (script, link, video, gu-island do not). HTMLImageElement is a plain class; mechanism unknown: look at the host side (image loads, __loaded) or GC roots. Recipe: /tmp/tagbis.sh idea in this note.) NYT: world fills even at 200 MB (296 s). Found so far with
 TROUGH_SWAP + `__trail()` inside a catch (gives the raise trail; decode text=v>>44, line=(v>>24)&0xfffff, col=v&0xffffff):
 the APS ad library's init throws "reading 'status' of undefined" (t38 3:14553, q(t,e) given undefined), then its error
 logger grows a queue; the real filler not yet found. Low value (ad code); parked.
+Unit 83 [by Opus]: regex alternation of many words: each alternative's closing jump now goes to the next alternative's jump
+(the last to the end), so no distance is longer than one alternative; RX_MAXW 32768 -> 61440 words (program buffer on the
+processor stack 135168 bytes). regex-many-alts.js (2500 alternatives); 92 of 92. YouTube 43/1: the entity pattern works.
+LAST YouTube error is ARRAY HOLES: d3's `Array(3).concat("...").map(ly)`: spec map skips the 3 holes; we have no holes
+(Array(n) pushes undefined, [,1] and a.length=3 make real undefineds; `0 in Array(3)` is true), so ly(undefined) throws.
+NEXT (a real engine change): a hole value in array storage (read as undefined by every get; `in`/hasOwnProperty/keys false;
+skipped by forEach/map/filter/some/every/reduce/indexOf/join-as-empty), made by Array(n), elisions, length growth, delete.
+Guardian 20 vs 31 note above (unit 82) still open.

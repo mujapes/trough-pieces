@@ -29,7 +29,7 @@
     .equ RX_CLOOP, 22                   // + mark, least, most, distance past the repeat: another turn, if the count allows
     .equ RX_CLOOPL, 23                  // the same, lazy
     .equ RX_CINC, 24                    // + which mark: one more turn done
-    .equ RX_MAXW, 32768                 // the longest program, in words
+    .equ RX_MAXW, 61440                 // the longest program, in words [by Opus: was 32768; jumps stay short, see rxc_alt]
     .equ W_RXSTACK, 464                 // the block of places to come back to (one, kept and reused; 0: not yet)
     .equ W_RXSIZE, 472                  // its size in bytes
 // The matcher. x1 the next instruction, x2 the text, x3 its units, x4 where we are, x5 whether the text is wide, x6 the
@@ -616,7 +616,7 @@ n_rxcompile:
     and     x23, x23, #1
     and     x21, x21, #0xffffffff
     mov     x22, #0
-    sub     sp, sp, #69632
+    sub     sp, sp, #0x21, lsl #12      // [by Opus] 135168: the program (RX_MAXW words) and room
     mov     x24, sp
     mov     x25, #4
     mov     x26, #1
@@ -758,12 +758,14 @@ rxc_alt:
     b       1b
 5:  ldr     x9, [sp, #16]
     mov     w12, #0xffff
-6:  cmp     w9, w12
+    mov     x13, x25                    // [by Opus] each alternative's jump goes to the next one's (the last to the end), so
+6:  cmp     w9, w12                     // no distance is longer than one alternative, however many there are
     b.eq    7f
     ldrh    w10, [x24, x9, lsl #1]
-    sub     x11, x25, x9
+    sub     x11, x13, x9
     sub     x11, x11, #1
     strh    w11, [x24, x9, lsl #1]
+    sub     x13, x9, #1
     mov     w9, w10
     b       6b
 7:  ldr     x30, [sp]
