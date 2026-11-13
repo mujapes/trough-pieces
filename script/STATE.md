@@ -342,3 +342,11 @@ six lines it prints: one 3 / timer / two 6 2,3 page 8 / three later 6 function 7
 Not made: instructions are never given back, so a page that loads thousands of scripts fills the code room; a top-level
 `let` named again by a later script is not refused.
 Next: a page's <script> elements from host/browse.c with a small document object; lazy loops over generators; shapes; fuzz job.
+**Sixteenth unit: the program can ask its host.** `__host(text)` (a global; prelude.js last line; built-ins 60 and 61 in lib.S):
+the request joins the printed output, W_WANT 544 says where it begins (plus one), and `run` answers 1 at once. The host calls
+`text`: its answer's top 32 bits are W_WANT (0: no request), the low 32 the bytes copied; it answers with `text` given a second
+number 1 and its block holding the answer (UTF-8; kept in W_ANSWER 552), then calls `run` again; `__host` returns the answer
+(undefined if none). No new entry was needed (the eight are used). Seen: `checks/host/t.py` (copy of the bench run; it uses
+/tmp/h paths) prints "host said Grüße from the host Grüße from the host". 61 routines in machine code.
+Next: host/browse.c finds a page's <script> elements, loads each into one world (a small `document` written in the language
+over `__host`: write, title), splices document.write's text into the page before `page render`; then a `dom` piece.

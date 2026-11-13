@@ -359,6 +359,28 @@ n_maker:
     stp     xzr, xzr, [x11, #32]
     b       n_undef
 // 42: a number that is an object's alone for as long as the world lasts (where it lies); Map and Set tell objects apart by it
+// 60 the program asks its host for something: the request (text) joins what the program has printed, W_WANT says where it
+// begins, and the machine stops as if out of steps; the host reads it with `text`, answers with `text` (second number 1)
+// and calls run again. 61 the answer (undefined if none was given), taken once.
+n_host:
+    NIN
+    ldr     x1, [sp, #24]
+    ldr     x0, [x1]
+    bl      v_text
+    cbz     x0, n_full
+    ldr     x9, [x19, #W_OUT_LEN]
+    add     x9, x9, #1
+    str     x9, [x19, #W_WANT]
+    str     xzr, [x19, #W_ANSWER]
+    bl      w_outs
+    mov     x25, #1
+    b       n_undef
+n_reply:
+    ldr     x0, [x19, #W_ANSWER]
+    str     xzr, [x19, #W_ANSWER]
+    cbnz    x0, 1f
+    VAL     x0, T_UNDEF
+1:  ret
 n_ident:
     ldr     x9, [x1]
     and     x9, x9, #0xffffffffffff
@@ -877,5 +899,6 @@ n_table:
     .word   n_asinh - n_table, n_acosh - n_table, n_atanh - n_table, n_fround - n_table, n_clz32 - n_table, n_imul - n_table
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
-    .equ    N_COUNT, 60
+    .word   n_host - n_table, n_reply - n_table
+    .equ    N_COUNT, 62
     .ltorg

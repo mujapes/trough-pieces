@@ -134,7 +134,23 @@ run:
 // text: what the program at the handle has printed since last asked, into this block from byte 64 -> how many bytes, or -1
 text:
     ENTER
+    cmp     x2, #2                      // second number 1: the other way: this block's text is the host's answer to
+    b.lo    0f                          //   what the program asked (see lib.S, 60) -> 1
+    ldrsh   x9, [x1, #2]
+    cmp     x9, #1
+    b.ne    0f
     bl      e_world
+    cbz     x9, 8f
+    add     x0, x19, #64
+    ldr     x1, [x19, #16]
+    sub     x1, x1, #64
+    mov     x19, x9
+    bl      w_text
+    cbz     x0, 8f
+    str     x0, [x19, #W_ANSWER]
+    mov     x0, #1
+    b       9f
+0:  bl      e_world
     cbz     x9, 8f
     ldr     x10, [x19, #16]
     subs    x10, x10, #64
@@ -152,7 +168,9 @@ text:
     add     x14, x14, #1
     b       1b
 2:  str     xzr, [x9, #W_OUT_LEN]
-    mov     x0, x12
+    ldr     x0, [x9, #W_WANT]           // (a request among it: where it begins, plus one, in the answer's top half)
+    str     xzr, [x9, #W_WANT]
+    orr     x0, x12, x0, lsl #32
     b       9f
 8:  mov     x0, #-1
 9:  LEAVE
