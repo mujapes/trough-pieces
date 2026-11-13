@@ -592,3 +592,9 @@ scripts_page writes the drawn copy with marks on, takes them off again (scripts 
 whose link is trough-node:N runs __tap(N) and forces a redraw. Checked: a button page through httpbin, three taps, "pressed
 1..3" drawn. Not yet: listeners on document/body only (delegation: the tap has no node), and marked content is drawn in the
 link colour.
+
+**Thirty-fourth unit [by Opus]: a listing of translated programs (2026-11-13).** `checks/dis.py ENGINE file.js [from [to]]`
+loads the file on the bench (no run) and prints every instruction of the world's code with its operand; jumps show their
+target. Names and operand sizes come from the .S sources (the `+ N bits` notes on .equ lines or handler labels, else the
+handler's U16/U8/FAR reads), so it follows the engine. 0 undecodable over the whole prelude. The prelude comes first: grep
+for the instructions you want, or pass a range.
