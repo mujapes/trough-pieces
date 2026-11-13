@@ -70,7 +70,7 @@ class Node extends EventTarget{
  querySelector(s){return __sel(this,s)[0]||null}
 }
 class Element extends Node{
- constructor(n){super(n,1)}
+ constructor(n){if(n===undefined&&__upg){var p=__upg;__upg=null;return p}var made=n===undefined;if(made)n=+__d('c div');super(n,1);if(made)__nodes[n]=this}
  get tagName(){return __d('n'+this.__n).toUpperCase()}
  get localName(){return __d('n'+this.__n)}
  getAttribute(k){var s=__d('g'+this.__n+' '+k);return s.charAt(0)=='1'?s.slice(1):null}
@@ -118,6 +118,7 @@ class Element extends Node{
    remove:function(){var a=get();for(var i=0;i<arguments.length;i++){var k=a.indexOf(arguments[i]);if(k>=0)a.splice(k,1)}put(a)},
    toggle:function(c,f){if(f===undefined)f=!this.contains(c);if(f)this.add(c);else this.remove(c);return !!f}}}
  matches(s){var p=String(s).split(',');for(var j=0;j<p.length;j++){var ch=__split(p[j]);if(ch&&__is(this,ch[ch.length-1])&&__chain(this,ch))return true}return false}
+ get content(){return this.__content||(this.__content=document.createDocumentFragment())}
  closest(s){var e=this;while(e&&e.nodeType==1){if(e.matches(s))return e;e=e.parentNode}return null}
  insertAdjacentHTML(pos,h){var t=document.createElement('div');t.innerHTML=h;var k=t.childNodes,p=String(pos).toLowerCase(),f=this.firstChild,n=this.nextSibling,up=this.parentNode;
   for(var i=0;i<k.length;i++){if(p=='beforeend')this.appendChild(k[i]);else if(p=='afterbegin')this.insertBefore(k[i],f);else if(up)up.insertBefore(k[i],p=='beforebegin'?this:n)}}
@@ -132,7 +133,7 @@ class Document extends Node{
  constructor(n){super(n,9);this.readyState='loading';this.cookie='';this.referrer='';this.hidden=false;this.visibilityState='visible';this.compatMode='CSS1Compat'}
  get implementation(){return {hasFeature:function(){return true}}}
  getElementById(i){return __w(__d('i '+i))}
- createElement(t){return __w(__d('c '+t))}
+ createElement(t){var e=__w(__d('c '+t));__upgrade(e,String(t).toLowerCase());return e}
  createElementNS(ns,t){return __w(__d('c '+t))}
  createTextNode(s){return __w(__d('x '+s))}
  createComment(s){return __w(__d('x '))}
@@ -158,7 +159,7 @@ var location=(function(){var h=__host('l')||'',m=/^(\w+:)\/\/([^\/?#]*)([^?#]*)(
  return {href:h,protocol:m[1]||'',host:m[2]||'',hostname:(m[2]||'').replace(/:\d+$/,''),pathname:m[3]||'/',search:m[4]||'',hash:m[5]||'',origin:(m[1]||'')+'//'+(m[2]||''),toString:function(){return this.href},assign:function(){},replace:function(){},reload:function(){}}})();
 var performance={timeOrigin:Date.now(),now:function(){return Date.now()-this.timeOrigin},mark:function(){},measure:function(){},clearMarks:function(){},clearMeasures:function(){},getEntries:function(){return[]},getEntriesByType:function(){return[]},getEntriesByName:function(){return[]},timing:{navigationStart:Date.now()},navigation:{type:0}};
 var Image=function Image(w,h){var e=document.createElement('img');if(w!==undefined)e.width=w;if(h!==undefined)e.height=h;return e};
-var customElements={_d:{},define:function(n,c){this._d[n]=c},get:function(n){return this._d[n]},whenDefined:function(n){return new Promise(function(){})},upgrade:function(){}};
+var customElements={_d:{},define:function(n,c){this._d[n]=c;var l=document.querySelectorAll(n);for(var i=0;i<l.length;i++){__upgrade(l[i],n);if(l[i].connectedCallback)try{l[i].connectedCallback()}catch(e){console.log('connectedCallback: '+e)}}},get:function(n){return this._d[n]},whenDefined:function(n){return new Promise(function(){})},upgrade:function(){}};
 // fetch and XMLHttpRequest: the host fetches (GET only so far) when asked with __host('f' + address); the answer comes at once
 // ("1", three digits of status, the body; or "0" and why not) and is handed on a moment later, as pages expect. Headers of the answer are not kept.
 var Headers=function Headers(h){this._h={};if(h){if(typeof h.forEach=='function'&&!Array.isArray(h)){var t=this;h.forEach(function(v,k){t.set(k,v)})}else if(Array.isArray(h))for(var i=0;i<h.length;i++)this.set(h[i][0],h[i][1]);else for(var k in h)this.set(k,h[k])}};
@@ -234,3 +235,14 @@ if(c<0x80)o.push(c);else if(c<0x800)o.push(0xc0|c>>6,0x80|c&63);else if(c<0x1000
 TextEncoder.prototype.encodeInto=function(s,a){var b=this.encode(s),n=Math.min(b.length,a.length),i;for(i=0;i<n;i++)a[i]=b[i];return {read:s.length,written:n}};
 function TextDecoder(l){this.encoding='utf-8'}
 TextDecoder.prototype.decode=function(b){if(b===undefined)return '';if(!(b instanceof Uint8Array))b=new Uint8Array(b.buffer||b,b.byteOffset||0,b.byteLength);var s='',i=0,c,n=b.length;while(i<n){c=b[i++];if(c>=0xf0&&i+2<n){c=(c&7)<<18|(b[i++]&63)<<12|(b[i++]&63)<<6|b[i++]&63}else if(c>=0xe0&&i+1<n){c=(c&15)<<12|(b[i++]&63)<<6|b[i++]&63}else if(c>=0xc0&&i<n){c=(c&31)<<6|b[i++]&63}else if(c>=0x80)c=0xfffd;s+=String.fromCodePoint(c)}return s};
+/* AbortController / AbortSignal [by Opus] */
+class AbortSignal extends EventTarget{constructor(){super();this.aborted=false;this.reason=undefined;this.onabort=null}
+ throwIfAborted(){if(this.aborted)throw this.reason}
+ static abort(r){var c=new AbortController();c.abort(r);return c.signal}
+ static timeout(ms){var c=new AbortController();setTimeout(function(){c.abort(new Error('TimeoutError'))},ms);return c.signal}
+ static any(l){var c=new AbortController();for(var s of l){if(s.aborted){c.abort(s.reason);break}s.addEventListener('abort',function(){c.abort(this.reason)})}return c.signal}}
+class AbortController{constructor(){this.signal=new AbortSignal()}
+ abort(r){var s=this.signal;if(s.aborted)return;s.aborted=true;s.reason=r===undefined?new Error('AbortError'):r;var e=new Event('abort');if(s.onabort)s.onabort(e);s.dispatchEvent(e)}}
+/* custom elements [by Opus]: an element whose tag has a defined class gets that class's prototype and runs its constructor
+   on itself (Element's constructor answers with the element being upgraded; super() takes it over as this) */
+var __upg=null;function __upgrade(e,n){var c=customElements._d[n];if(!c||e.__up)return;e.__up=1;Object.setPrototypeOf(e,c.prototype);__upg=e;try{new c()}catch(x){console.log('custom element '+n+': '+x)}__upg=null}

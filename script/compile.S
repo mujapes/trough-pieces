@@ -1646,7 +1646,15 @@ c_scan_block:
     b.ne    100b
     bl      c_declare
     b       1b
-510: cmp     w24, #28
+510: cmp     w24, #3                     // [by Opus] class at a statement's start in the body proper: its name is a variable
+    b.ne    513f                        // of the function from the start (an arrow written before it can reach it)
+    cmp     w1, #1
+    b.ne    8f
+    orr     w9, w6, w27
+    cbz     w9, 8f
+    mov     w4, #3
+    b       8f
+513: cmp     w24, #28
     b.eq    52f
     cmp     w24, #33
     b.eq    511f
@@ -3951,6 +3959,19 @@ c_super:
 10: mov     w0, #OP_SUPER
     mov     w1, #0xffff
     bl      c_op16
+    bl      next_word                   // [by Opus] the parent's constructor may answer with an object: it becomes `this`
+    bl      c_args
+    tbnz    w0, #31, 12f
+    str     w0, [sp, #8]
+    OP      OP_CALLM
+    ldr     w0, [sp, #8]
+    bl      c_byte
+    b       13f
+12: OP      OP_APPLY
+    mov     w0, #1
+    bl      c_byte
+13: OP      OP_SUPERTHIS
+    b       8f
 1:  bl      next_word
     bl      c_args
     tbnz    w0, #31, 11f

@@ -826,3 +826,10 @@ Enumerable is still always true (class members should be false). checks/programs
 GitHub's two remaining module errors (both "not a function"; host shows an empty message, cause not found yet):
 core runs into f18 225:8764 `C=new S.dw` (an imported class missing: S is a webpack module); landing-pages into 4u
 4:51067. NEXT: why S.dw is missing (a module not loaded or an export getter); why the host prints an empty message.
+Unit 47 [by Opus]: (1) c_scan_block: `class X` at a statement's start in a function body is that function's variable from
+the start (an arrow written before it reached a global instead; GitHub's webpack getters `dw:()=>b`). class-hoist.js.
+(2) OP_SUPERTHIS (97; OP_COUNT 98): after super(..) the parent's answer, if an object, becomes `this`. super-return.js.
+(3) document.js: template .content, AbortController/AbortSignal, CUSTOM ELEMENTS (createElement and define upgrade: the
+prototype is swapped and the class constructed with Element's constructor answering the element; connectedCallback on
+define for elements already in the tree). 67 of 67. GitHub core now reaches f18 relative-time ('call' of undefined in
+its constructor, 12 times) and 'distance' of undefined; landing-pages still primer-react 4:153114 not a function.

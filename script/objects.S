@@ -931,6 +931,16 @@ i_this:
     bl      m_this
     PUSH    x0
     NEXT
+i_superthis:
+    ldr     x0, [x22, #-8]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    1f
+    cmp     x20, x19
+    b.eq    1f
+    str     x0, [x20, #40]
+1:  NEXT
 i_swap:
     ldp     x0, x1, [x22, #-16]
     stp     x1, x0, [x22, #-16]
