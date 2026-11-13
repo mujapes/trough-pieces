@@ -30,3 +30,12 @@ console.log(f1(5),f2(1,2),f3(1),f4());
 function* gen(){let e=0;{yield (()=>e)(); e=2} return e} console.log([...gen()].join());
 var wo={},wm=new WeakMap([[wo,1]]),ws=new WeakSet; ws.add(wo); console.log(wm.get(wo),ws.has(wo),wm.has(ws));
 var s1=async()=>{let e=!1;try{await Promise.resolve(1).then(()=>{e=!0})}catch(r){let t=`x${r}`;e=!1}return e}; s1().then(v=>console.log('await in a block',v));
+try{throw Error("x")}catch(e){console.log(e instanceof Error, e.message, String(e))}
+var t=TypeError("y"); console.log(t instanceof TypeError, t instanceof Error, t.message, RangeError("z").name, String(new RangeError("q")));
+class MyErr extends Error{constructor(m){super(m);this.name="MyErr"}} var m=new MyErr("w"); console.log(m instanceof MyErr, m instanceof Error, m.message, String(m), m.constructor===MyErr);
+try{null.x}catch(e){console.log(e instanceof TypeError, e.constructor===TypeError, e.name)}
+try{undefinedThing}catch(e){console.log(e instanceof ReferenceError,e.name)}
+var c=new Error("a",{cause:5}); console.log(c.cause, typeof Error.prototype.toString, TypeError.prototype.constructor===TypeError);
+console.log(new Error().message === "", Error("").toString());
+(()=>{ console.log(typeof hx); async function hx(){return 1} function hu(){} var he; console.log(typeof he, typeof hu) })();
+(function(){ var r=[]; function z(){ return ge.a } async function x(){} let gy=2; var ge={a:7}; r.push(z(), typeof x, gy); console.log(r.join()) })();

@@ -488,3 +488,17 @@ Symbol as a function (a unique '@@desc@n' string; Symbol.for, keyFor, the well-k
 isPrototypeOf, getOwnPropertySymbols. objects.S m_delprop: a property found on a prototype or outside the own list was
 "deleted" by moving memory past the list's end: the browser host crashed on bbc.com; now left alone. 45 of 45.
 bbc.com/news after this: 57 run, 17 failed: 12 of them one stop in the turbopack loader (failed-3 col 9045 area).
+
+**Twenty-fifth unit [by Opus]: named property errors, Error without new, async function hoisting (2026-11-13).**
+(1) objects.S m_nokey: reading or setting a property of undefined/null throws "Cannot read properties of undefined (reading
+'name')" / "Cannot set properties of null (setting 'name')" as browsers do (text built on the stack, stack given back before
+m_raise; keys over 80 bytes or wide are left out); i_in still uses the plain m_noprops. (2) compile.S c_prelude: the error
+classes are functions now (`__errclass`), so `Error("x")`, `TypeError("y")` without new make errors (a class called plainly ran
+on the global object and gave undefined: every minified `throw Error(...)` threw undefined); `{cause}` kept;
+Error.captureStackTrace is a no-op. (3) compile.S c_scan_block: `async function name` at a statement's start is a declaration
+(it was declared only when reached, so it was undefined before its line, and the late declaration put a name into a slot the
+scan had already given out: the bbc turbopack loader's `e` read another variable). 45 of 45 (site2.js has all three).
+bbc.com/news: 57 run, 4 failed (was 17): two "not a function" (col 2497/2503 of one script), piano SDK's own error, `for await`.
+Known, not fixed: Object.keys(new Error("k")) lists "message" (defineProperty cannot make a property non-enumerable yet).
+No garbage collector: about 20000 caught errors fill a 1.2 MB bench world (each makes strings and an object). A name declared
+during translation that the scan did not see can still share a slot: only the async case is closed.

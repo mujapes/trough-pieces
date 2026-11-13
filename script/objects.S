@@ -293,6 +293,80 @@ k_toprim_end:
 e_noprops: .ascii "TypeError: Cannot read properties of undefined or null"
 e_noprops_end:
     .balign 4
+// m_nokey: reading (w2 0) or setting (w2 1) the property named x1 of x0, which is undefined or null: the TypeError names
+// both, as browsers do: "Cannot read properties of undefined (reading 'name')". The text is put together on the stack, made
+// a string, and the stack given back before it is thrown (a caught error must not leave the stack lower). A key that is not
+// a narrow string, or is longer than 80 bytes, is left out.
+m_nokey:
+    sub     sp, sp, #224
+    str     x30, [sp, #208]
+    add     x3, sp, #16                 // where the text goes
+    mov     x4, #0
+    adr     x5, e_nk_read
+    adr     x6, e_nk_set
+    cmp     w2, #0
+    csel    x5, x5, x6, eq
+    bl      90f                         // "Cannot read properties of " / "Cannot set properties of "
+    TAGIS   x0, T_NULL
+    adr     x5, e_nk_undef
+    adr     x6, e_nk_null
+    csel    x5, x6, x5, eq
+    bl      90f
+    TAGIS   x1, T_STRING
+    b.ne    5f
+    and     x7, x1, #0xffffffffffff
+    add     x7, x19, x7
+    ldr     x8, [x7], #8
+    lsr     x9, x8, #32
+    cbnz    x9, 5f
+    and     x8, x8, #0xffffffff
+    cmp     x8, #80
+    b.hi    5f
+    adr     x5, e_nk_open
+    cmp     w2, #0
+    adr     x6, e_nk_open2
+    csel    x5, x5, x6, eq
+    bl      90f
+    mov     x9, #0
+1:  cmp     x9, x8
+    b.hs    2f
+    ldrb    w10, [x7, x9]
+    strb    w10, [x3, x4]
+    add     x9, x9, #1
+    add     x4, x4, #1
+    b       1b
+2:  adr     x5, e_nk_close
+    bl      90f
+5:  mov     x0, x3
+    mov     x1, x4
+    bl      w_string
+    str     x0, [sp]
+    adr     x0, e_nk_type
+    mov     x1, #9
+    bl      w_string
+    ldr     x1, [sp]
+    ldr     x30, [sp, #208]
+    add     sp, sp, #224
+    cbz     x0, m_noprops
+    cbz     x1, m_noprops
+    ldr     x9, [x19, #W_POS]
+    str     x9, [x19, #W_ERR_LINE]
+    b       m_raise
+90: ldrb    w10, [x5], #1               // copies the text at x5, up to a zero byte, to the end of what is there
+    cbz     w10, 91f
+    strb    w10, [x3, x4]
+    add     x4, x4, #1
+    b       90b
+91: ret
+e_nk_read:  .asciz "Cannot read properties of "
+e_nk_set:   .asciz "Cannot set properties of "
+e_nk_undef: .asciz "undefined"
+e_nk_null:  .asciz "null"
+e_nk_open:  .asciz " (reading '"
+e_nk_open2: .asciz " (setting '"
+e_nk_close: .asciz "')"
+e_nk_type:  .ascii "TypeError"
+    .balign 4
 m_noprops:
     adr     x0, e_noprops
     mov     x1, #(e_noprops_end - e_noprops)
@@ -384,8 +458,10 @@ m_getprop:
     sub     w9, w9, w10
     cmp     w9, #1
     b.hi    7f
+    ldp     x0, x1, [sp, #16]
     ldp     x29, x30, [sp], #32
-    b       m_noprops
+    mov     w2, #0
+    b       m_nokey
 7:  ldr     x0, [sp, #16]               // a string, number or boolean: what the library gave its kind
     lsr     x9, x0, #48
     mov     x2, #(W_PROTOS + 24)
@@ -474,8 +550,10 @@ m_setprop:
     sub     w9, w9, w10
     cmp     w9, #1
     b.hi    9f
+    ldp     x0, x1, [sp, #16]
     ldp     x29, x30, [sp], #48
-    b       m_noprops
+    mov     w2, #1
+    b       m_nokey
 8:  ldp     x29, x30, [sp], #48
     b       m_full
 9:  mov     x0, #0

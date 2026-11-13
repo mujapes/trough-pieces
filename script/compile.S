@@ -223,14 +223,15 @@ c_jobsname: .ascii "__jobs"
     .balign 4
 c_prelude:
     .incbin "script/prelude.js"
-    .ascii "class Error{constructor(m){if(m!==undefined)this.message=\"\"+m}toString(){return this.message===\"\"?this.name:this.name+\": \"+this.message}}"
-    .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";"
-    .ascii "class TypeError extends Error{}TypeError.prototype.name=\"TypeError\";"
-    .ascii "class RangeError extends Error{}RangeError.prototype.name=\"RangeError\";"
-    .ascii "class ReferenceError extends Error{}ReferenceError.prototype.name=\"ReferenceError\";"
-    .ascii "class SyntaxError extends Error{}SyntaxError.prototype.name=\"SyntaxError\";"
-    .ascii "class EvalError extends Error{}EvalError.prototype.name=\"EvalError\";"
-    .ascii "class URIError extends Error{}URIError.prototype.name=\"URIError\";"
+    // the error classes: functions, so that Error("x") without new makes an error as the language says (a class called
+    // plainly would run on the global object and give back nothing); a second argument {cause} is kept
+    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause}"
+    .ascii "Error.prototype.toString=function(){return this.message===\"\"?this.name:this.name+\": \"+this.message};"
+    .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";Error.captureStackTrace=function(){};"
+    .ascii "function __errclass(n){var C=function(m,o){if(!(this instanceof C))return new C(m,o);Error.call(this,m,o)};C.prototype=Object.create(Error.prototype);"
+    .ascii "C.prototype.constructor=C;C.prototype.name=n;Object.setPrototypeOf(C,Error);return C}"
+    .ascii "var TypeError=__errclass(\"TypeError\"),RangeError=__errclass(\"RangeError\"),ReferenceError=__errclass(\"ReferenceError\"),"
+    .ascii "SyntaxError=__errclass(\"SyntaxError\"),EvalError=__errclass(\"EvalError\"),URIError=__errclass(\"URIError\");"
 c_prelude_end:
     .balign 4
 // the ways it goes wrong: the message, with the line and column of the word it stopped at
@@ -1518,6 +1519,11 @@ c_scan_block:
     mov     w4, #3
     b       8f
 51: cbnz    w2, 8f
+    cmp     w24, #35                    // async at a statement's start: the function that follows is a declaration too
+    b.ne    511f
+    orr     w7, w6, w27
+    b       8f
+511:
     cmp     w24, #2                     // catch (name): the name is a variable of this function, known before its blocks are met
     b.ne    510f
     stp     w1, w2, [sp]
