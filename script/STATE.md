@@ -833,3 +833,10 @@ the start (an arrow written before it reached a global instead; GitHub's webpack
 prototype is swapped and the class constructed with Element's constructor answering the element; connectedCallback on
 define for elements already in the tree). 67 of 67. GitHub core now reaches f18 relative-time ('call' of undefined in
 its constructor, 12 times) and 'distance' of undefined; landing-pages still primer-react 4:153114 not a function.
+Unit 48 [by Opus]: named class expressions (`var a=class e{.. new e ..}`) get their own name in a block of their own
+(c_primary: c_block_in, c_class as a declaration, c_block_out). class-expr-name.js; 68 of 68. document.js: attachShadow,
+attachInternals (GitHub relative-time now constructs). GitHub now: core stops in color-convert ('distance' of undefined)
+because Object.defineProperty(..,{value}) makes ENUMERABLE properties (channels/labels show up in Object.keys): NEXT is a
+non-enumerable flag per property (idea: a bit in the key word above the 48-bit offset; o_keyeq must mask it; KEYS skips it;
+defineProperty default enumerable false; class methods non-enumerable). Landing-pages now stops on BigInt (not defined):
+BigInt is a large stage of its own (the lexer already reads 123n as kind 8).

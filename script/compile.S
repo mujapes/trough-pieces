@@ -4426,7 +4426,19 @@ c_primary:
     b.eq    20f
     cmp     w24, #3
     b.ne    21f
-    mov     w0, #0
+    bl      c_peek                      // [by Opus] class name { }: the name is the class's own, in a block of its own
+    cmp     w0, #K_NAME
+    b.ne    22f
+    sub     sp, sp, #128
+    mov     x0, sp
+    mov     w1, #1
+    bl      c_block_in
+    mov     w0, #1
+    bl      c_class
+    bl      c_block_out
+    add     sp, sp, #128
+    b       9f
+22: mov     w0, #0
     bl      c_class
     b       9f
 21: cmp     w24, #17                    // import(x), import.meta: the prelude's __import stands for the word

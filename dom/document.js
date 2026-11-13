@@ -118,6 +118,8 @@ class Element extends Node{
    remove:function(){var a=get();for(var i=0;i<arguments.length;i++){var k=a.indexOf(arguments[i]);if(k>=0)a.splice(k,1)}put(a)},
    toggle:function(c,f){if(f===undefined)f=!this.contains(c);if(f)this.add(c);else this.remove(c);return !!f}}}
  matches(s){var p=String(s).split(',');for(var j=0;j<p.length;j++){var ch=__split(p[j]);if(ch&&__is(this,ch[ch.length-1])&&__chain(this,ch))return true}return false}
+ attachShadow(o){var f=document.createDocumentFragment();f.host=this;f.mode=o&&o.mode;this.__shadow=f;if(!o||o.mode!=='closed')this.shadowRoot=f;return f}
+ attachInternals(){var e=this;return {states:new Set(),setFormValue:function(){},setValidity:function(){},checkValidity:function(){return true},reportValidity:function(){return true},get form(){return e.closest('form')},role:null,ariaLabel:null,shadowRoot:e.__shadow||null}}
  get content(){return this.__content||(this.__content=document.createDocumentFragment())}
  closest(s){var e=this;while(e&&e.nodeType==1){if(e.matches(s))return e;e=e.parentNode}return null}
  insertAdjacentHTML(pos,h){var t=document.createElement('div');t.innerHTML=h;var k=t.childNodes,p=String(pos).toLowerCase(),f=this.firstChild,n=this.nextSibling,up=this.parentNode;
