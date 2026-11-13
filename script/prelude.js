@@ -278,7 +278,7 @@ Object.setPrototypeOf=function(o,p){sp(o,p);return o};
 Object.create=function(p,ds){var o={};sp(o,p);if(ds)Object.defineProperties(o,ds);return o};
 Object.freeze=same;Object.seal=same;Object.preventExtensions=same;Object.isFrozen=function(){return false};Object.isSealed=function(){return false};Object.isExtensible=function(){return true};
 Object.getOwnPropertyNames=function(o){return Object.keys(o)};Object.getOwnPropertySymbols=function(){return []};
-Object.getOwnPropertyDescriptor=function(o,k){return own.call(o,k)?{value:o[k],writable:true,enumerable:true,configurable:true}:undefined};
+Object.getOwnPropertyDescriptor=function(o,k){var a=o!==null&&(typeof o==="object"||typeof o==="function")?__n(71)(o,typeof k==="symbol"?k:""+k):undefined;if(a)return {get:a[0],set:a[1],enumerable:true,configurable:true};return own.call(o,k)?{value:o[k],writable:true,enumerable:true,configurable:true}:undefined};
 Object.is=function(a,b){return a===b?a!==0||1/a===1/b:a!==a&&b!==b};
 Object.fromEntries=function(it){var o={};for(var e of it)o[e[0]]=e[1];return o};
 })(__n);

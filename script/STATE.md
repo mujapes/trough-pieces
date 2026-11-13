@@ -820,3 +820,9 @@ document.js, UTF-8); (2) TRANSLATOR BUG: c_scan_meth missed a method written sho
 (`f({m(e){..}})`), so the outer function's variables stayed on the stack and the method read garbage after return; fixed
 (bit 16 of the scan state). checks/programs/meth-in-args.js; 64 of 64. GitHub: 302 failed -> 2 (both with an empty message,
 ran-2 and ran-4: next look). Wikipedia 8/0, HN 1/0, Guardian 18/1 unchanged.
+Unit 46 [by Opus]: Object.getOwnPropertyDescriptor gives {get,set} for accessors (built-in 71 n_ownacc, lib.S) instead of
+calling the getter (GitHub f18's CommandEvent polyfill re-defines `source` and its getter threw "illegal invocation").
+Enumerable is still always true (class members should be false). checks/programs/accessor-desc.js; 65 of 65.
+GitHub's two remaining module errors (both "not a function"; host shows an empty message, cause not found yet):
+core runs into f18 225:8764 `C=new S.dw` (an imported class missing: S is a webpack module); landing-pages into 4u
+4:51067. NEXT: why S.dw is missing (a module not loaded or an export getter); why the host prints an empty message.

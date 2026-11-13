@@ -530,6 +530,37 @@ n_trail:
     mov     x30, x15
     cbz     x0, n_full
     ret
+// 71 [by Opus]: (object, string key): its own property, if it is a getter and setter, as the array [get, set]; else undefined
+n_ownacc:
+    mov     x15, x30
+    ldp     x0, x1, [x1]
+    lsr     x9, x0, #48
+    mov     w10, #T_OBJECT
+    cmp     w9, w10
+    b.ne    9f
+    lsr     x9, x1, #48
+    mov     w10, #T_STRING
+    cmp     w9, w10
+    b.ne    9f
+    and     x0, x0, #0xffffffffffff
+    add     x0, x19, x0
+    bl      o_find
+    cbz     x2, 9f
+    ldr     x3, [x2]
+    lsr     x9, x3, #48
+    mov     w10, #T_ACC
+    cmp     w9, w10
+    b.ne    9f
+    and     x0, x3, #0xffffffffffff
+    add     x0, x19, x0
+    mov     x1, #2
+    bl      a_from
+    mov     x30, x15
+    cbz     x0, n_full
+    ret
+9:  VAL     x0, T_UNDEF
+    mov     x30, x15
+    ret
 n_ident:
     ldr     x9, [x1]
     and     x9, x9, #0xffffffffffff
@@ -1137,6 +1168,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table
-    .equ    N_COUNT, 71
+    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table, n_ownacc - n_table
+    .equ    N_COUNT, 72
     .ltorg
