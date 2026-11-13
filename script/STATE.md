@@ -602,3 +602,8 @@ for the instructions you want, or pass a range.
 **Thirty-fifth unit [by Opus]: delegated clicks (2026-11-13).** dom/document.js __mark: when document, body or window listens for
 clicks, buttons, [role=button], [tabindex], summary and [data-href] outside links are marked too, so a tap reaches the page's
 delegated handler with the right target (e.target.closest works). Checked: a span role=button with a document listener.
+
+**Live screen on real sites (2026-11-13) [by Opus].** Wikipedia's timers filled the 32 MB world within a minute (thousands of
+"the world is full"). host: a full world now marks the page dead once (its scripts stop, the page stays); ticks every 200 ms;
+TROUGH_KEEP_PAGE=file saves the drawn copy and says how many elements are clickable. NEXT: the garbage collector (plan at the
+end of intent.md).

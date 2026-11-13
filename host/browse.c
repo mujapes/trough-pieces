@@ -160,7 +160,7 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
                 fprintf(stderr, "fetch %s: %s\n", where[0] ? where : "?", got ? "came" : why); free(got); free(base); free(rel); free(full); resize(s->answer, gn + 1); text_of(s->answer, qw, 2, 0, table); continue; }
             memcpy(s->answer + 64, a, an); resize(s->answer, an); text_of(s->answer, qw, 2, 0, table); continue; }
         if (r == 0) return;
-        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s%s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : "", getenv("TROUGH_KEEP_ALL") ? (snprintf(s->which, sizeof s->which, " [ran-%d]", s->ran), s->which) : ""); free(e); s->failed++;
+        if (r < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s%s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : "", getenv("TROUGH_KEEP_ALL") ? (snprintf(s->which, sizeof s->which, " [ran-%d]", s->ran), s->which) : ""); if (e && memmem(e + 64, length(e), "world is full", 13)) { s->dead = 1; fprintf(stderr, "script: the page's world is full; its scripts stop here\n"); } free(e); s->failed++;
             const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep && text) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }
             return; } }
     fprintf(stderr, "script: stopped after too many steps; no more scripts run on this page\n"); s->dead = 1; s->failed++; }
@@ -218,7 +218,9 @@ static uint8_t *scripts_page(scripts *s, const char *address) {
             if (m && cn < 64 && d[b + 1] != '/') { int node = atoi(m + mn); size_t tl = 0; while (b + 1 + tl < i && d[b + 1 + tl] > ' ' && d[b + 1 + tl] != '>') tl++;
                 int depth = 1; size_t j = i + 1; for (; j + tl + 2 < n; j++) if (d[j] == '<') { if (d[j + 1] == '/' && !strncasecmp(d + j + 2, d + b + 1, tl) && !isalnum((unsigned char)d[j + 2 + tl])) { if (!--depth) break; } else if (!strncasecmp(d + j + 1, d + b + 1, tl) && !isalnum((unsigned char)d[j + 1 + tl])) depth++; }
                 if (j + tl + 2 < n) { on += (size_t)sprintf(o + on, "<a href=\"trough-node:%d\">", node); close_at[cn] = j; closers[cn++] = 0; found++; } } } }
-    (void)closers; uint8_t *r = text_block(o, on); free(o); free(t); return r; }
+    (void)closers; uint8_t *r = text_block(o, on); free(o); free(t);
+    { const char *keep = getenv("TROUGH_KEEP_PAGE"); if (keep) { FILE *f = fopen(keep, "wb"); if (f) { fwrite(r + 64, 1, length(r), f); fclose(f); } fprintf(stderr, "drawn page: %d clickable\n", found); } }
+    return r; }
 /* the live screen's page world: its timers that are due by the real clock are run; a fresh page text if the tree changed, else 0 */
 static uint8_t *scripts_tick(scripts *s, const char *address, int force) {
     if (!s || s->dead) return 0; struct timeval tv; gettimeofday(&tv, 0); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
@@ -267,7 +269,7 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
                 for (long long o = 0; o + 20 <= ln && pic_n < PICS; ) { uint32_t f[5]; memcpy(f, list + 64 + o, 20); if (f[4] < sizeof pics[0].src && f[2] && f[3]) { pic *p = &pics[pic_n++]; p->x = f[0]; p->y = f[1]; p->w = f[2]; p->h = f[3]; size_t k = 0; for (uint32_t i = 0; i < f[4]; i++) { char c = (char)list[64 + o + 20 + i]; p->src[k++] = c; if (c == '&' && i + 4 < f[4] && !memcmp(list + 64 + o + 21 + i, "amp;", 4)) i += 4; } p->src[k] = 0; p->state = 0; p->ready = 0; } o += 20 + ((f[4] + 3) & ~3u); }
                 free(list); now->n = pic_n; printf("%d pictures to fetch\n", pic_n); fflush(stdout); pthread_t th; if (pic_n && !pthread_create(&th, 0, picture_worker, now)) pthread_detach(th); else { free(now); now = 0; pics = 0; pic_n = 0; } }
             if (!body) { char sorry[600]; int n = snprintf(sorry, sizeof sorry, "<h2>This page could not be opened</h2><p>%s</p><p>%s</p>", address, why); body = text_block(sorry, (size_t)n); } }
-        if (live && body && now_ms() - ticked > 50) { ticked = now_ms(); uint8_t *changed = scripts_tick(live, address, tapped); tapped = 0;   /* the page keeps running: timers on the real clock */
+        if (live && body && now_ms() - ticked > 200) { ticked = now_ms(); uint8_t *changed = scripts_tick(live, address, tapped); tapped = 0;   /* the page keeps running: timers on the real clock */
             if (changed && (length(changed) != length(body) || memcmp(changed + 64, body + 64, length(body)))) { free(body); body = changed; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; dirty = 1; printf("the page changed itself\n"); fflush(stdout); } else free(changed); }
         if (dirty) { dirty = 0; int drawn = 0; double t = now_ms(); at(34, body); at(35, font); memcpy(&counter, screen + 24, 8); { /* the page shows from row (scroll - BAR) of its own height; each strip of TILE rows is drawn by the pieces once and kept */
               long long first = scroll - BAR; size_t rowbytes = 4 * (size_t)W;

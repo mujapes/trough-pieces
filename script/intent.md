@@ -67,3 +67,19 @@ made from the same programs. A program the piece gets wrong is added before it i
 ## Not decided yet
 Whether hot paths get machine code of their own made at run time (a compiler inside the engine): the code
 stream and the writable-and-runnable memory this phone allows make it possible; the interpreter comes first.
+
+## Garbage collector plan (2026-11-13, Opus; amend freely)
+Why now: on the live screen Wikipedia's timers fill a 32 MB world within a minute, and the page's scripts then stop.
+Shape: conservative, non-moving mark-sweep, so nothing that holds a raw distance or a pointer in a register can be broken.
+- Every heap block gets an 8-byte head before it: size (bits 0-47), mark (63), free (62). w_alloc writes it; the four places that
+  move W_HEAP by hand (compile.S, world.S) are audited for code that assumes two allocations are contiguous.
+- Two bitmaps reserved at w_begin from the heap's end (1 bit per 8 bytes each, about 3%): block starts, and marks. Finding the
+  block holding any address: the nearest start bit at or below it (clz over 64-bit words).
+- Roots: every word of the world's header, the constants, the globals, the value stack (W_STACK to W_SP), all of x0-x28 saved at
+  w_alloc's entry, and the native stack from sp up to a base recorded by each entry (load, run, ...).
+- Any word, as itself or as its low 48 bits, that falls inside the heap marks the block it lands in; marked blocks are scanned
+  the same way (explicit mark stack in the free part of the bitmap area; on overflow a flag and a rescan).
+- Sweep coalesces unmarked runs into free blocks on one list (world field); w_alloc tries the bump pointer, then the list
+  (first fit, splitting), then collects once and retries, then fails as today ("the world is full").
+- Done when: a program that makes garbage forever in a loop of timers runs in a small bench world; 47 of 47 programs; Wikipedia
+  on the live screen keeps running for ten minutes.
