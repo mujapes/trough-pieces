@@ -285,7 +285,7 @@ c_prelude:
     .incbin "script/prelude.js"
     // the error classes: functions, so that Error("x") without new makes an error as the language says (a class called
     // plainly would run on the global object and give back nothing); a second argument {cause} is kept
-    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause;var p=__n(66)();this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)+\":\"+p%4294967296}"
+    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause;var p=__n(66)(),t=__n(70)(true),i;this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)+\":\"+p%4294967296;for(i=2;i<t.length;i++)this.stack+=\"\\n    at <anonymous>:\"+Math.floor(t[i]/4294967296)+\":\"+t[i]%4294967296}"
     .ascii "Error.prototype.toString=function(){return this.message===\"\"?this.name:this.name+\": \"+this.message};"
     .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";Error.captureStackTrace=function(){};"
     .ascii "function __errclass(n){var C=function(m,o){if(!(this instanceof C))return new C(m,o);Error.call(this,m,o)};C.prototype=Object.create(Error.prototype);"

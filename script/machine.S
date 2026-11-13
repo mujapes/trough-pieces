@@ -340,6 +340,7 @@ m_wrong:
 m_fail:
     ldr     x9, [x19, #W_POS]           // where it happened: the statement last begun
     str     x9, [x19, #W_ERR_LINE]
+    bl      m_trail
     ldr     x9, [x19, #W_HANDLER]
     cbz     x9, m_fatal
     mov     x23, x0
@@ -371,9 +372,41 @@ m_fail:
     adr     x0, e_full
     mov     x1, #(e_wrong - e_full)
     b       m_fatal
+// m_trail: the call trail is kept (W_TRAIL): where the statement last begun is, then where each call record still open was
+// called from, newest first, 16 at most. Uses x9-x12 only (callable with anything else live, from m_fail and from lib.S).
+m_trail:
+    ldr     x9, [x19, #W_POS]
+    str     x9, [x19, #W_TRAIL]
+    mov     x10, #1
+    mov     x11, x20
+1:  cmp     x10, #16
+    b.hs    9f
+    sub     x12, x11, x19               // a record is above the world's header and below the stack's top
+    cmp     x12, #800
+    b.lo    9f
+    cmp     x11, x22
+    b.hs    9f
+    ldr     x9, [x11, #56]
+    lsr     x12, x9, #8
+    ands    x12, x12, #0xffffff
+    b.eq    9f
+    lsr     x9, x9, #32
+    orr     x12, x12, x9, lsl #32
+    add     x9, x19, #W_TRAIL
+    str     x12, [x9, x10, lsl #3]
+    add     x10, x10, #1
+    ldr     x12, [x11, #24]             // the record of the call around it
+    add     x12, x19, x12
+    cmp     x12, x11
+    b.hs    9f
+    mov     x11, x12
+    b       1b
+9:  str     x10, [x19, #W_TRAILN]
+    ret
 // m_raise: an error of the class named x0 with the message x1 (string values) is thrown: an object whose prototype is that
 // class's (the class is looked up among the globals; the message alone is thrown if it is not there)
 m_raise:
+    bl      m_trail                     // (x30 is not needed here: m_raise ends by throwing)
     stp     x0, x1, [sp, #-32]!         // 0 the name then the prototype, 8 the message, 16 the object
     mov     x1, x0
     ldr     x10, [x19, #W_GLOB]
@@ -1447,7 +1480,13 @@ m_call:                                 // w0 arguments from x1 on, the function
     sub     x9, x12, x19
     stp     x9, x11, [x22, #32]
     ldr     x9, [x1, #-8]
-    stp     x9, x13, [x22, #48]
+    ldr     x16, [x19, #W_POS]          // word 7: the call's kind (8 bits), and where the caller was (line 24 bits, column 32 bits)
+    and     x17, x16, #0xffffff
+    lsr     x16, x16, #32
+    lsl     x16, x16, #32
+    orr     x16, x16, x17, lsl #8
+    orr     x16, x16, x13
+    stp     x9, x16, [x22, #48]
     mov     x20, x22
     add     x22, x22, #64
     mov     x27, x1
@@ -1477,6 +1516,7 @@ m_call:                                 // w0 arguments from x1 on, the function
 i_ret:
     ldr     x0, [x22, #-8]
     ldr     x13, [x20, #56]             // 1: called by new; 2: a setter, whose answer is dropped
+    and     x13, x13, #0xff
     cbz     x13, 1f
     cmp     x13, #2
     b.hs    1f
@@ -1485,6 +1525,14 @@ i_ret:
     ldr     x0, [x20, #40]
 1:
 m_ret_x0:                               // (i_yield comes in here: x0 the answer, x13 the call's kind)
+    ldr     x9, [x20, #56]              // the caller's place becomes the place errors are reported at again
+    lsr     x10, x9, #8
+    ands    x10, x10, #0xffffff
+    b.eq    6f
+    lsr     x9, x9, #32
+    orr     x10, x10, x9, lsl #32
+    str     x10, [x19, #W_POS]
+6:
     ldp     x9, x10, [x20]
     ldp     x28, x11, [x20, #16]
     ldr     x12, [x20, #32]
@@ -1597,6 +1645,7 @@ i_yield:
     stp     x0, x10, [x9]
     mov     x0, x14
     ldr     x13, [x20, #56]
+    and     x13, x13, #0xff
     b       m_ret_x0
 // m_resume: built-in 59, a turn of the call itself: (holder, null or not, value). The kept call is put back on the stack
 // where the arguments were (the holder stays under it), its record made to answer this call, its try records moved to

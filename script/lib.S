@@ -488,6 +488,38 @@ n_markerr:
     ucvtf   d0, x9
     fmov    x0, d0
     ret
+// 70: the call trail of the last error made (m_trail), as an array of numbers line * 2^32 + column, newest first; with an
+// argument that is true, it is taken here first (for an error made by the language: the Error function's own call is first)
+n_trail:
+    mov     x15, x30
+    ldr     x9, [x1]
+    mov     x10, #(T_BOOL << 48)
+    orr     x10, x10, #1
+    cmp     x9, x10
+    b.ne    1f
+    bl      m_trail
+1:  ldr     x14, [x19, #W_TRAILN]
+    add     x9, x22, x14, lsl #3
+    cmp     x9, x26
+    b.hi    m_deep
+    mov     x10, #0
+2:  cmp     x10, x14
+    b.hs    3f
+    add     x9, x19, #W_TRAIL
+    ldr     x9, [x9, x10, lsl #3]
+    lsr     x11, x9, #32
+    and     x9, x9, #0xffffffff
+    orr     x9, x11, x9, lsl #32
+    ucvtf   d0, x9
+    str     d0, [x22, x10, lsl #3]
+    add     x10, x10, #1
+    b       2b
+3:  mov     x0, x22
+    mov     x1, x14
+    bl      a_from
+    mov     x30, x15
+    cbz     x0, n_full
+    ret
 n_ident:
     ldr     x9, [x1]
     and     x9, x9, #0xffffffffffff
@@ -1095,6 +1127,6 @@ n_table:
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
     .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
-    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table
-    .equ    N_COUNT, 70
+    .word   n_proxy - n_table, n_pkey - n_table, n_compile - n_table, n_trail - n_table
+    .equ    N_COUNT, 71
     .ltorg

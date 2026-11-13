@@ -30,6 +30,14 @@ static uint8_t *text_block(const char *s, size_t n) { uint8_t *b = block(2, n); 
 static uint8_t *surface(uint32_t version, uint32_t w, uint32_t h, uint32_t per) { uint64_t z = 64 + (uint64_t)w * h * per; uint8_t *b = calloc(1, z + 16); if (!b) exit(4); uint32_t head[4] = {version, w, h, w * per}; memcpy(b, head, 16); memcpy(b + 16, &z, 8); return b; }
 /* handles 20 and up are the host's to hand out */
 static void at(int handle, void *b) { table[256 + handle] = b; }
+/* the collector's free total: walks the free list (gc.S); a block ends at the next start bit or the top */
+static unsigned long long free_total(const uint8_t *w, int *count) { uint64_t h0 = *(uint64_t *)(w + 600), top = *(uint64_t *)(w + 208); const uint64_t *bits = (const uint64_t *)(w + *(uint64_t *)(w + 608)); unsigned long long sum = 0; *count = 0;
+    for (uint64_t d = *(uint64_t *)(w + 640); d; d = *(uint64_t *)(w + d)) { uint64_t b = (d - h0) / 8 + 1, tb = (top - h0) / 8; while (b < tb && !(bits[b >> 6] >> (b & 63) & 1)) b++; sum += h0 + b * 8 - d; ++*count; } return sum; }
+/* held blocks by size (powers of two), and the 8 biggest: for finding what a page world keeps */
+static void held_sizes(const uint8_t *w) { uint64_t h0 = *(uint64_t *)(w + 600), top = *(uint64_t *)(w + 208), fr = *(uint64_t *)(w + 640); const uint64_t *bits = (const uint64_t *)(w + *(uint64_t *)(w + 608)); unsigned long long n[40] = {0}, by[40] = {0}, big[8] = {0}, bigat[8] = {0}; uint64_t tb = (top - h0) / 8, b = 0;
+    while (b < tb) { uint64_t e = b + 1; while (e < tb && !(bits[e >> 6] >> (e & 63) & 1)) e++; uint64_t d = h0 + b * 8, sz = (e - b) * 8; if (d == fr) fr = *(uint64_t *)(w + d); else { int k = 63 - __builtin_clzll(sz); n[k]++; by[k] += sz; for (int j = 0; j < 8; j++) if (sz > big[j]) { for (int m = 7; m > j; m--) { big[m] = big[m-1]; bigat[m] = bigat[m-1]; } big[j] = sz; bigat[j] = d; break; } } b = e; }
+    for (int k = 0; k < 40; k++) if (n[k]) fprintf(stderr, "  held %8llu blocks of %llu+ bytes: %llu\n", n[k], 1ull << k, by[k]);
+    for (int j = 0; j < 8; j++) if (big[j]) { const uint8_t *q = w + bigat[j]; fprintf(stderr, "  big %llu at %llu: ", big[j], bigat[j]); for (int i = 0; i < 48; i++) fputc(q[i] >= 32 && q[i] < 127 ? q[i] : '.', stderr); fputc('\n', stderr); } }
 static double now_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1e3 + t.tv_nsec / 1e6; }
 /* --- a PNG, stored without compression: the picture is for a card on the screen, not for keeping --- */
 static uint32_t crc_table[256];
@@ -183,7 +191,7 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
     s.answer_room = 6 * n + (2u << 20); s.req_room = n + (1u << 20) + 16; s.tree = block(9, 16 * n + (8u << 20)); s.req = block(2, s.req_room); s.answer = block(2, s.answer_room);
     uint8_t *first = malloc(n + 3); if (!first) exit(4); memcpy(first, "H1 ", 3); memcpy(first + 3, d, n);
     if (entry("dom.asm", "begin")(s.tree, 0, 0, 0, table) < 0 || tree_ask(&s, first, n + 3) < 0) { free(first); free(opening); free(s.tree); free(s.req); free(s.answer); return body; } free(first);
-    s.world = block(6, 96u << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
+    s.world = block(6, (getenv("TROUGH_WORLD_MB") ? (unsigned)atoi(getenv("TROUGH_WORLD_MB")) : 96u) << 20); s.out = block(2, 1u << 20); at(40, s.world); entry("script.asm", "begin")(s.world, 0, 0, 0, table);
     struct timeval tv; gettimeofday(&tv, 0); time_t now = tv.tv_sec; struct tm lt; localtime_r(&now, &lt); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
     entry("script.asm", "clock")(s.world, 0, 0, (long long)(((unsigned long long)(uint16_t)(int16_t)(lt.tm_gmtoff / 60) << 48) | ((unsigned long long)ms & 0xffffffffffffull)), table);
     run_script(&s, opening + 64, length(opening), address); free(opening); if (s.failed) s.dead = 1; s.ran = 0;
@@ -347,7 +355,7 @@ int main(int argc, char **argv) {
     if (bn < 0) { printf("%.*s -> %lld, %zu bytes, %s; the reply's body could not be read\n", (int)length(address), address + 64, status, got, secure); return 1; } resize(body, (size_t)bn);
     if (packed == 1) { at(33, body); int16_t qb[1] = {33}; uint8_t *plain = block(2, room); long long un = unpack(plain, qb, 1, 0, table); if (un < 0) { printf("the packed body could not be unpacked\n"); return 1; } resize(plain, (size_t)un); body = plain; bn = un; }
     int ran = 0, failed = 0; { char where[2048]; snprintf(where, sizeof where, "%.*s", (int)length(address), address + 64); const char *tk = getenv("TROUGH_TICKS"); scripts *kept = 0; body = with_scripts(body, where, roots, &ran, &failed, tk ? &kept : 0); bn = (long long)length(body);
-        if (tk && kept) { int n = atoi(tk); for (int i = 0; i <= n; i++) { if (i % 25 == 0) { fprintf(stderr, "[%.0f ms] ", now_ms()); const uint8_t *w = kept->world; fprintf(stderr, "tick %d: heap %llu of %llu, code %llu of %llu, dead %d\n", i, (unsigned long long)*(uint64_t *)(w + 208), (unsigned long long)*(uint64_t *)(w + 216), (unsigned long long)*(uint64_t *)(w + 80), (unsigned long long)*(uint64_t *)(w + 88), kept->dead); }
+        if (tk && kept) { int n = atoi(tk); for (int i = 0; i <= n; i++) { if (i % 25 == 0) { fprintf(stderr, "[%.0f ms] ", now_ms()); const uint8_t *w = kept->world; int fc; fprintf(stderr, "tick %d: free %llu in %d, gcs %llu, heap %llu of %llu, code %llu of %llu, dead %d\n", i, free_total(w, &fc), fc, (unsigned long long)*(uint64_t *)(w + 648), (unsigned long long)*(uint64_t *)(w + 208), (unsigned long long)*(uint64_t *)(w + 216), (unsigned long long)*(uint64_t *)(w + 80), (unsigned long long)*(uint64_t *)(w + 88), kept->dead); if (i == 0) { fprintf(stderr, "  heap0 %llu\n", (unsigned long long)*(uint64_t *)(w + 600)); held_sizes(w); } }
             if (i < n) { usleep(200000); uint8_t *t = scripts_tick(kept, where, i % 5 == 0); free(t); } } } }
     at(34, body); at(35, font); const uint8_t *d = body + 64; const char *kind = bn > 8 && !memcmp(d, "\x89PNG\r\n\x1a\n", 8) ? "png" : bn > 2 && d[0] == 0xff && d[1] == 0xd8 ? "jpeg" : bn > 4 && !memcmp(d, "GIF8", 4) ? "gif" : 0;
     uint8_t *screen; long long answer;

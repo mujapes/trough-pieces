@@ -795,3 +795,20 @@ tap does) and prints heap top/end and code length every 25. Wikipedia Moon: heap
 reaches 96 MB once, the collector reuses after that); code grows 14 bytes a tick (no danger); 100 ticks about 1 s each, not
 slowing, not dead. The earlier "filling" was not reproduced in 100 ticks; a 1500-tick run hit the 600 s limit. Next look:
 the collector's live total (sum the free list) per tick, and why loading the page needs 96 MB.
+World size [by Opus]: browse.c tick report now sums the collector's free list (free_total). Wikipedia Moon after load: 84
+collections during load, about 47 MB free in 14214 blocks, so about 50 MB held (conservative marking; Chrome holds ~5-10 MB
+for this page, so retention or bulky representation is likely). Idle ticks make ~370 KB of garbage each, no collection in 50.
+"Needs 96 MB" is partly policy (the top grows to the end before collecting). Next look: a size histogram of marked blocks
+after a collection, to see what the 50 MB is (script texts? compiled-from strings? the tree?).
+World size, answered [by Opus]: of the 96 MB, about 31 MB is fixed regions before the heap (code room 12.5 MB etc., scaled to
+the world). Held after load is only ~18.5 MB (held_sizes in browse.c: 9.3 MB in 98 blocks of 64 KB+, likely kept script
+texts; 2.5 MB in 142k blocks of 16 bytes). The 47 MB "free" is just the collector waiting for the top to reach the end.
+TROUGH_WORLD_MB=N picks the size: 64 and 48 both load Wikipedia Moon fully (129 and 188 collections, not dead). Wikipedia does
+not need 96 MB. Possible next: a smaller default once collection time is measured; kept 64 KB+ texts could be dropped.
+Unit 44 [by Opus]: CALL TRAIL. Each call record's word 7 now packs the caller's place (kind 8 bits, line 24, column 32); a
+return puts W_POS back to the caller's place (errors after a call in the same statement were reported inside the callee).
+m_trail (machine.S) keeps W_TRAIL/W_TRAILN (header now 800 bytes) at every m_raise/m_fail; __n(70) = `__trail` (prelude)
+gives it as numbers line*2^32+column; Error's stack lists every caller; document.js module errors say "called from L:C ...".
+checks/programs/trail.js; 63 of 63. browse.c: TROUGH_WORLD_MB, free_total, held_sizes. GitHub now shows 12-deep trails, but
+places carry no script identity (138:160598 is in none of core.js's lines): NEXT give each translated text a number and pack
+it into the place (or keep a code-offset -> text table), then read GitHub's two errors.

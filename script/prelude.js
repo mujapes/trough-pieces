@@ -268,7 +268,7 @@ AG.prototype={next:function(v){return en(this,0,v)},'return':function(v){return 
 AG.prototype['\x01Symbol.asyncIterator']=function(){return this};
 n(-14,function(h){return new AG(h)})})(__n);
 var __host=(function(n){var h=n(60),a=n(61);return function(r){h(''+r);return a()}})(__n);
-var globalThis=__n(62)();
+var globalThis=__n(62)();var __trail=__n(70);
 var console=(function(){var p=function(){__console.log(...arguments)},z=function(){};return {log:p,info:p,warn:p,error:p,debug:p,trace:p,table:p,group:p,groupCollapsed:p,groupEnd:z,time:z,timeEnd:z,count:z,assert:function(c){if(!c)p('Assertion failed')}}})();
 (function(n){var acc=n(63),gp=n(64),sp=n(65),own=Object.prototype.hasOwnProperty,same=function(o){return o};
 Object.defineProperty=function(o,k,d){if(d&&(d.get||d.set))acc(o,k,d.get,d.set);else if(d&&'value' in d)o[k]=d.value;else if(!own.call(o,k))o[k]=undefined;return o};

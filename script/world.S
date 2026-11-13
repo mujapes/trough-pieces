@@ -53,6 +53,8 @@
     .equ W_GENFN3, 576                  // the prelude's driver of an async generator (OP_GENSNAP 2)
     .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function
     .equ W_WANT, 544                    // not 0: the program asks its host for something: one more than where the request begins in what it has printed
+    .equ W_TRAILN, 664                  // the call trail of the last error made: how many places (machine.S m_trail)
+    .equ W_TRAIL, 672                   // and the places, 16 at most, each line * 2^32 + column; the first where it was made
     .equ W_GOBJ, 560                    // the global object, whose properties are the global variables themselves (0: not made yet)
     .equ W_ANSWER, 552                  // the host's answer, a string value (0: none)
     .equ W_HANDLER, 304                 // the newest try still open: where its record on the stack ends (0: none)
@@ -80,7 +82,7 @@ w_begin:
     cmp     x9, x10
     b.lo    9f
     add     x11, x19, #64
-    mov     x12, #76
+    mov     x12, #92
 1:  str     xzr, [x11], #8
     subs    x12, x12, #1
     b.ne    1b
@@ -88,7 +90,7 @@ w_begin:
     str     w11, [x19, #W_MAGIC]
     mov     w11, #1
     str     w11, [x19, #(W_MAGIC + 4)]
-    mov     x11, #672                   // the header: 672 bytes (576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 free)
+    mov     x11, #800                   // the header: 800 bytes (576: W_GENFN3, 584 W_LAST, 592-655 the collector's, gc.S, 656 W_PKEY, 664 W_TRAILN, 672-799 W_TRAIL)
     lsr     x12, x9, #3
     and     x12, x12, #-16
     stp     x11, xzr, [x19, #W_CODE]
