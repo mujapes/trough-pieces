@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -167,6 +168,7 @@ static uint8_t *fetch_body(const char *where, const uint8_t *roots, char *why, s
 /* the page's text with its scripts run. The page is read into a tree (the dom piece); each script element, in page order, runs in one
  * world of our own engine and reaches the tree through `document`; the tree written back out is the page that gets drawn. The same
  * block comes back if there is no script, or the tree or the document object cannot be had. */
+static uint8_t *scripts_page(scripts *s, const char *address);
 static void scripts_free(scripts *s) { if (!s) return; free(s->world); free(s->out); free(s->answer); free(s->tree); free(s->req); free(s); }
 static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *roots, int *ran, int *failed, scripts **keep) {
     const uint8_t *d = body + 64, *end = d + length(body); size_t n = length(body); scripts s; memset(&s, 0, sizeof s); s.roots = roots; *ran = *failed = 0;
@@ -201,14 +203,28 @@ static uint8_t *with_scripts(uint8_t *body, const char *address, const uint8_t *
         fired = 1; tree_ask(&s, (const uint8_t *)"C0", 2); int before = s.ran; if (!s.dead) run_script(&s, (const uint8_t *)"__fire()", 8, address); s.ran = before; }
     free(seen);
     long long pn = tree_ask(&s, (const uint8_t *)"h1", 2); uint8_t *fresh = body; if (pn >= 0) { fresh = text_block((const char *)s.answer + 64, (size_t)pn); free(body); }
-    *ran = s.ran; *failed = s.failed; if (keep && !s.dead) { *keep = malloc(sizeof s); if (*keep) { **keep = s; (*keep)->zone = zone; return fresh; } }
+    *ran = s.ran; *failed = s.failed; if (keep && !s.dead) { *keep = malloc(sizeof s); if (*keep) { **keep = s; (*keep)->zone = zone; uint8_t *m = scripts_page(*keep, address); if (m) { free(fresh); fresh = m; } return fresh; } }
     free(s.world); free(s.out); free(s.answer); free(s.tree); free(s.req); return fresh; }
+/* the page as drawn: elements the page listens to for clicks hold a link "trough-node:N" around their content (only in this copy) */
+static uint8_t *scripts_page(scripts *s, const char *address) {
+    int kept = s->ran, bad = s->failed; run_script(s, (const uint8_t *)"__mark(1)", 9, address); long long pn = tree_ask(s, (const uint8_t *)"h1", 2);
+    uint8_t *t = pn < 0 ? 0 : text_block((const char *)s->answer + 64, (size_t)pn); run_script(s, (const uint8_t *)"__mark(0)", 9, address); s->ran = kept; s->failed = bad; if (!t) return 0;
+    const char *mk = "data-trough-click=\""; size_t mn = strlen(mk), n = length(t); const char *d = (const char *)t + 64; char *o = malloc(2 * n + 64); if (!o) exit(4); size_t on = 0, i = 0; int found = 0;
+    char *closers[64]; size_t close_at[64]; int cn = 0;   /* where each mark's </a> goes, found ahead by counting the same tag */
+    for (; i < n; i++) {
+        for (int c = 0; c < cn; c++) if (close_at[c] == i) { memcpy(o + on, "</a>", 4); on += 4; }
+        o[on++] = d[i];
+        if (d[i] == '>' ) { size_t b = i; while (b > 0 && d[b] != '<') b--; const char *m = memmem(d + b, i - b, mk, mn);
+            if (m && cn < 64 && d[b + 1] != '/') { int node = atoi(m + mn); size_t tl = 0; while (b + 1 + tl < i && d[b + 1 + tl] > ' ' && d[b + 1 + tl] != '>') tl++;
+                int depth = 1; size_t j = i + 1; for (; j + tl + 2 < n; j++) if (d[j] == '<') { if (d[j + 1] == '/' && !strncasecmp(d + j + 2, d + b + 1, tl) && !isalnum((unsigned char)d[j + 2 + tl])) { if (!--depth) break; } else if (!strncasecmp(d + j + 1, d + b + 1, tl) && !isalnum((unsigned char)d[j + 1 + tl])) depth++; }
+                if (j + tl + 2 < n) { on += (size_t)sprintf(o + on, "<a href=\"trough-node:%d\">", node); close_at[cn] = j; closers[cn++] = 0; found++; } } } }
+    (void)closers; uint8_t *r = text_block(o, on); free(o); free(t); return r; }
 /* the live screen's page world: its timers that are due by the real clock are run; a fresh page text if the tree changed, else 0 */
-static uint8_t *scripts_tick(scripts *s, const char *address) {
+static uint8_t *scripts_tick(scripts *s, const char *address, int force) {
     if (!s || s->dead) return 0; struct timeval tv; gettimeofday(&tv, 0); long long ms = (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-    long long wake = entry("script.asm", "clock")(s->world, 0, 0, 0, table); if (wake < 0 || wake > ms) return 0;
-    entry("script.asm", "clock")(s->world, 0, 0, s->zone | (ms & 0xffffffffffffll), table); tree_ask(s, (const uint8_t *)"C0", 2); run_script(s, 0, 0, address);
-    long long pn = tree_ask(s, (const uint8_t *)"h1", 2); if (pn < 0) return 0; return text_block((const char *)s->answer + 64, (size_t)pn); }
+    long long wake = entry("script.asm", "clock")(s->world, 0, 0, 0, table); int due = wake >= 0 && wake <= ms; if (!due && !force) return 0;
+    if (due) { entry("script.asm", "clock")(s->world, 0, 0, s->zone | (ms & 0xffffffffffffll), table); tree_ask(s, (const uint8_t *)"C0", 2); int kept = s->ran; run_script(s, 0, 0, address); s->ran = kept; }
+    return scripts_page(s, address); }
 /* The live screen: browse <out dir> --serve <picture file> <events file> <width> <height> [address]
  * The picture file is a surface as the pieces know it (64-byte head, then the dots) that the app maps and shows; bytes 24-31 of
  * the head are a counter this host raises after every redraw. The events file gets one line per event from the app:
@@ -241,7 +257,7 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
     int fd = open(argv[3], O_RDWR | O_CREAT, 0600); if (fd < 0 || ftruncate(fd, (off_t)bytes)) { fprintf(stderr, "cannot make the picture file\n"); return 1; }
     uint8_t *screen = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); if (screen == MAP_FAILED) return 1; uint64_t z = bytes, counter = 0; uint32_t head[4] = {1, W, H, 4 * W}; memset(screen, 0, 64); memcpy(screen, head, 16); memcpy(screen + 16, &z, 8);
     FILE *ev = fopen(argv[4], "a+"); if (!ev) return 1; fseek(ev, 0, SEEK_END); long read_to = ftell(ev);
-    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0, editing = 0; char typed[512] = ""; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; job *now = 0; scripts *live = 0; double ticked = 0; static int applied[PICS]; pic *pics = 0; int pic_n = 0;
+    char why[400] = "", address[2048]; snprintf(address, sizeof address, "%s", argc > 7 ? argv[7] : "https://example.com/"); uint8_t *body = 0; long long tall = 0, scroll = 0; int size_px = 30, dirty = 1, fresh = 1, down = 0, last_y = 0, down_x = 0, down_y = 0, moved = 0, depth = 0, editing = 0; char typed[512] = ""; enum { BAR = 44 }; static char before[16][2048]; entry5 rect = entry("paint", "fill_rect"), words = entry("font", "draw"); enum { TILE = 1024, KEPT = 24, PICS = 32 }; job *now = 0; scripts *live = 0; double ticked = 0; int tapped = 0; static int applied[PICS]; pic *pics = 0; int pic_n = 0;
     { const char *need[][2] = {{"url","resolve"},{"url","part"},{"url","port"},{"http","request"},{"http","status"},{"http","header"},{"http","packed"},{"http","body"},{"inflate","unpack"},{"tls","feed"},{"png","decode"},{"jpeg","decode"},{"gif","decode"},{"image","blit"},{"image","smooth"},{"image","stretch"},{"paint","clear"},{"page","pictures"},{"page","link"}}; for (size_t i = 0; i < sizeof need / sizeof need[0]; i++) entry(need[i][0], need[i][1]); }   /* every piece is loaded before a second thread exists */ static uint8_t *strip[KEPT]; static long long strip_at[KEPT]; static unsigned long strip_used[KEPT], tick; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; entry5 render = entry("page", "render"), clear = entry("paint", "clear");
     for (;;) {
         if (fresh) { fresh = 0; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; double t = now_ms(); body = fetch_body(address, roots, why, sizeof why); if (body) { int ran, failed; scripts_free(live); live = 0; body = with_scripts(body, address, roots, &ran, &failed, &live); } scroll = 0; dirty = 1; printf("%s: %s (%.0f ms)\n", address, body ? "open" : why, now_ms() - t); fflush(stdout);
@@ -251,7 +267,7 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
                 for (long long o = 0; o + 20 <= ln && pic_n < PICS; ) { uint32_t f[5]; memcpy(f, list + 64 + o, 20); if (f[4] < sizeof pics[0].src && f[2] && f[3]) { pic *p = &pics[pic_n++]; p->x = f[0]; p->y = f[1]; p->w = f[2]; p->h = f[3]; size_t k = 0; for (uint32_t i = 0; i < f[4]; i++) { char c = (char)list[64 + o + 20 + i]; p->src[k++] = c; if (c == '&' && i + 4 < f[4] && !memcmp(list + 64 + o + 21 + i, "amp;", 4)) i += 4; } p->src[k] = 0; p->state = 0; p->ready = 0; } o += 20 + ((f[4] + 3) & ~3u); }
                 free(list); now->n = pic_n; printf("%d pictures to fetch\n", pic_n); fflush(stdout); pthread_t th; if (pic_n && !pthread_create(&th, 0, picture_worker, now)) pthread_detach(th); else { free(now); now = 0; pics = 0; pic_n = 0; } }
             if (!body) { char sorry[600]; int n = snprintf(sorry, sizeof sorry, "<h2>This page could not be opened</h2><p>%s</p><p>%s</p>", address, why); body = text_block(sorry, (size_t)n); } }
-        if (live && body && now_ms() - ticked > 50) { ticked = now_ms(); uint8_t *changed = scripts_tick(live, address);   /* the page keeps running: timers on the real clock */
+        if (live && body && now_ms() - ticked > 50) { ticked = now_ms(); uint8_t *changed = scripts_tick(live, address, tapped); tapped = 0;   /* the page keeps running: timers on the real clock */
             if (changed && (length(changed) != length(body) || memcmp(changed + 64, body + 64, length(body)))) { free(body); body = changed; for (int i = 0; i < KEPT; i++) strip_at[i] = -1; dirty = 1; printf("the page changed itself\n"); fflush(stdout); } else free(changed); }
         if (dirty) { dirty = 0; int drawn = 0; double t = now_ms(); at(34, body); at(35, font); memcpy(&counter, screen + 24, 8); { /* the page shows from row (scroll - BAR) of its own height; each strip of TILE rows is drawn by the pieces once and kept */
               long long first = scroll - BAR; size_t rowbytes = 4 * (size_t)W;
@@ -273,9 +289,10 @@ static int serve(int argc, char **argv, const uint8_t *roots, uint8_t *font) {
                 else if (line[0] == 'u') { if (down && moved < 12 && down_y < BAR) { if (down_x < 64 && depth) { snprintf(address, sizeof address, "%s", before[--depth]); fresh = 1; printf("back to %s\n", address); fflush(stdout); } else if (down_x >= 64) { editing = !editing; typed[0] = 0; dirty = 1; } }
                     else if (down && moved < 12) {   /* a tap: is there a link under it? The page piece says; the url piece works out where it leads */
                         at(34, body); at(35, font); int16_t ql[8] = {34, 35, (int16_t)size_px, (int16_t)((scroll > 32000 ? 32000 : scroll) - BAR), (int16_t)down_x, (int16_t)down_y, (int16_t)W, (int16_t)H}; uint8_t *href = block(2, 4096); long long hn = entry("page", "link")(href, ql, 8, 0, table);
+                        if (live && hn > 12 && !memcmp(href + 64, "trough-node:", 12)) { char c[48]; int k = snprintf(c, sizeof c, "__tap(%d)", atoi((const char *)href + 76)); int kept = live->ran; run_script(live, (const uint8_t *)c, (size_t)k, address); live->ran = kept; tapped = 1; ticked = 0; printf("tap at %d %d: the page's own click (%s)\n", down_x, down_y, c); hn = -1; }
                         if (hn > 0) { { /* an address written in a page spells & as &amp; (to become the page piece's job) */ size_t o = 0; for (long long i = 0; i < hn; i++) { href[64 + o++] = href[64 + i]; if (href[64 + i] == '&' && i + 4 < hn && !memcmp(href + 64 + i + 1, "amp;", 4)) i += 4; } hn = (long long)o; } resize(href, (size_t)hn); uint8_t *base = text_block(address, strlen(address)); at(30, base); at(31, href); int16_t qn[2] = {30, 31}; uint8_t *next = made_text(entry("url", "resolve"), qn, 2, 8192);
                             if (next && length(next) < sizeof address) { if (depth == 16) { memmove(before[0], before[1], 15 * sizeof before[0]); depth = 15; } snprintf(before[depth++], sizeof before[0], "%s", address); memcpy(address, next + 64, length(next)); address[length(next)] = 0; fresh = 1; printf("tap at %d %d: link to %s\n", down_x, down_y, address); } else printf("tap at %d %d: a link the address piece cannot follow\n", down_x, down_y); }
-                        else printf("tap at %d %d: no link there\n", down_x, down_y); fflush(stdout); } down = 0; }
+                        else if (hn != -1) printf("tap at %d %d: no link there\n", down_x, down_y); fflush(stdout); } down = 0; }
                 else if (line[0] == 'o' && line[1] == ' ') { if (depth == 16) { memmove(before[0], before[1], 15 * sizeof before[0]); depth = 15; } snprintf(before[depth++], sizeof before[0], "%s", address); snprintf(address, sizeof address, "%s", line + 2); fresh = 1; }
                 else if (line[0] == 'g' && sscanf(line + 1, "%d", &y) == 1) { long long limit = tall + BAR > (long long)H ? tall + BAR - H : 0; scroll = y < 0 ? 0 : y > limit ? limit : y; dirty = 1; }   /* go to that row of the page */
                 else if (line[0] == 'k' && sscanf(line + 1, "%d", &x) == 1) {   /* a key: typed into the line. Enter opens an address, or searches for anything else */

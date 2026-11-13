@@ -584,3 +584,11 @@ clock, writes the tree out again, and if the page text changed throws the drawn 
 itself"). Checked: a page with setInterval 6 s (through httpbin.org/base64) changed itself four times in 30 s. Not yet: a tap
 reaching the page's dispatchEvent (needs the page piece to say which tree node is under a point); pictures are not re-fetched
 after a change.
+
+**Thirty-third unit [by Opus]: a tap reaches the page's click handlers (2026-11-13).** dom/document.js: __mark(on) sets or
+removes `data-trough-click=N` on elements with a click listener or onclick; __tap(N) dispatches a bubbling click. host:
+scripts_page writes the drawn copy with marks on, takes them off again (scripts never see them), and puts
+`<a href="trough-node:N">` around each marked element's content (closing tag found by counting the same tag name). A tap
+whose link is trough-node:N runs __tap(N) and forces a redraw. Checked: a button page through httpbin, three taps, "pressed
+1..3" drawn. Not yet: listeners on document/body only (delegation: the tap has no node), and marked content is drawn in the
+link colour.

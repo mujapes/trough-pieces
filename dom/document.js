@@ -192,3 +192,6 @@ function removeEventListener(t,f){__win.removeEventListener(t,f)}
 function dispatchEvent(e){return __win.dispatchEvent(e)}
 function __fire(){document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));__win.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';var e=new Event('load');__win.dispatchEvent(e);if(typeof window.onload=='function')window.onload(e)}
 function __loaded(n,ok){var e=__w(n);if(e)e.dispatchEvent(new Event(ok?'load':'error'))}
+// the live screen: elements with a click handler are marked only while the drawn copy is written; a tap there clicks them
+function __mark(on){for(var k in __nodes){var o=__nodes[k];if(o instanceof Element&&((o.__l&&o.__l.click&&o.__l.click.length)||typeof o.onclick=='function')){if(on)o.setAttribute('data-trough-click',k);else o.removeAttribute('data-trough-click')}}}
+function __tap(n){var o=__nodes[n];if(o)o.dispatchEvent(new Event('click',{bubbles:true}))}
