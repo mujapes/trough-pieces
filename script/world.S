@@ -45,7 +45,7 @@
     .equ W_JWIDE, 416                   // JSON.parse: 1 if the text it is reading has two bytes a unit
     .equ W_ITERFN, 424                  // the prelude's function that turns anything loopable into an array (0: not yet)
     .equ W_FALLBACK, 432                // three functions of the prelude: join, indexOf, slice in the language, for what built-ins 49-51 do not take
-    .equ W_K_TOPRIM, 504                // the text "@@toPrimitive"
+    .equ W_K_TOPRIM, 504                // the key Symbol.toPrimitive ("\001Symbol.toPrimitive")
     .equ W_K_VALUEOF, 496               // the text "valueOf"
     .equ W_K_FULL, 456                  // the text of the error for a full world, made at the start while there is room
     .equ W_GENFN, 528                   // two functions of the prelude: what makes a generator of a holder, what drives an async function

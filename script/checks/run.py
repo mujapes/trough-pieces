@@ -13,6 +13,7 @@ def ours(path):
     return out,err,res
 def ref(cmd,path):
     r=subprocess.run(cmd+[path],capture_output=True,timeout=60); t=r.stdout.decode('utf8','replace')
+    if cmd[0]=='node' and r.returncode and 'throws' not in os.path.basename(path): print('note %s: node itself stopped with an error, so the lines after it are not compared'%os.path.basename(path))
     # node's console shows a negative zero as -0, which is its console's habit and not the language's text for it ("0")
     return re.sub(r'(?<![\w.+-])-0(?![\w.])','0',t) if cmd[0]=='node' else t
 files=sorted(glob.glob((sys.argv[2] if len(sys.argv)>2 and sys.argv[2]!='-v' else os.path.dirname(os.path.abspath(__file__))+'/programs')+'/*.js')) if not (len(sys.argv)>2 and sys.argv[2].endswith('.js')) else [sys.argv[2]]

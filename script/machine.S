@@ -152,6 +152,8 @@ s_boolean:   .ascii "boolean"
 s_object:    .ascii "object"
 s_objtext:   .ascii "[object Object]"
 s_end:
+s_symbol:    .ascii "symbol"
+s_symbol_end:
     .balign 4
 // v_join: the two string values x0 and x1 as one string -> x0 (0 if the world is full)
 v_join:
@@ -1023,7 +1025,17 @@ i_typeof:
 1:  mov     w16, #T_STRING
     cmp     w17, w16
     b.ne    2f
-    LIT     s_string, s_boolean
+    STRV    x0, x1, x2                  // a string whose first unit is 1 is a symbol (see prelude.js, Symbol)
+    cbz     x2, 11f
+    ldr     x3, [x1, #-8]
+    lsr     x3, x3, #32
+    cbnz    x3, 11f
+    ldrb    w3, [x1]
+    cmp     w3, #1
+    b.ne    11f
+    LIT     s_symbol, s_symbol_end
+    b       9f
+11: LIT     s_string, s_boolean
     b       9f
 2:  mov     w16, #T_BOOL
     cmp     w17, w16

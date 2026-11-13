@@ -1,6 +1,6 @@
 // The library's half that is written in the language (see lib.S). __n(k): the built-in routine numbered k.
 __n(-7);
-function Object(v){if(v===undefined||v===null)return {};return v}function Array(n){var a=[],i;if(arguments.length===1&&typeof n==='number'){if(n!==(n>>>0))throw new RangeError('Invalid array length');for(i=0;i<n;i++)a.push(undefined)}else for(i=0;i<arguments.length;i++)a.push(arguments[i]);return a}function Function(){}function String(x){return arguments.length?''+x:''}
+var __symobj;function Object(v){if(v===undefined||v===null)return {};if(typeof v==='symbol')return __symobj(v);return v}function Array(n){var a=[],i;if(arguments.length===1&&typeof n==='number'){if(n!==(n>>>0))throw new RangeError('Invalid array length');for(i=0;i<n;i++)a.push(undefined)}else for(i=0;i<arguments.length;i++)a.push(arguments[i]);return a}function Function(){}function String(x){if(!arguments.length)return '';if(typeof x==='symbol')return 'Symbol('+Symbol.__desc(x)+')';return ''+x}
 function Number(x){return arguments.length?+x:0}function Boolean(x){return !!x}
 __n(-1,Object.prototype);__n(-2,Array.prototype);__n(-3,Function.prototype);__n(-4,String.prototype);__n(-5,Number.prototype);__n(-6,Boolean.prototype);
 var Math={floor:__n(1),ceil:__n(2),abs:__n(3),sqrt:__n(4),round:__n(5),trunc:__n(6),sign:__n(7),min:__n(8),max:__n(9),exp:__n(20),log:__n(21),log2:__n(22),log10:__n(23),random:__n(24),sin:__n(25),cos:__n(26),tan:__n(27),atan:__n(31),atan2:__n(32),asin:__n(33),acos:__n(34),expm1:__n(35),log1p:__n(36),sinh:__n(37),cosh:__n(38),tanh:__n(39),cbrt:__n(40),hypot:__n(41),asinh:__n(43),acosh:__n(44),atanh:__n(45),fround:__n(46),clz32:__n(47),imul:__n(48),pow:function(a,b){return a**b},
@@ -96,14 +96,14 @@ if(r){i=0;while(1){if(i===a.length){a.push(1);break}a[i]=a[i]+1;if(a[i]<10)break
 s='';for(i=a.length-1;i>=0;i--)s+=a[i];i=0;while(i<s.length-1&&s.charCodeAt(i)===48)i++;s=s.substring(i);while(s.length<=f)s='0'+s}
 if(f)s=s.substring(0,s.length-f)+'.'+s.substring(s.length-f);return g+s};
 })(Array.prototype,String.prototype,Number.prototype,__n);
-var Symbol={iterator:'@@iterator',asyncIterator:'@@asyncIterator'},Map,Set,WeakMap,WeakSet,WeakRef,FinalizationRegistry;
+var Symbol={iterator:'\x01Symbol.iterator',asyncIterator:'\x01Symbol.asyncIterator'},Map,Set,WeakMap,WeakSet,WeakRef,FinalizationRegistry;
 (function(n,A){
 var id=n(42),D={};
 function AI(a,m){this.a=a;this.i=0;this.m=m}
 AI.prototype.next=function(){var a=this.a,i=this.i,m=this.m;if(i>=a.length)return{value:undefined,done:true};this.i=i+1;return{value:m===0?a[i]:m===1?i:[i,a[i]],done:false}};
-AI.prototype['@@iterator']=function(){return this};
-A.values=A['@@iterator']=function(){return new AI(this,0)};A.keys=function(){return new AI(this,1)};A.entries=function(){return new AI(this,2)};
-n(-8,function(o){var f,t,a,r;if(o==null||typeof(f=o['@@iterator'])!=='function')throw new TypeError('the value is not iterable');
+AI.prototype['\x01Symbol.iterator']=function(){return this};
+A.values=A['\x01Symbol.iterator']=function(){return new AI(this,0)};A.keys=function(){return new AI(this,1)};A.entries=function(){return new AI(this,2)};
+n(-8,function(o){var f,t,a,r;if(o==null||typeof(f=o['\x01Symbol.iterator'])!=='function')throw new TypeError('the value is not iterable');
 t=f.call(o);if(Array.isArray(t))return t;if(t instanceof AI&&t.m===0&&t.i===0){t.i=t.a.length;return t.a}a=[];while(!(r=t.next()).done)a.push(r.value);return a});
 function key(k){var t=typeof k;return t==='string'?'s'+k:t==='number'?'n'+k:(t==='object'&&k!==null)||t==='function'?'o'+id(k):'x'+k}
 function pack(m){var k=m._k,v=m._v,nk=[],nv=[],h={},i;for(i=0;i<k.length;i++)if(k[i]!==D){h[key(k[i])]=nk.length;nk.push(k[i]);if(v)nv.push(v[i])}m._k=nk;if(v)m._v=nv;m._h=h;m._d=0}
@@ -116,14 +116,14 @@ M.get=function(k){var i=this._h[key(k)];return i===undefined?undefined:this._v[i
 M.set=function(k,v){var s=key(k),i=this._h[s];if(i===undefined){this._h[s]=this._k.length;this._k.push(k===0?0:k);this._v.push(v);this.size++}else this._v[i]=v;return this};
 M.clear=function(){this._h={};this._k=[];this._v=[];this.size=0;this._d=0};
 M.forEach=function(f,t){var i;for(i=0;i<this._k.length;i++)if(this._k[i]!==D)f.call(t,this._v[i],this._k[i],this)};
-M.keys=function(){return new AI(list(this,0),0)};M.values=function(){return new AI(list(this,1),0)};M.entries=M['@@iterator']=function(){return new AI(list(this,2),0)};
+M.keys=function(){return new AI(list(this,0),0)};M.values=function(){return new AI(list(this,1),0)};M.entries=M['\x01Symbol.iterator']=function(){return new AI(list(this,2),0)};
 Set=function Set(it){if(!(this instanceof Set))throw new TypeError("Constructor Set requires 'new'");this._h={};this._k=[];this.size=0;this._d=0;if(it!=null)for(var e of it)this.add(e)};
 var S=Set.prototype;S.has=has;S['delete']=del;
 S.add=function(k){var s=key(k);if(this._h[s]===undefined){this._h[s]=this._k.length;this._k.push(k===0?0:k);this.size++}return this};
 S.clear=function(){this._h={};this._k=[];this.size=0;this._d=0};
 WeakMap=Map;WeakSet=Set;WeakRef=function WeakRef(o){this._o=o};FinalizationRegistry=function FinalizationRegistry(){};WeakRef.prototype.deref=function(){return this._o};FinalizationRegistry.prototype.register=FinalizationRegistry.prototype.unregister=function(){};
 S.forEach=function(f,t){var i,k;for(i=0;i<this._k.length;i++)if((k=this._k[i])!==D)f.call(t,k,k,this)};
-S.values=S.keys=S['@@iterator']=function(){return new AI(list(this,0),0)};S.entries=function(){return new AI(list(this,3),0)};
+S.values=S.keys=S['\x01Symbol.iterator']=function(){return new AI(list(this,0),0)};S.entries=function(){return new AI(list(this,3),0)};
 })(__n,Array.prototype);
 var RegExp;
 (function(n){var C=n(52),X=n(53);
@@ -195,7 +195,7 @@ function ts(p){return p2(p[3])+':'+p2(p[4])+':'+p2(p[5])}
 function lt(p){var h=p[3]%12;return (h?h:12)+':'+p2(p[4])+':'+p2(p[5])+' '+(p[3]<12?'AM':'PM')}
 function fmt(k){return function(){var t=this._t;if(t!==t)return 'Invalid Date';var p=parts(k===3?t:t+tz());
 return k===0?ds(p)+' '+ts(p)+' '+zone():k===1?ds(p):k===2?ts(p)+' '+zone():k===3?WD[p[7]]+', '+p2(p[2])+' '+MN[p[1]]+' '+yr(p[0])+' '+ts(p)+' GMT':k===4?(p[1]+1)+'/'+p[2]+'/'+p[0]:k===5?lt(p):(p[1]+1)+'/'+p[2]+'/'+p[0]+', '+lt(p)}}
-P.toString=P['@@toPrimitive']=fmt(0);P.toDateString=fmt(1);P.toTimeString=fmt(2);P.toUTCString=P.toGMTString=fmt(3);P.toLocaleDateString=fmt(4);P.toLocaleTimeString=fmt(5);P.toLocaleString=fmt(6);
+P.toString=P['\x01Symbol.toPrimitive']=fmt(0);P.toDateString=fmt(1);P.toTimeString=fmt(2);P.toUTCString=P.toGMTString=fmt(3);P.toLocaleDateString=fmt(4);P.toLocaleTimeString=fmt(5);P.toLocaleString=fmt(6);
 })(__n);
 var __q;if(!__q)__q={m:[],t:[],id:0};
 var Promise,setTimeout,setInterval,clearTimeout,clearInterval,queueMicrotask,__jobs;
@@ -237,7 +237,7 @@ if(typeof t.f==='function')t.f.apply(undefined,t.a);micro();return true}
 __jobs=function(){micro();var k=0,T,i,b=-1;while(run1()&&++k<1e5);T=Q.t;for(i=0;i<T.length;i++)if(b<0||T[i].at<b)b=T[i].at;setwake(b)};
 })(__n,__q);
 (function(n){var rs=n(59),RT={},GP={next:function(v){return st(this,0,v)},'return':function(v){return st(this,2,v)},'throw':function(e){return st(this,1,e)}};
-GP['@@iterator']=function(){return this};
+GP['\x01Symbol.iterator']=function(){return this};
 function st(g,m,v){if(g._r)throw new TypeError('Generator is already running');
 if(g._d||(m&&!g._s)){g._d=true;if(m===1)throw v;return{value:m?v:undefined,done:true}}
 var h=g._h,r;g._r=g._s=true;h[1]=0;
@@ -286,5 +286,24 @@ var __import=function(u){return Promise.reject(new TypeError('import() is not ma
 Object.prototype.propertyIsEnumerable=function(k){return Object.prototype.hasOwnProperty.call(this,k)};
 Object.prototype.isPrototypeOf=function(o){if(o==null)return false;for(o=Object.getPrototypeOf(o);o!=null;o=Object.getPrototypeOf(o))if(o===this)return true;return false};
 Object.getOwnPropertySymbols=function(){return[]};
-(function(){var old=Symbol,n=0,reg={},k,S=function Symbol(d){return '@@'+(d===undefined?'':d)+'@'+(++n)},w=['hasInstance','toPrimitive','toStringTag','species','unscopables','match','matchAll','replace','search','split','isConcatSpreadable'];
-for(k in old)S[k]=old[k];for(k=0;k<w.length;k++)S[w[k]]='@@'+w[k];S['for']=function(k){k=String(k);return reg[k]||(reg[k]=S(k))};S.keyFor=function(s){for(var k in reg)if(reg[k]===s)return k};Symbol=S})();
+(function(){var old=Symbol,n=0,reg={},k,
+S=function Symbol(d){if(this instanceof S)throw new TypeError('Symbol is not a constructor');return '\x01'+(d===undefined?'':String(d))+'\x01'+(++n)},
+w=['hasInstance','toPrimitive','toStringTag','species','unscopables','match','matchAll','replace','search','split','isConcatSpreadable'];
+// a symbol is a string whose first unit is \x01 (typeof says "symbol"): \x01 description \x01 number, or \x01Symbol.name for the well-known ones
+for(k in old)S[k]=old[k];for(k=0;k<w.length;k++)S[w[k]]='\x01Symbol.'+w[k];
+S['for']=function(k){k=String(k);return reg[k]||(reg[k]=S(k))};S.keyFor=function(s){for(var k in reg)if(reg[k]===s)return k};
+var desc=function(s){var i=s.lastIndexOf('\x01');return i>0?s.slice(1,i):s.slice(1)};S.__desc=desc;
+S.prototype={constructor:S,toString:function(){return 'Symbol('+desc(this.__s)+')'},valueOf:function(){return this.__s}};
+Object.defineProperty(S.prototype,'description',{get:function(){return desc(this.__s)}});
+__symobj=function(v){var o=Object.create(S.prototype);o.__s=v;return o};
+Symbol=S})();
+Array.from=function(it,f,t){var r=[],i=0,v,n;if(it==null)throw new TypeError(it+' is not iterable');
+if(typeof it[Symbol.iterator]==='function'){for(v of it){r.push(f?f.call(t,v,i):v);i++}return r}
+n=it.length>>>0;for(;i<n;i++){v=it[i];r.push(f?f.call(t,v,i):v)}return r};
+Array.of=function(){return Array.prototype.slice.call(arguments)};
+(function(){var T=Symbol.toStringTag,isA=Array.isArray;
+Math[T]='Math';JSON[T]='JSON';Map.prototype[T]='Map';Set.prototype[T]='Set';Promise.prototype[T]='Promise';Symbol.prototype[T]='Symbol';
+Object.prototype.toString=function(){var o=this,t=typeof o,g;if(o===undefined)return '[object Undefined]';if(o===null)return '[object Null]';
+if(t==='number')return '[object Number]';if(t==='string')return '[object String]';if(t==='boolean')return '[object Boolean]';if(t==='symbol')return '[object Symbol]';
+g=o[T];if(typeof g==='string')return '[object '+g+']';if(t==='function')return '[object Function]';if(isA(o))return '[object Array]';
+if(o instanceof Date)return '[object Date]';if(o instanceof RegExp)return '[object RegExp]';if(o instanceof Error)return '[object Error]';return '[object Object]'}})();

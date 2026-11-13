@@ -288,7 +288,7 @@ k_constructor: .ascii "constructor"
 k_tostring:    .ascii "toString"
 k_end:
 k_valueof:     .ascii "valueOf"
-k_toprim:      .ascii "@@toPrimitive"
+k_toprim:      .ascii "\001Symbol.toPrimitive"
 k_toprim_end:
 e_noprops: .ascii "TypeError: Cannot read properties of undefined or null"
 e_noprops_end:

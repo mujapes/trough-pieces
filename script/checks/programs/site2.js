@@ -40,9 +40,15 @@ console.log(new Error().message === "", Error("").toString());
 (()=>{ console.log(typeof hx); async function hx(){return 1} function hu(){} var he; console.log(typeof he, typeof hu) })();
 (function(){ var r=[]; function z(){ return ge.a } async function x(){} let gy=2; var ge={a:7}; r.push(z(), typeof x, gy); console.log(r.join()) })();
 var c=function(e,n){return function(){try{return e(1)}catch(e){throw e}}}; console.log(c(x=>x+1)()); function g(e){ try{ return e*2 }catch(e){ return -1 } } console.log(g(4)); var h=function(){ var e=5; try{ return e }catch(e){} }; console.log(h())
-var r=[]; function k(){ let a=1; try{ throw 2 }catch(e){ let b=e+a; r.push(()=>b+e) } return r[0]() } console.log(k());
+var r=[]; function kc(){ let a=1; try{ throw 2 }catch(e){ let b=e+a; r.push(()=>b+e) } return r[0]() } console.log(kc());
 for(var i=0;i<3;i++){ try{ if(i==1) throw i; }catch(q){ continue } r.push('i'+i) } console.log(r.length);
-function m(){ try{ throw 'x' }catch(e){ return e+'!' }finally{ r.push('f') } } console.log(m(), r.length);
+function mc(){ try{ throw 'x' }catch(e){ return e+'!' }finally{ r.push('f') } } console.log(mc(), r.length);
 try{ try{ throw 1 }catch(e){ throw e+1 } }catch(e){ console.log('outer',e) }
 var fs=[]; for(let j=0;j<2;j++){ try{ throw j }catch(e){ fs.push(()=>e) } } console.log(fs[0](),fs[1]());
 try{ throw {p:3} }catch({p}){ console.log(p) }
+var a=Symbol('q'),b=Symbol('q'),o={};o[a]=1;o[b]=2;
+console.log(typeof a, a!==b, o[a], o[b], String(a), Object(a) instanceof Symbol, Object(a).description, Symbol.for('x')===Symbol.for('x'), typeof Symbol.iterator);
+console.log([...new Set([1,2])].length, Array.from(new Map([[1,2]])).length, String(Symbol.iterator), typeof String(Symbol()));
+var it={[Symbol.iterator](){var i=0;return {next(){return {done:i>2,value:i++}}}}}; console.log([...it].join(), Array.from(it,x=>x*2).join(), Array.from({length:2,0:'a',1:'b'}).join(), Array.from('hé').length, Array.of(7,8).join());
+var km="m",q={[km](x){return x+1},*[km+"g"](){yield 1;yield 2},async [km+"a"](){return 3},["p"]:4}; console.log(q.m(1),[...q.mg()].join(),q.p); q.ma().then(v=>console.log(v));
+var t=Object.prototype.toString; console.log(t.call(function(){}), t.call([]), t.call(1), t.call("s"), t.call(true), t.call(new Date(0)), t.call(/a/), t.call({}), t.call(new Map), t.call(Symbol()), t.call(Promise.resolve()), t.call(new Error("x")), t.call(JSON), t.call(Math), String({}), t.call(new Set))

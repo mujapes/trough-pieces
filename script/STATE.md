@@ -531,3 +531,17 @@ loads), so anything iterated by library code fails. Reproduce: /tmp-style bench 
 ran-7.js + `[1][Symbol.iterator]()`. FIX: a real symbol type (a tag of its own, typeof "symbol", unique, usable as a property
 key, never equal to a string, Object(sym) instanceof Symbol, description, toString "Symbol(desc)", well-known symbols that the
 engine's own for..of / spread / toPrimitive use instead of the '@@iterator' strings). Next unit.
+
+**Twenty-eighth unit [by Opus]: symbols that libraries accept; Object.prototype.toString; Array.from (2026-11-13).**
+(1) A symbol is a string whose first unit is 1: `\x01 description \x01 n` from Symbol(d), `\x01Symbol.name` for the well-known
+ones (iterator, asyncIterator, toPrimitive, toStringTag, ...). machine.S i_typeof: such a narrow string is "symbol".
+prelude.js: every '@@iterator'/'@@asyncIterator'/'@@toPrimitive' is now '\x01Symbol.…' (objects.S k_toprim too); String(sym)
+is "Symbol(desc)"; Object(sym) is a wrapper with Symbol.prototype (description, toString); `new Symbol` throws. core-js now
+keeps our Symbol. Known: Object.keys and for..in list symbol keys (with the marker); `'\x01...'+''` is not refused; Object(3) is
+still 3 (no number/string wrappers). (2) compile.S c_object: `[key](){}` (and *[key], async [key]) methods. (3) prelude:
+Array.from (iterables, array-likes, map function) and Array.of: they did not exist. (4) Object.prototype.toString answers
+[object Function/Array/Number/String/Boolean/Symbol/Date/RegExp/Error/...] and honours Symbol.toStringTag (set on Math, JSON,
+Map, Set, Promise, Symbol): core-js decides whether bind is native by it (it said "Object" for functions, so core-js's bind
+helper was undefined and every Set/Map built from a list failed). (5) checks/run.py warns when node itself stops on a program:
+site2.js had two name clashes (k, m) that stopped node halfway, so half of it was not compared; fixed (1905 lines now).
+bbc.com/news: 57 run, 3 failed: piano SDK's own two (logic), `for await` (SyntaxError). old.reddit 17/0 to be rechecked.

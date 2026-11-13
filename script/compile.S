@@ -2950,8 +2950,15 @@ c_w_spread: .ascii "__spread"
 19: bl      next_word
     bl      c_assign
     EXPECT  38
+    ISP     35, 191f                    // [key]() { }: a method with a worked-out name (a generator or async one too)
+    mov     w0, #4
+    bl      c_function
+    b       192f
+191:
+    str     xzr, [x29, #F_PEND]
     EXPECT  54
     bl      c_assign
+192:
     OP      OP_INITE
     b       7f
 2:  stp     x25, x26, [sp, #16]
