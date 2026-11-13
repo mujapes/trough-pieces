@@ -19,6 +19,10 @@
     .equ T_MOVED, 40                    //        how far it has moved since (f32)
     .equ T_TLEN, 48                     //        typed so far
     .equ T_TYPED, 2048                  //        the line being typed, at most 1000
+    .equ T_KBTOP, 56                    //        the keyboard's top row on screen
+    .equ T_CAPS, 64                     //        shift: the next letter a capital
+    .equ T_GLOW, 128                    //        each key's glow, 40 f32, 1 when pressed, fading
+    .equ KH, 130
     .equ C_DLSYM, 80
     .equ C_ACT, 88
     .equ GW, 24
@@ -86,19 +90,7 @@ text:
     fmov    s2, #20.0
     fcmp    s1, s2
     b.ge    4f
-    stp     x9, x23, [sp, #96]
-    mov     x0, #0
-    adr     x1, showname
-    ldr     x9, [x19, #C_DLSYM]
-    blr     x9
-    cbz     x0, 43f
-    mov     x9, x0
-    ldr     x0, [x19, #C_ACT]
-    mov     w1, #2                      // SHOW_FORCED
-    blr     x9
-43: ldp     x9, x23, [sp, #96]
-    ldr     s0, [x9, #12]
-    b       4f
+    b       tapkey
 42: cmp     w10, #2
     b.ne    4f
     ldr     s1, [x20, #T_LASTY]
@@ -139,27 +131,76 @@ key:
     b.hi    2f
     add     w13, w14, #'a'
     tst     w11, #1                     // shift
-    b.eq    9f
+    b.eq    addch
     sub     w13, w13, #32
-    b       9f
+    b       addch
 2:  sub     w14, w10, #7                // 0-9
     cmp     w14, #9
     b.hi    4f
     add     w13, w14, #'0'
-    b       9f
+    b       addch
 4:  adr     x14, marks                  // others by table: keycode, character
 5:  ldrb    w15, [x14], #2
     cbz     w15, 3b
     cmp     w15, w10
     b.ne    5b
     ldrb    w13, [x14, #-1]
-9:  cmp     x12, #1000
+addch:
+    cmp     x12, #1000
     b.hs    3b
     add     x14, x20, #T_TYPED
     strb    w13, [x14, x12]
     add     x12, x12, #1
     str     x12, [x20, #T_TLEN]
     b       3b
+// tapkey: a tap (x9 the event) on our own keyboard: which key, its glow, and what it does
+tapkey:
+    ldr     s3, [x9, #8]
+    fcvtzs  x13, s3
+    fcvtzs  x14, s0
+    ldr     x15, [x20, #T_KBTOP]
+    cbz     x15, 3b
+    subs    x14, x14, x15
+    b.lt    3b
+    mov     x16, #KH
+    udiv    x14, x14, x16
+    cmp     x14, #3
+    b.hi    3b
+    ldr     x16, [x19, #C_W]
+    mov     x17, #10
+    mul     x13, x13, x17
+    udiv    x13, x13, x16
+    cmp     x13, #9
+    b.hi    3b
+    madd    x12, x14, x17, x13          // the key's number
+    add     x16, x20, #T_GLOW
+    fmov    s4, #1.0
+    str     s4, [x16, x12, lsl #2]
+    adr     x16, keys
+    ldrb    w13, [x16, x12]
+    ldr     x12, [x20, #T_TLEN]
+    cmp     w13, #'^'
+    b.ne    1f
+    ldr     w14, [x20, #T_CAPS]
+    eor     w14, w14, #1
+    str     w14, [x20, #T_CAPS]
+    b       3b
+1:  cmp     w13, #'<'
+    b.ne    2f
+    cbz     x12, 3b
+    sub     x12, x12, #1
+    str     x12, [x20, #T_TLEN]
+    b       3b
+2:  cmp     w13, #'>'
+    b.eq    send
+    ldr     w14, [x20, #T_CAPS]         // capitals for one letter
+    cbz     w14, addch
+    str     wzr, [x20, #T_CAPS]
+    sub     w14, w13, #'a'
+    cmp     w14, #25
+    b.hi    addch
+    sub     w13, w13, #32
+    b       addch
 send:
     stp     x9, x23, [sp, #96]
     add     x14, x20, #T_TYPED
@@ -276,7 +317,9 @@ send:
     b       83b
 84: add     x23, x23, #1
     b       8b
-9:  sub     x6, x27, #110           // the typed line: "> " then the text then a bar, at the bottom
+9:  bl      keyboard
+    ldr     x6, [x20, #T_KBTOP]         // the typed line: "> " then the text then a bar, above the keyboard
+    sub     x6, x6, #64
     mov     x23, #0
     adr     x10, prompt
     ldrb    w0, [x10]
@@ -306,12 +349,14 @@ send:
     ret
 // glyph_at(w0 character, x6 top row, x23 column): one character, light, with the screen in x25-x28. Uses x0-x5, x10-x17.
 glyph_at:
-    sub     w0, w0, #32
-    cmp     w0, #94
-    b.hi    9f
     mov     x10, #GW
     mov     x13, #24
     madd    x13, x23, x10, x13
+// glyph_px(w0 character, x6 top row, x13 left)
+glyph_px:
+    sub     w0, w0, #32
+    cmp     w0, #94
+    b.hi    9f
     add     x12, x13, #GW
     cmp     x12, x28
     b.gt    9f
@@ -344,7 +389,96 @@ glyph_at:
     add     x16, x16, #1
     b       1b
 9:  ret
-showname: .asciz "ANativeActivity_showSoftInput"
+// keyboard: four rows of ten keys at the bottom, each a lighter block whose glow fades a little every frame, with its
+// letter in the middle. Uses x0-x5, x10-x18, x21-x24 (the text is drawn before it). Screen in x25-x28.
+keyboard:
+    stp     x30, x21, [sp, #-16]!
+    mov     x10, #(4 * KH + 40)
+    sub     x21, x27, x10               // top
+    str     x21, [x20, #T_KBTOP]
+    mov     x0, #0                      // the keyboard's backing
+    mov     x1, x21
+    mov     x2, x28
+    sub     x3, x27, x21
+    mov     w4, #0x1410
+    movk    w4, #0xff18, lsl #16
+    bl      rect
+    mov     x22, #0                     // key number
+1:  cmp     x22, #40
+    b.hs    9f
+    mov     x10, #10
+    udiv    x23, x22, x10               // row
+    msub    x24, x23, x10, x22          // column
+    add     x11, x20, #T_GLOW           // glow: shown, then fades
+    ldr     s0, [x11, x22, lsl #2]
+    ldr     s1, =0x3f59999a             // 0.85
+    fmul    s1, s0, s1
+    str     s1, [x11, x22, lsl #2]
+    ldr     s2, =0x42c00000             // 96: how much lighter a pressed key is
+    fmul    s0, s0, s2
+    fcvtzu  w12, s0
+    orr     w12, w12, w12, lsl #8
+    orr     w12, w12, w12, lsl #8
+    and     w12, w12, #0xffffff
+    mov     w4, #0x3830
+    movk    w4, #0xff40, lsl #16
+    add     w4, w4, w12
+    udiv    x13, x28, x10               // key width
+    mul     x0, x24, x13
+    add     x0, x0, #5
+    mov     x14, #KH
+    madd    x1, x23, x14, x21
+    add     x1, x1, #6
+    sub     x2, x13, #10
+    sub     x3, x14, #12
+    stp     x0, x1, [sp, #-16]!
+    bl      rect
+    ldp     x0, x1, [sp], #16
+    adr     x11, keys                   // its letter, a capital under shift
+    ldrb    w15, [x11, x22]
+    cmp     w15, #' '
+    b.eq    2f
+    ldr     w16, [x20, #T_CAPS]
+    cbz     w16, 3f
+    sub     w16, w15, #'a'
+    cmp     w16, #25
+    b.hi    3f
+    sub     w15, w15, #32
+3:  udiv    x13, x28, x10
+    sub     x13, x13, #GW
+    lsr     x13, x13, #1
+    add     x13, x13, x0
+    sub     x13, x13, #5
+    add     x6, x1, #(KH - 12 - GH) / 2
+    mov     w0, w15
+    bl      glyph_px
+2:  add     x22, x22, #1
+    b       1b
+9:  ldp     x30, x21, [sp], #16
+    ret
+// rect(x0 left, x1 top, x2 width, x3 height, w4 colour), clipped to the screen in x25-x28. Uses x10-x12, x16-x18.
+rect:
+    add     x2, x0, x2
+    cmp     x2, x28
+    csel    x2, x28, x2, gt
+    add     x3, x1, x3
+    cmp     x3, x27
+    csel    x3, x27, x3, gt
+1:  cmp     x1, x3
+    b.hs    9f
+    mul     x16, x1, x26
+    add     x16, x25, x16, lsl #2
+    mov     x17, x0
+2:  cmp     x17, x2
+    b.hs    3f
+    str     w4, [x16, x17, lsl #2]
+    add     x17, x17, #1
+    b       2b
+3:  add     x1, x1, #1
+    b       1b
+9:  ret
+keys: .ascii "qwertyuiopasdfghjkl'zxcvbnm,.?^^     <<>"
+    .balign 4
 opath: .asciz "/sdcard/Android/media/t.flow/typed.txt"
 prompt: .ascii "> "
 marks: .byte 62, ' ', 56, '.', 55, ',', 76, '/', 69, '-', 70, '=', 74, ';', 75, 39, 77, '@', 0, 0
