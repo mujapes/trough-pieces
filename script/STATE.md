@@ -502,3 +502,20 @@ bbc.com/news: 57 run, 4 failed (was 17): two "not a function" (col 2497/2503 of 
 Known, not fixed: Object.keys(new Error("k")) lists "message" (defineProperty cannot make a property non-enumerable yet).
 No garbage collector: about 20000 caught errors fill a 1.2 MB bench world (each makes strings and an object). A name declared
 during translation that the scan did not see can still share a slot: only the async case is closed.
+
+**Twenty-sixth unit [by Opus]: catch gets its own scope; errors keep the place they were made (2026-11-13).**
+(1) compile.S s_try: `catch (name) { ... }` is a block of its own (c_scan_fn + c_block_in, the name declared as a let with
+F_DECLKIND 1, the body's statements read in place, c_block_out before OP_ENDTRY); c_scan_block no longer declares catch names in
+the function (the jump at its old place skips that code). Before, the catch name was a variable of the whole function, so in
+`function(){try{return e()}catch(e){...}}` the try's `e` read the catch's (undefined): esbuild's __commonJS helper
+(`c=function(e,n){return function(){try{return n||e(...)}catch(e){throw n=0,e}}}`) failed for every lazy module. A catch with a
+pattern ({a}) still declares in the function. (2) lib.S built-in 66 n_markerr: W_POS becomes W_ERR_LINE and comes back as
+line * 2^32 + column; the Error function calls it and sets `stack` ("Name: message\n    at <anonymous>:L:C"). machine.S
+i_throw: throwing an object no longer overwrites the place, so a rethrow reports where the error was made.
+(3) host/browse.c: TROUGH_KEEP_ALL=<dir> saves every script run as ran-N.js (an error in a timer or listener is reported
+while a later script runs, and its place is in the earlier script's text: search all of them for the column).
+45 of 45 (site2.js +9 catch cases). bbc.com/news 57 run, 4 failed: piano SDK's own two errors (its logic), `for await`
+(SyntaxError), one "not a function" (line 1 col 2497 of SOME script; best guess ran-7.js, core-js, a statement `return t` in
+its aCallable check J, after which the caller calls t: something whose typeof is "function" cannot be called. Not confirmed.)
+Known: OP_LINE positions are not tied to a script, so callbacks report into the wrong file; tagging W_POS with a script
+number needs a world field (the header is full at 576: W_POS took 568).

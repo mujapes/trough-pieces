@@ -452,6 +452,17 @@ n_reply:
     cbnz    x0, 1f
     VAL     x0, T_UNDEF
 1:  ret
+// 66: an error is being made here: where the statement last begun is becomes the place errors are reported at, and is
+// given back as line * 2^32 + column (a number)
+n_markerr:
+    ldr     x9, [x19, #W_POS]
+    str     x9, [x19, #W_ERR_LINE]
+    lsr     x10, x9, #32
+    and     x9, x9, #0xffffffff
+    orr     x9, x10, x9, lsl #32
+    ucvtf   d0, x9
+    fmov    x0, d0
+    ret
 n_ident:
     ldr     x9, [x1]
     and     x9, x9, #0xffffffffffff
@@ -971,6 +982,6 @@ n_table:
     .word   n_join - n_table, n_aindexof - n_table, n_aslice - n_table, n_rxcompile - n_table, n_rxexec - n_table
     .word   n_now - n_table, n_dayfrom - n_table, n_civil - n_table, n_setclock - n_table, n_setwake - n_table, n_undef - n_table
     .word   n_host - n_table, n_reply - n_table, n_global - n_table
-    .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table
-    .equ    N_COUNT, 66
+    .word   n_defacc - n_table, n_getproto - n_table, n_setproto - n_table, n_markerr - n_table
+    .equ    N_COUNT, 67
     .ltorg

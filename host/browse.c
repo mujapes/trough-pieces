@@ -142,6 +142,7 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
         const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }   /* for finding what the engine lacks */
         return; }
     free(source); s->ran++;
+    { const char *all = getenv("TROUGH_KEEP_ALL"); if (all && text) { char path[600]; snprintf(path, sizeof path, "%s/ran-%d.js", all, s->ran); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } } }   /* every script, for finding where a run-time error really was */
     for (int turn = 0; turn < 200000; turn++) {
         long long r = run(s->world, 0, 0, 20000000, table), t = text_of(s->out, qw, 1, 0, table); size_t bytes = t < 0 ? 0 : (size_t)(t & 0xffffffff), want = t < 0 ? 0 : (size_t)(t >> 32); const uint8_t *o = s->out + 64;
         size_t said = want ? want - 1 : bytes; if (said) fprintf(stderr, "console: %.*s", (int)said, o);

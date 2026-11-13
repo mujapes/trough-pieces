@@ -225,7 +225,7 @@ c_prelude:
     .incbin "script/prelude.js"
     // the error classes: functions, so that Error("x") without new makes an error as the language says (a class called
     // plainly would run on the global object and give back nothing); a second argument {cause} is kept
-    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause}"
+    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause;var p=__n(66)();this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)+\":\"+p%4294967296}"
     .ascii "Error.prototype.toString=function(){return this.message===\"\"?this.name:this.name+\": \"+this.message};"
     .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";Error.captureStackTrace=function(){};"
     .ascii "function __errclass(n){var C=function(m,o){if(!(this instanceof C))return new C(m,o);Error.call(this,m,o)};C.prototype=Object.create(Error.prototype);"
@@ -1524,7 +1524,8 @@ c_scan_block:
     orr     w7, w6, w27
     b       8f
 511:
-    cmp     w24, #2                     // catch (name): the name is a variable of this function, known before its blocks are met
+    b       510f                        // (catch names: no longer declared in the function; s_try gives each catch a block)
+    cmp     w24, #2
     b.ne    510f
     stp     w1, w2, [sp]
     stp     w3, w4, [sp, #8]
@@ -4956,19 +4957,50 @@ s_try:
     bl      c_pattern
     EXPECT  36
     b       2f
-1:  bl      c_declref
-    str     w0, [sp, #64 + 56]
-    bl      next_word
+1:  stp     x25, x26, [sp, #64 + 32]    // catch (name) { ... }: a block of its own whose one let is the name, so the name hides
+    bl      next_word                   // nothing outside the catch (the try's own words see the outer variable)
     EXPECT  36
-    ldr     w0, [sp, #64 + 56]
+    ISP     33, c_unexpected
+    sub     sp, sp, #128
+    mov     w0, #0
+    bl      c_scan_fn
+    mov     w1, w0
+    mov     x0, sp
+    bl      c_block_in
+    ldr     w9, [x29, #F_DECLKIND]
+    str     w9, [sp, #128 + 64 + 48]
+    mov     w9, #1
+    str     w9, [x29, #F_DECLKIND]
+    stp     x25, x26, [sp, #128 + 64 + 64]
+    ldp     x25, x26, [sp, #128 + 64 + 32]
+    bl      c_declref
+    ldp     x25, x26, [sp, #128 + 64 + 64]
+    ldr     w9, [sp, #128 + 64 + 48]
+    str     w9, [x29, #F_DECLKIND]
     bl      c_store
+    OP      OP_POP
+    mov     w0, #OP_TRY
+    bl      c_jump
+    str     x0, [sp, #128 + 64 + 8]
+    bl      next_word
+11: cmp     w23, #K_PUNCT
+    mov     w9, #34
+    ccmp    w24, w9, #0, eq
+    b.eq    12f
+    cbz     w23, c_unexpected
+    bl      c_stmt
+    b       11b
+12: bl      c_block_out
+    add     sp, sp, #128
+    bl      next_word
+    b       3f
 2:  OP      OP_POP
     ISP     33, c_unexpected
     mov     w0, #OP_TRY
     bl      c_jump
     str     x0, [sp, #64 + 8]
     bl      c_stmt
-    OP      OP_ENDTRY
+3:  OP      OP_ENDTRY
     mov     w0, #OP_JMP
     bl      c_jump
     str     x0, [sp, #64 + 24]

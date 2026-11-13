@@ -39,3 +39,10 @@ var c=new Error("a",{cause:5}); console.log(c.cause, typeof Error.prototype.toSt
 console.log(new Error().message === "", Error("").toString());
 (()=>{ console.log(typeof hx); async function hx(){return 1} function hu(){} var he; console.log(typeof he, typeof hu) })();
 (function(){ var r=[]; function z(){ return ge.a } async function x(){} let gy=2; var ge={a:7}; r.push(z(), typeof x, gy); console.log(r.join()) })();
+var c=function(e,n){return function(){try{return e(1)}catch(e){throw e}}}; console.log(c(x=>x+1)()); function g(e){ try{ return e*2 }catch(e){ return -1 } } console.log(g(4)); var h=function(){ var e=5; try{ return e }catch(e){} }; console.log(h())
+var r=[]; function k(){ let a=1; try{ throw 2 }catch(e){ let b=e+a; r.push(()=>b+e) } return r[0]() } console.log(k());
+for(var i=0;i<3;i++){ try{ if(i==1) throw i; }catch(q){ continue } r.push('i'+i) } console.log(r.length);
+function m(){ try{ throw 'x' }catch(e){ return e+'!' }finally{ r.push('f') } } console.log(m(), r.length);
+try{ try{ throw 1 }catch(e){ throw e+1 } }catch(e){ console.log('outer',e) }
+var fs=[]; for(let j=0;j<2;j++){ try{ throw j }catch(e){ fs.push(()=>e) } } console.log(fs[0](),fs[1]());
+try{ throw {p:3} }catch({p}){ console.log(p) }

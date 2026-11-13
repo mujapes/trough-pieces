@@ -485,10 +485,13 @@ i_endtryk:
     sub     x22, x9, #40
     str     x0, [x22], #8
     NEXT
-i_throw:
+i_throw:                                // (an object keeps the place it was made at, so a rethrow reports the cause)
+    ldr     x0, [x22, #-8]
+    TAGIS   x0, T_OBJECT
+    b.eq    1f
     ldr     x9, [x19, #W_POS]
     str     x9, [x19, #W_ERR_LINE]
-    POP     x0
+1:  POP     x0
     b       m_throw
 i_gosub:
     ldrsw   x0, [x21], #4
