@@ -6,6 +6,8 @@
     .text
     .global record
     .global part
+    .global take
+    .global back
     .equ DIGEST, 96                     // a block of this piece's own for the hash's answer: 64-byte head, 64 bytes
     .equ Q, 224
     .equ KEPT, 240                      // three values kept across calls
@@ -259,3 +261,82 @@ p_bad:
     mov     x0, #-1
 p_out:
     LEAVE
+
+// [by Opus] take: the swap itself. x0 the ledger (host-owned, 4096 bytes: 16 per socket 0-255: the address it held before,
+// and how many times it has been taken), x1 the sockets (16-bit), x2 how many (1-64), x3 where the new addresses are (one
+// 8-byte address per socket, in the same order), x4 the call table. All are checked before any is written: a socket over
+// 255, a repeated socket or an empty address -> -1, nothing changed. Otherwise each socket's old address goes to the ledger
+// and the new one into the table with a release store (code written before is seen by whoever loads the socket after), and
+// the answer is the first socket's new count. Callers already inside the old code finish there; nothing is unmapped.
+take:
+    sub     x9, x2, #1
+    cmp     x9, #63
+    b.hi    t_bad
+    mov     x9, #0
+1:  ldrh    w10, [x1, x9, lsl #1]
+    cmp     w10, #255
+    b.hi    t_bad
+    ldr     x11, [x3, x9, lsl #3]
+    cbz     x11, t_bad
+    mov     x12, #0                     // no socket twice: the second would keep the first's new address as its "before"
+2:  cmp     x12, x9
+    b.hs    3f
+    ldrh    w13, [x1, x12, lsl #1]
+    cmp     w13, w10
+    b.eq    t_bad
+    add     x12, x12, #1
+    b       2b
+3:  add     x9, x9, #1
+    cmp     x9, x2
+    b.lo    1b
+    dmb     ish
+    mov     x9, #0
+4:  ldrh    w10, [x1, x9, lsl #1]
+    add     x12, x0, x10, lsl #4
+    ldr     x13, [x4, x10, lsl #3]
+    ldr     x14, [x12, #8]
+    add     x14, x14, #1
+    stp     x13, x14, [x12]
+    ldr     x11, [x3, x9, lsl #3]
+    add     x15, x4, x10, lsl #3
+    stlr    x11, [x15]
+    add     x9, x9, #1
+    cmp     x9, x2
+    b.lo    4b
+    ldrh    w10, [x1]
+    add     x12, x0, x10, lsl #4
+    ldr     x0, [x12, #8]
+    ret
+t_bad:
+    mov     x0, #-1
+    ret
+// [by Opus] back: undoes the last take of each socket listed (x0 ledger, x1 sockets, x2 how many 1-64, x4 table): the address
+// kept in the ledger goes back into the table (release store) and the ledger's is cleared, so a second back does nothing.
+// -1 (nothing changed) if a socket is over 255 or has no kept address; otherwise how many were put back.
+back:
+    sub     x9, x2, #1
+    cmp     x9, #63
+    b.hi    t_bad
+    mov     x9, #0
+1:  ldrh    w10, [x1, x9, lsl #1]
+    cmp     w10, #255
+    b.hi    t_bad
+    add     x12, x0, x10, lsl #4
+    ldr     x13, [x12]
+    cbz     x13, t_bad
+    add     x9, x9, #1
+    cmp     x9, x2
+    b.lo    1b
+    mov     x9, #0
+2:  ldrh    w10, [x1, x9, lsl #1]
+    add     x12, x0, x10, lsl #4
+    ldr     x13, [x12]
+    cbz     x13, 3f                     // listed twice: the first already put it back
+    str     xzr, [x12]
+    add     x15, x4, x10, lsl #3
+    stlr    x13, [x15]
+3:  add     x9, x9, #1
+    cmp     x9, x2
+    b.lo    2b
+    mov     x0, x2
+    ret

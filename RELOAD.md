@@ -65,3 +65,16 @@ from reading the record to the files being in place. The app still notices throu
 next step is the app following the stream itself, into a live region.
 The trial and roll-back above apply to each record unchanged. The assembler that turns written instructions into
 bytes is the last tool outside the system; it can become a piece.
+
+## Priority from 2026-11-13 (user, aaa74435) [plan by Opus, for Fable's review]
+User: build the machine-code hot-reload core fully first, everything else on top, so changes land live and are seen at once.
+Verified state: swaps of pieces work (seal, keeper in Java, replay, trial); `reload` judges records only; the decisions and
+the swap itself are still Java; the screen (browse host) picks up a new engine or document.js only by restarting, which
+reloads the page and loses its state; Trough's own UI is Java and lands through javac+d8 (slow).
+Stages, in order:
+1. `reload` takes the swap itself: socket table, in-flight callers finish in old code, old code kept for rollback
+   (entries `take`, `back`), driven by the stream of records; Java keeper only maps memory and calls it.
+2. The screen host loads its engine as a piece through `reload` and swaps it live: the page's world block carries over
+   (world layout version + migrate), document.js changes applied by re-running only it. Seen at once on the background.
+3. Trial with a health entry (missing item 1) and pre-swap block kept until settled (missing item 2).
+4. Trough's own screen parts move to pieces drawn through the host, so UI changes land the same way, not through d8.

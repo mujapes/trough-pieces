@@ -32,3 +32,5 @@ if ./build.sh script/impl.S out/script.asm begin tokens numtext load run text er
 echo "--- dom: the page as a tree, request by request against the recorded answers"
 if ./build.sh dom/impl.S out/dom.asm begin ask && gcc -O1 -o out/domt dom/checks/t.c loader/piece.c && ./out/domt out/dom.asm < dom/checks/t.txt | cmp -s - dom/checks/t.out; then echo "dom: answers as recorded"; else echo "dom: FAILED"; fail=1; fi
 exit $fail
+echo "--- reload: take/back on a call table"
+./build.sh reload/impl.S out/reload.live record part take back >/dev/null && gcc -O1 -o out/swapcheck reload/checks/swap.c loader/piece.c && ./out/swapcheck out/reload.live || exit 1

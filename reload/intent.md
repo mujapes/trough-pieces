@@ -27,3 +27,11 @@ and a multiple of 4 (ARM64 instructions).
 ## Conventions
 - No state. Calls the hash piece (socket 14, SHA-256) with a table of its own.
 - The answer to `record` is the only gate: `part` never hands out bytes of a record that fails it.
+
+## take and back [by Opus, 2026-11-13]
+- **take**(ledger, sockets, how many 1-64, argument: where the new addresses are, table): swaps a group of sockets to new
+  code in one step. Everything is checked first (socket over 255, a socket twice, an empty address: -1, nothing changed).
+  Each socket's old address and a count go to the ledger (16 bytes a socket, 4096 bytes); the new address is stored with
+  release order. Answer: the first socket's count. Old code is not unmapped; callers inside it finish there.
+- **back**(ledger, sockets, how many): puts the kept addresses back and clears them; -1 if any has none kept.
+Checked by `checks/swap.c` (10 checks).
