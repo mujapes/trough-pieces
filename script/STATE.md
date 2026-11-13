@@ -950,3 +950,4 @@ Unit 66 [by Opus]: suspects from unit 52 checked: c_strconst (no allocation in i
 positions, not heap values) are safe. Errors: message, cause and stack are non-enumerable (Error in compile.S's prelude tail
 via __n(73)/__n(72); machine.S m_raise hides the message of the machine's own errors); TypeError etc. have .name and a hidden
 prototype constructor. errors-real.js; 83 of 83. Still: Symbol.hasInstance.
+Unit 67 [by Opus]: site sweep after units 58-66: Wikipedia 8/0, HN 1/0, GitHub 5/0, Guardian 31/0, BBC 62/0, NPR 23/3. document.js: iframe contentWindow/contentDocument (a small separate window, not loaded). NPR 23/3 -> 23/2 (Boomerang fixed; left: world full at 96 MB, the bot check).
