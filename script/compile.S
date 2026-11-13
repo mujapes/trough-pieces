@@ -291,11 +291,11 @@ c_prelude:
     .incbin "script/prelude.js"
     // the error classes: functions, so that Error("x") without new makes an error as the language says (a class called
     // plainly would run on the global object and give back nothing); a second argument {cause} is kept
-    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined)this.message=\"\"+m;if(o!==null&&typeof o===\"object\"&&\"cause\" in o)this.cause=o.cause;var p=__n(66)(),t=__n(70)(true),i;this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)%16777216+\":\"+p%4294967296;for(i=2;i<t.length;i++)this.stack+=\"\\n    at <anonymous>:\"+Math.floor(t[i]/16777216)%1048576+\":\"+t[i]%16777216}"
+    .ascii "function Error(m,o){if(!(this instanceof Error))return new Error(m,o);if(m!==undefined){__n(73)(this,\"message\",\"\"+m);__n(72)(this,\"message\")}if(o!==null&&typeof o===\"object\"&&\"cause\" in o){__n(73)(this,\"cause\",o.cause);__n(72)(this,\"cause\")}var p=__n(66)(),t=__n(70)(true),i;this.stack=String(this)+\"\\n    at <anonymous>:\"+Math.floor(p/4294967296)%16777216+\":\"+p%4294967296;for(i=2;i<t.length;i++)this.stack+=\"\\n    at <anonymous>:\"+Math.floor(t[i]/16777216)%1048576+\":\"+t[i]%16777216;__n(72)(this,\"stack\")}"
     .ascii "Error.prototype.toString=function(){return this.message===\"\"?this.name:this.name+\": \"+this.message};"
     .ascii "Error.prototype.name=\"Error\";Error.prototype.message=\"\";Error.captureStackTrace=function(){};"
     .ascii "function __errclass(n){var C=function(m,o){if(!(this instanceof C))return new C(m,o);Error.call(this,m,o)};C.prototype=Object.create(Error.prototype);"
-    .ascii "C.prototype.constructor=C;C.prototype.name=n;Object.setPrototypeOf(C,Error);return C}"
+    .ascii "C.prototype.constructor=C;C.prototype.name=n;__n(73)(C,\"name\",n);__n(72)(C,\"name\");__n(72)(C.prototype,\"constructor\");__n(72)(C.prototype,\"name\");Object.setPrototypeOf(C,Error);return C}"
     .ascii "var TypeError=__errclass(\"TypeError\"),RangeError=__errclass(\"RangeError\"),ReferenceError=__errclass(\"ReferenceError\"),"
     .ascii "SyntaxError=__errclass(\"SyntaxError\"),EvalError=__errclass(\"EvalError\"),URIError=__errclass(\"URIError\");"
 c_prelude_end:

@@ -946,3 +946,7 @@ kept only as a raw number on the processor stack, so a collection inside the sec
 then be moved down over room already on the free list (a block both live and free: later reuse damages it, e.g. a function's
 plan). Now W_GCS is read before and after; if a collection happened the second copy stays where it is. Not proven to be THE
 GitHub fault (it no longer reproduces); no stress reproducer yet. 82 of 82.
+Unit 66 [by Opus]: suspects from unit 52 checked: c_strconst (no allocation in its search) and c_fragment (names are text
+positions, not heap values) are safe. Errors: message, cause and stack are non-enumerable (Error in compile.S's prelude tail
+via __n(73)/__n(72); machine.S m_raise hides the message of the machine's own errors); TypeError etc. have .name and a hidden
+prototype constructor. errors-real.js; 83 of 83. Still: Symbol.hasInstance.

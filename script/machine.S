@@ -452,7 +452,19 @@ m_raise:
     add     x0, x19, x0
     bl      o_put
     cbz     x0, 6f
+    LIT     k_message, k_colon          // [by Opus] the message is not enumerable (as the language's own errors)
+    cbz     x0, 7f
+    mov     x1, x0
     ldr     x0, [sp, #16]
+    add     x0, x19, x0
+    bl      o_find
+    cbz     x2, 7f
+    ldur    x3, [x2, #-8]
+    and     x3, x3, #0xffffffffffff
+    mov     x9, #0xfff8000000000000
+    orr     x3, x3, x9
+    stur    x3, [x2, #-8]
+7:  ldr     x0, [sp, #16]
     mov     x16, #(T_OBJECT << 48)
     orr     x0, x0, x16
     add     sp, sp, #32
