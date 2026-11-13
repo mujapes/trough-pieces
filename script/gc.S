@@ -269,9 +269,17 @@ gc_collect:
 6:  tbnz    x22, #63, 52b               // marked: an open run ends here
     ldr     x9, [x19, #W_HEAP0]
     add     x9, x9, x22, lsl #3
-    str     x9, [x23]
+    ldr     x10, [x23]                  // [by Opus] the link before keeps its own size (top 24 bits)
+    and     x10, x10, #0xffffff0000000000
+    orr     x10, x10, x9
+    str     x10, [x23]
     add     x23, x19, x9
-    str     xzr, [x23]
+    sub     x10, x20, x22               // this run's size / 8, recorded if it fits in 24 bits
+    lsr     x11, x10, #24
+    cmp     x11, #0
+    csel    x10, x10, xzr, eq
+    lsl     x10, x10, #40
+    str     x10, [x23]
     mov     x22, #-1
     b       52b
 7:  tbnz    x22, #63, 8f                // a run open at the top: the top comes down to it
@@ -281,7 +289,9 @@ gc_collect:
     ldr     x9, [x19, #W_HEAP0]
     add     x9, x9, x22, lsl #3
     str     x9, [x19, #W_HEAP]
-8:  str     xzr, [x23]
+8:  ldr     x10, [x23]                  // [by Opus] the list ends; the last block keeps its size
+    and     x10, x10, #0xffffff0000000000
+    str     x10, [x23]
     ldp     x29, x30, [sp], #16
     ret
 
@@ -292,7 +302,12 @@ g_fit:
     mov     x17, x0
     add     x16, x19, #W_FREE           // where the distance of the block being looked at is kept
 1:  ldr     x15, [x16]
+    and     x15, x15, #0xffffffffff     // [by Opus] a link's low 40 bits are the distance; its top 24 its own block's size / 8
     cbz     x15, 9f
+    ldr     x13, [x19, x15]
+    lsr     x13, x13, #40
+    lsl     x13, x13, #3                // its size, if recorded (0: found from the start bits, as before)
+    cbnz    x13, 11f
     ldr     x9, [x19, #W_HEAP0]
     sub     x0, x15, x9
     lsr     x0, x0, #3
@@ -304,25 +319,35 @@ g_fit:
     ldr     x9, [x19, #W_HEAP0]
     add     x14, x9, x0, lsl #3         // its end
     sub     x13, x14, x15               // its size
-    cmp     x13, x17
+11: cmp     x13, x17
     b.hs    2f
     add     x16, x19, x15
     b       1b
 2:  add     x12, x19, x15
     ldr     x11, [x12]                  // the next
+    and     x11, x11, #0xffffffffff
+    ldr     x9, [x16]                   // the link before keeps its own block's size
+    and     x9, x9, #0xffffff0000000000
     sub     x13, x13, x17
     cbz     x13, 3f
     add     x10, x15, x17               // the rest stays free, in this one's place on the list
-    str     x10, [x16]
-    add     x9, x19, x10
-    str     x11, [x9]
+    orr     x9, x9, x10
+    str     x9, [x16]
+    lsr     x9, x13, #3                 // the rest's size, if it fits in 24 bits
+    lsr     x0, x9, #24
+    cmp     x0, #0
+    csel    x9, x9, xzr, eq
+    orr     x9, x11, x9, lsl #40
+    add     x0, x19, x10
+    str     x9, [x0]
     ldr     x9, [x19, #W_HEAP0]
     sub     x0, x10, x9
     lsr     x0, x0, #3
     ldr     x1, [x19, #W_BITS]
     bl      g_setbit
     b       4f
-3:  str     x11, [x16]
+3:  orr     x11, x11, x9
+    str     x11, [x16]
 4:  add     x12, x19, x15
     mov     x9, x17
 5:  str     xzr, [x12], #8

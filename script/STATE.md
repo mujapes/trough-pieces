@@ -993,3 +993,10 @@ zeros, harmless to the collector). c_fragment finds its function's closure by W_
 header 880. browse.c TROUGH_TICKS also prints consts and globals. checks/big/many-consts.js (runbig.py); 87 of 87.
 GitHub 5/0 (77742 constants), Wikipedia 11/0, Guardian 31/0. LEFT: c_addconst and c_strconst search every constant on each
 add (quadratic: ~78000^2/2 compares on GitHub; a hash would cut load time).
+Unit 74 [by Opus]: allocation speed. Wikipedia took 45 s of processor time (was 5 s before more of its scripts ran). Sampled
+with gdb (attach to the headless out/browse, NOT Trough's own browse process; pc minus the 0x28000 r-xp piece mapping): all in
+gc.S g_next under g_fit: first-fit walked ~7000 free blocks per allocation and found each one's size by scanning the start
+bitmap. Now each free-list link holds the distance in its low 40 bits and its own block's size/8 in the top 24 (0: unknown,
+found from the bitmap as before); the sweep and g_fit's split keep them; host/browse.c masks links. Also TROUGH_TIMES=1
+prints when each script is loaded. Wikipedia 45 s -> 15 s (11/0), GitHub 5/0 (52 s: next suspect the quadratic constant
+search), Guardian 31/0, BBC 62/0. 87 of 87.

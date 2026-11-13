@@ -32,10 +32,10 @@ static uint8_t *surface(uint32_t version, uint32_t w, uint32_t h, uint32_t per) 
 static void at(int handle, void *b) { table[256 + handle] = b; }
 /* the collector's free total: walks the free list (gc.S); a block ends at the next start bit or the top */
 static unsigned long long free_total(const uint8_t *w, int *count) { uint64_t h0 = *(uint64_t *)(w + 600), top = *(uint64_t *)(w + 208); const uint64_t *bits = (const uint64_t *)(w + *(uint64_t *)(w + 608)); unsigned long long sum = 0; *count = 0;
-    for (uint64_t d = *(uint64_t *)(w + 640); d; d = *(uint64_t *)(w + d)) { uint64_t b = (d - h0) / 8 + 1, tb = (top - h0) / 8; while (b < tb && !(bits[b >> 6] >> (b & 63) & 1)) b++; sum += h0 + b * 8 - d; ++*count; } return sum; }
+    for (uint64_t d = *(uint64_t *)(w + 640) & 0xffffffffffull; d; d = *(uint64_t *)(w + d) & 0xffffffffffull) { uint64_t b = (d - h0) / 8 + 1, tb = (top - h0) / 8; while (b < tb && !(bits[b >> 6] >> (b & 63) & 1)) b++; sum += h0 + b * 8 - d; ++*count; } return sum; }
 /* held blocks by size (powers of two), and the 8 biggest: for finding what a page world keeps */
-static void held_sizes(const uint8_t *w) { uint64_t h0 = *(uint64_t *)(w + 600), top = *(uint64_t *)(w + 208), fr = *(uint64_t *)(w + 640); const uint64_t *bits = (const uint64_t *)(w + *(uint64_t *)(w + 608)); unsigned long long n[40] = {0}, by[40] = {0}, big[8] = {0}, bigat[8] = {0}; uint64_t tb = (top - h0) / 8, b = 0;
-    while (b < tb) { uint64_t e = b + 1; while (e < tb && !(bits[e >> 6] >> (e & 63) & 1)) e++; uint64_t d = h0 + b * 8, sz = (e - b) * 8; if (d == fr) fr = *(uint64_t *)(w + d); else { int k = 63 - __builtin_clzll(sz); n[k]++; by[k] += sz; for (int j = 0; j < 8; j++) if (sz > big[j]) { for (int m = 7; m > j; m--) { big[m] = big[m-1]; bigat[m] = bigat[m-1]; } big[j] = sz; bigat[j] = d; break; } } b = e; }
+static void held_sizes(const uint8_t *w) { uint64_t h0 = *(uint64_t *)(w + 600), top = *(uint64_t *)(w + 208), fr = *(uint64_t *)(w + 640) & 0xffffffffffull; const uint64_t *bits = (const uint64_t *)(w + *(uint64_t *)(w + 608)); unsigned long long n[40] = {0}, by[40] = {0}, big[8] = {0}, bigat[8] = {0}; uint64_t tb = (top - h0) / 8, b = 0;
+    while (b < tb) { uint64_t e = b + 1; while (e < tb && !(bits[e >> 6] >> (e & 63) & 1)) e++; uint64_t d = h0 + b * 8, sz = (e - b) * 8; if (d == fr) fr = *(uint64_t *)(w + d) & 0xffffffffffull; else { int k = 63 - __builtin_clzll(sz); n[k]++; by[k] += sz; for (int j = 0; j < 8; j++) if (sz > big[j]) { for (int m = 7; m > j; m--) { big[m] = big[m-1]; bigat[m] = bigat[m-1]; } big[j] = sz; bigat[j] = d; break; } } b = e; }
     for (int k = 0; k < 40; k++) if (n[k]) fprintf(stderr, "  held %8llu blocks of %llu+ bytes: %llu\n", n[k], 1ull << k, by[k]);
     for (int j = 0; j < 8; j++) if (big[j]) { const uint8_t *q = w + bigat[j]; fprintf(stderr, "  big %llu at %llu: ", big[j], bigat[j]); for (int i = 0; i < 48; i++) fputc(q[i] >= 32 && q[i] < 127 ? q[i] : '.', stderr); fputc('\n', stderr); } }
 static double now_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1e3 + t.tv_nsec / 1e6; }
@@ -153,7 +153,7 @@ static void run_script(scripts *s, const uint8_t *text, size_t n, const char *ad
     if (text && load(s->world, qs, 1, 0, table) < 0) { uint8_t *e = made_text(error, qw, 1, 600); fprintf(stderr, "script: %.*s\n", e ? (int)length(e) : 0, e ? (char *)e + 64 : ""); free(e); free(source); s->failed++;
         const char *keep = getenv("TROUGH_KEEP_FAILED"); if (keep) { char path[600]; snprintf(path, sizeof path, "%s/failed-%d.js", keep, s->failed); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } }   /* for finding what the engine lacks */
         return; }
-    free(source); s->ran++;
+    free(source); s->ran++; if (getenv("TROUGH_TIMES")) fprintf(stderr, "[%.0f ms] script %d loaded (%zu bytes)\n", now_ms(), s->ran, (size_t)n);
     { const char *all = getenv("TROUGH_KEEP_ALL"); if (all && text) { char path[600]; snprintf(path, sizeof path, "%s/ran-%d-t%d.js", all, s->ran, (int)(*(uint64_t *)(s->world + 800) & 255)); FILE *f = fopen(path, "wb"); if (f) { fwrite(text, 1, n, f); fclose(f); } } }   /* every script, for finding where a run-time error really was */
     long long asks = 0;
     for (int turn = 0; turn < 200000; turn++) {
