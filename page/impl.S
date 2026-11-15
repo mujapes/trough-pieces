@@ -44,7 +44,21 @@
     // for "pictures": where the next record goes in the block and where the block ends
     .equ OUT_AT, 2752
     .equ OUT_END, 2760
-    .equ FRAME, 2864
+    // [by Opus 11-15] the page's own look (data-tl from the host's style pass): what applies now, and the open styled blocks
+    .equ EFF_BG, 2768
+    .equ EFF_FG, 2772
+    .equ EFF_PL, 2776
+    .equ STK_N, 2780
+    .equ NUMS, 2784
+    .equ STK, 2792
+    .equ EFF_LINK, 3816
+    .equ EFF_FS, 3820
+    .equ EFF_BOLD, 3824                  // [by Opus 11-15] bold: drawn twice, one dot apart
+    .equ BOLD_XI, 3828
+    .equ BOLD_N, 3832
+    .equ BOLD_C, 3836
+    .equ BOLD_FN, 3840
+    .equ FRAME, 3920
 check:
     ldr     w9, [x0]
     cmp     w9, #1
@@ -92,6 +106,7 @@ flush_line:
     stp     x27, x28, [sp, #32]
     ldr     w9, [x19, #LINE_N]
     cbz     w9, f_out
+    bl      band
     ldp     x9, x10, [x19, #Y]
     add     x9, x9, x10
     str     x9, [x19, #Y]
@@ -110,7 +125,9 @@ flush_line:
     cmp     x9, #0
     b.le    f_down
     mov     w26, #0                     // drawn run by run so link text can be another colour; the pen carries on
-    mov     x27, #128
+    ldr     w27, [x19, #EFF_PL]
+    add     x27, x27, #8
+    lsl     x27, x27, #4
     mov     w25, #0
 f_run:
     ldr     w9, [x19, #LINKS]
@@ -142,6 +159,7 @@ f_run:
 2:  ldr     w9, [x19, #SIZE]
     strh    w9, [x1, x2, lsl #1]
     add     x2, x2, #1
+    str     w2, [x19, #BOLD_XI]
     strh    w12, [x1, x2, lsl #1]
     add     x2, x2, #1
     strh    w28, [x1, x2, lsl #1]
@@ -160,7 +178,18 @@ f_run:
     mov     x29, x27                    // (x29 is saved above and free here: the pen as it was)
     sub     x27, x27, x12, lsl #4
     ldr     w3, =0xff202020
-    ldr     w9, =0xffcc5500
+    ldr     w9, [x19, #EFF_FG]
+    tbnz    w9, #31, 5f
+    rev     w9, w9
+    lsr     w9, w9, #8
+    orr     w3, w9, #0xff000000
+5:  ldr     w9, =0xffcc5500
+    ldr     w10, [x19, #EFF_LINK]
+    tbnz    w10, #31, 6f
+    rev     w10, w10
+    lsr     w10, w10, #8
+    orr     w9, w10, #0xff000000
+6:
     tst     w25, #1
     csel    w3, w9, w3, ne
     ldr     x0, [x19, #S]
@@ -171,10 +200,28 @@ f_run:
     tst     w9, #0x80000000
     csel    x10, x11, x10, eq
     ldr     x9, [x4, x10]
+    str     w2, [x19, #BOLD_N]
+    str     w3, [x19, #BOLD_C]
+    str     x9, [x19, #BOLD_FN]
     blr     x9
     add     x27, x27, x0                // the pen moves to where the run ended,
     cmp     x0, #0
     csel    x27, x29, x27, lt           // unless the font piece refused
+    b.lt    7f
+    ldr     w9, [x19, #EFF_BOLD]        // bold: the same run again, one dot to the right
+    cbz     w9, 7f
+    add     x1, x19, #QBUF
+    ldr     w2, [x19, #BOLD_XI]
+    ldrh    w9, [x1, x2, lsl #1]
+    add     w9, w9, #1
+    strh    w9, [x1, x2, lsl #1]
+    ldr     w2, [x19, #BOLD_N]
+    ldr     w3, [x19, #BOLD_C]
+    ldr     x0, [x19, #S]
+    ldr     x4, [x19, #TABLE]
+    ldr     x9, [x19, #BOLD_FN]
+    blr     x9
+7:
     add     w25, w25, #1
     b       f_run
 f_next:
@@ -270,6 +317,8 @@ end_word:
     cbz     w9, 1f
     ldrsw   x10, [x19, #WIDTH]
     sub     x10, x10, #16
+    ldr     w11, [x19, #EFF_PL]
+    sub     x10, x10, x11
     lsl     x10, x10, #4
     ldr     x11, [x19, #LINE_W]
     ldrsw   x12, [x19, #SPACE]
@@ -505,6 +554,14 @@ render:
     ldr     x9, [x4, #(3 * 8)]
     blr     x9
 r_start:
+    mov     w9, #-1
+    str     w9, [x19, #EFF_BG]
+    str     w9, [x19, #EFF_FG]
+    str     wzr, [x19, #EFF_PL]
+    str     wzr, [x19, #STK_N]
+    str     w9, [x19, #EFF_LINK]
+    str     wzr, [x19, #EFF_FS]
+    str     wzr, [x19, #EFF_BOLD]
     mov     x22, #0
 r_loop:
     cmp     x22, x21
@@ -685,7 +742,7 @@ r_known:
 2:  mov     x28, #0                     // which kind of block, or 0
     str     xzr, [x19, #SP3]
 3:  ldr     x9, [x19, #SP3]
-    cmp     x9, #22
+    cmp     x9, #23
     b.hs    4f
     add     x10, x9, #1
     str     x10, [x19, #SP3]
@@ -700,7 +757,7 @@ r_known:
     b       3b
 4:  orr     x9, x27, x28
     cbz     x9, r_after
-    ldr     w10, [x19, #BASE]
+    bl      eff_base
     mov     w11, w10                    // the text size of this block
     cbz     x27, 6f
     cmp     x27, #3
@@ -744,6 +801,7 @@ r_known:
     cbz     x25, 13f
     mov     w0, w10
 13: bl      begin_block
+    bl      style_tag
     cbnz    x25, r_after
     cmp     x28, #12
     b.ne    r_after
@@ -1107,6 +1165,255 @@ r_out:
     add     sp, sp, #FRAME
     ret
     .ltorg
+
+// [by Opus 11-15] band: before a line is drawn, the stretch from where the last line ended (with the space owed) to where this one
+// ends is painted in the background that applies, when one does and this is a drawing. Uses x0-x16.
+band:
+    ldr     w9, [x19, #PROBE]
+    cbnz    w9, 9f
+    ldr     w3, [x19, #EFF_BG]
+    tbnz    w3, #31, 9f
+    ldr     w9, [x19, #SIZE]
+    add     w9, w9, w9, lsl #2
+    asr     w9, w9, #2
+    ldr     x10, [x19, #PENDING]
+    add     x9, x10, w9, sxtw            // how tall
+    ldr     x10, [x19, #Y]
+    ldrsw   x11, [x19, #SCROLL]
+    sub     x10, x10, x11                // from where, on the surface
+    b       fill_band
+9:  ret
+// fill_band: x10 top (surface), x9 height, w3 colour (0xRRGGBB) -> painted across the whole width, clipped to 16-bit numbers
+fill_band:
+    ldrsw   x11, [x19, #HEIGHT]
+    cmp     x10, x11
+    b.ge    9f
+    add     x12, x10, x9
+    cmp     x12, #0
+    b.le    9f
+    cmp     x10, #0
+    csel    x10, xzr, x10, lt
+    cmp     x12, x11
+    csel    x12, x11, x12, gt
+    sub     x9, x12, x10
+    cmp     x9, #0
+    b.le    9f
+    strh    wzr, [x19, #NUMS]
+    strh    w10, [x19, #(NUMS + 2)]
+    ldr     w11, [x19, #WIDTH]
+    strh    w11, [x19, #(NUMS + 4)]
+    strh    w9, [x19, #(NUMS + 6)]
+    rev     w3, w3                       // 0xRRGGBB -> the surface's order, 0xAABBGGRR
+    lsr     w3, w3, #8
+    orr     w3, w3, #0xff000000
+    ldr     x0, [x19, #S]
+    add     x1, x19, #NUMS
+    mov     x2, #4
+    ldr     x4, [x19, #TABLE]
+    ldr     x9, [x4, #(4 * 8)]
+    br      x9
+9:  ret
+// eff_base: the text size blocks take now: the base, scaled by the innermost size of its own (sixteenths) -> w10. Uses w9.
+eff_base:
+    ldr     w10, [x19, #BASE]
+    ldr     w9, [x19, #EFF_FS]
+    cbz     w9, 1f
+    mul     w10, w10, w9
+    lsr     w10, w10, #4
+    cmp     w10, #4
+    mov     w9, #4
+    csel    w10, w9, w10, lt
+    cmp     w10, #200
+    mov     w9, #200
+    csel    w10, w9, w10, gt
+1:  ret
+// effective: what applies now, from the open styled blocks: the innermost background and text colour, the sum of left paddings
+effective:
+    mov     w9, #-1
+    str     w9, [x19, #EFF_LINK]
+    str     wzr, [x19, #EFF_BOLD]
+    mov     w10, #-1
+    mov     w11, #0
+    ldr     w12, [x19, #STK_N]
+    add     x13, x19, #STK
+1:  cbz     w12, 2f
+    sub     w12, w12, #1
+    add     x14, x13, x12, lsl #4
+    ldp     w15, w16, [x14]
+    tbz     w9, #31, 3f
+    and     w9, w15, #0xbfffffff         // (bit 30 marks a button)
+    tbnz    w15, #31, 3f
+    tbz     w15, #30, 3f
+    str     w16, [x19, #EFF_LINK]        // a button that gives the background gives its link text its colour too
+3:  tbz     w10, #31, 4f
+    mov     w10, w16
+4:  ldr     w15, [x14, #8]
+    tbz     w15, #30, 41f
+    mov     w9, #1
+    str     w9, [x19, #EFF_BOLD]
+    and     w15, w15, #0xbfffffff
+41: add     w11, w11, w15
+    b       1b
+2:  mov     w15, #0                      // the innermost size of its own
+    ldr     w12, [x19, #STK_N]
+5:  cbz     w12, 6f
+    sub     w12, w12, #1
+    add     x14, x13, x12, lsl #4
+    ldrh    w15, [x14, #14]
+    cbz     w15, 5b
+6:  str     w15, [x19, #EFF_FS]
+    str     w9, [x19, #EFF_BG]
+    str     w10, [x19, #EFF_FG]
+    cmp     w11, #400
+    mov     w12, #400
+    csel    w11, w12, w11, gt
+    str     w11, [x19, #EFF_PL]
+    ret
+// style_tag: after a block's opening (x25 0) or closing tag: an opening pushes its data-tl (or nothing set), padding above joins the
+// space owed; a closing paints its padding below and pops. hr opens nothing. Keeps x19-x28.
+style_tag:
+    stp     x29, x30, [sp, #-16]!
+    cmp     x28, #22
+    b.eq    90f
+    cbnz    x25, 50f
+    ldr     w9, [x19, #STK_N]
+    cmp     w9, #64
+    b.hs    90f
+    add     w10, w9, #1
+    str     w10, [x19, #STK_N]
+    add     x17, x19, #STK
+    add     x17, x17, x9, lsl #4
+    mov     w9, #-1
+    stp     w9, w9, [x17]
+    stp     wzr, wzr, [x17, #8]
+    adr     x2, t_tl
+    bl      find_attr
+    cbz     x13, 80f
+    add     x13, x12, x13
+10: cmp     x12, x13
+    b.hs    30f
+    ldrb    w14, [x12]
+    ldrb    w15, [x12, #1]
+    add     x12, x12, #3
+    mov     w16, #0
+    mov     w11, #0                      // digits seen
+11: cmp     x12, x13
+    b.hs    12f
+    ldrb    w9, [x12]
+    add     x12, x12, #1
+    cmp     w9, #';'
+    b.eq    12f
+    sub     w10, w9, #'0'
+    cmp     w10, #9
+    b.ls    13f
+    orr     w10, w9, #32
+    sub     w10, w10, #('a' - 10)
+    cmp     w10, #10
+    b.lo    11b
+    cmp     w10, #15
+    b.hi    11b
+13: cmp     w14, #'p'
+    b.eq    14f
+    cmp     w15, #'s'
+    b.eq    14f
+    lsl     w16, w16, #4
+    b       15f
+14: mov     w9, #10
+    mul     w16, w16, w9
+15: add     w16, w16, w10
+    b       11b
+12: cmp     w15, #'s'
+    b.ne    121f
+    ldrh    w9, [x17, #12]
+    orr     w9, w9, w16, lsl #16
+    str     w9, [x17, #12]
+    b       10b
+121: cmp    w14, #'b'
+    b.ne    16f
+    str     w16, [x17]
+    b       10b
+16: cmp     w14, #'f'
+    b.ne    17f
+    cmp     w15, #'w'
+    b.ne    161f
+    ldr     w9, [x17, #8]
+    orr     w9, w9, #0x40000000          // fw=1: bold, kept in the left padding's top bit
+    str     w9, [x17, #8]
+    b       10b
+161:
+    str     w16, [x17, #4]
+    b       10b
+17: cmp     w15, #'l'
+    b.ne    18f
+    str     w16, [x17, #8]
+    b       10b
+18: cmp     w15, #'b'
+    b.ne    19f
+    strh    w16, [x17, #12]
+    b       10b
+19: cmp     w15, #'t'
+    b.ne    10b
+    ldr     x9, [x19, #PENDING]
+    add     x9, x9, w16, uxtw
+    str     x9, [x19, #PENDING]
+    b       10b
+30: cmp     x28, #23
+    b.ne    81f
+    ldr     w9, [x17]
+    tbnz    w9, #31, 81f
+    orr     w9, w9, #0x40000000
+    str     w9, [x17]
+81: ldrh    w9, [x17, #14]
+    cbz     w9, 80f
+    bl      effective
+    b       85f
+80: bl      effective
+    b       90f
+85: bl      eff_base                     // a size of its own: the block's lines are that size
+    mov     w0, w10
+    mov     x1, #0
+    bl      begin_block
+    b       90f
+50: ldr     w9, [x19, #STK_N]
+    cbz     w9, 90f
+    sub     w9, w9, #1
+    str     w9, [x19, #STK_N]
+    add     x17, x19, #STK
+    add     x17, x17, x9, lsl #4
+    ldrh    w9, [x17, #14]
+    cbz     w9, 52f
+    stp     x17, xzr, [sp, #-16]!
+    bl      effective                    // the size the block had ends with it
+    bl      eff_base
+    mov     w0, w10
+    mov     x1, #0
+    bl      begin_block
+    ldp     x17, xzr, [sp], #16
+52: ldrh    w9, [x17, #12]
+    cbz     w9, 80b
+    ldr     w3, [x19, #EFF_BG]           // padding below, in the background that applied inside
+    tbnz    w3, #31, 51f
+    ldr     w12, [x19, #PROBE]
+    cbnz    w12, 51f
+    ldr     x10, [x19, #Y]
+    ldr     x11, [x19, #PENDING]
+    add     x10, x10, x11
+    ldrsw   x11, [x19, #SCROLL]
+    sub     x10, x10, x11
+    stp     x9, x17, [sp, #-16]!
+    bl      fill_band
+    ldp     x9, x17, [sp], #16
+51: ldr     x10, [x19, #Y]
+    ldr     x11, [x19, #PENDING]
+    add     x10, x10, x11
+    add     x10, x10, w9, uxtw
+    str     x10, [x19, #Y]
+    str     xzr, [x19, #PENDING]
+    b       80b
+90: ldp     x29, x30, [sp], #16
+    ret
+t_tl:   .asciz "data-tl"
+    .balign 4
 // find_attr: where the value of an attribute is written in the opening tag whose name is at x23 (x24 long) and which ends
 // before x26: after the attribute's name (at x2, lower case, ending in a zero byte; any case in the page; white space before
 // it), an equals sign, then the value in either kind of quotes or bare -> x12 where, x13 how long (0 if there is none).
@@ -1316,7 +1623,7 @@ t_skipped:
     NAME9   noscript
     NAME9   svg
 t_blocks:
-    .irp    name, p, div, section, article, header, footer, main, ul, ol, blockquote, tr, li, body, html, table, nav, form, pre, dl, dt, dd, hr
+    .irp    name, p, div, section, article, header, footer, main, ul, ol, blockquote, tr, li, body, html, table, nav, form, pre, dl, dt, dd, hr, button
     NAME12  \name
     .endr
     .balign 4
