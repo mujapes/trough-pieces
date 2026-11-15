@@ -1249,8 +1249,8 @@ effective:
     mov     w10, w16
 4:  ldr     w15, [x14, #8]
     tbz     w15, #30, 41f
-    mov     w9, #1
-    str     w9, [x19, #EFF_BOLD]
+    mov     w17, #1
+    str     w17, [x19, #EFF_BOLD]
     and     w15, w15, #0xbfffffff
 41: add     w11, w11, w15
     b       1b
